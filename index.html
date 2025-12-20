@@ -252,6 +252,69 @@
         let currentCameraId = null;
         let cameras = [];
         let isWideAngleCamera = false;
+        let updateVideoRotationInterval = null;
+
+        // Функция для обновления вращения видео, чтобы оно всегда смотрело в камеру
+        function updateVideoRotation() {
+            if (!videoContainer || !scene.camera) return;
+            
+            // Получаем позицию камеры
+            const camera = scene.camera;
+            const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
+            
+            // Получаем текущую позицию видео
+            const videoPosition = videoContainer.getWorldPosition(new THREE.Vector3());
+            
+            // Создаем вектор направления от видео к камере
+            const direction = new THREE.Vector3()
+                .subVectors(cameraPosition, videoPosition)
+                .normalize();
+            
+            // Вычисляем угол вращения вокруг оси Y
+            const angleY = Math.atan2(direction.x, direction.z);
+            
+            // Вычисляем угол наклона (pitch) для того, чтобы видео также наклонялось вверх/вниз
+            const horizontalDistance = Math.sqrt(direction.x * direction.x + direction.z * direction.z);
+            const angleX = Math.atan2(-direction.y, horizontalDistance);
+            
+            // Применяем вращение к видео
+            videoContainer.rotation.x = angleX;
+            videoContainer.rotation.y = angleY;
+            videoContainer.rotation.z = 0;
+            
+            // Также обновляем вращение кнопок, чтобы они оставались горизонтальными
+            if (playButton) {
+                playButton.rotation.x = -angleX;
+                playButton.rotation.y = 0;
+                playButton.rotation.z = 0;
+            }
+            if (pauseButton) {
+                pauseButton.rotation.x = -angleX;
+                pauseButton.rotation.y = 0;
+                pauseButton.rotation.z = 0;
+            }
+            if (volumeButton) {
+                volumeButton.rotation.x = -angleX;
+                volumeButton.rotation.y = 0;
+                volumeButton.rotation.z = 0;
+            }
+        }
+
+        // Запускаем интервал для обновления вращения видео
+        function startVideoRotationUpdate() {
+            if (updateVideoRotationInterval) {
+                clearInterval(updateVideoRotationInterval);
+            }
+            updateVideoRotationInterval = setInterval(updateVideoRotation, 50); // Обновляем 20 раз в секунду
+        }
+
+        // Останавливаем обновление вращения
+        function stopVideoRotationUpdate() {
+            if (updateVideoRotationInterval) {
+                clearInterval(updateVideoRotationInterval);
+                updateVideoRotationInterval = null;
+            }
+        }
 
         // Функция для поиска доступных камер
         async function getAvailableCameras() {
@@ -489,6 +552,9 @@
                 videoContainer.add(videoMesh);
                 
                 createButtons();
+                
+                // Запускаем обновление вращения видео
+                startVideoRotationUpdate();
             }
             
             // Позиционируем видео перед камерой
@@ -498,8 +564,11 @@
             
             videoContainer.position.copy(pos);
             
-            // Фиксируем вращение, чтобы видео всегда смотрело на камеру
-            videoContainer.rotation.set(0, 0, 0);
+            // Не фиксируем вращение, так как оно будет обновляться автоматически
+            // videoContainer.rotation.set(0, 0, 0);
+            
+            // Сразу обновляем вращение, чтобы видео смотрело в камеру
+            updateVideoRotation();
             
             // Сохраняем текущий масштаб при перемещении
             videoContainer.scale.set(currentScale, currentScale, currentScale);
@@ -809,29 +878,29 @@
             startDistance = null;
         });
 
-        // Вращение видео
-        let isRotating = false;
-        let lastTouchX = 0;
+        // Вращение видео - отключаем ручное вращение, так как видео всегда смотрит в камеру
+        // let isRotating = false;
+        // let lastTouchX = 0;
         
-        scene.addEventListener('touchstart', e => {
-            if(e.touches.length == 1 && videoContainer){
-                isRotating = true;
-                lastTouchX = e.touches[0].clientX;
-            }
-        });
+        // scene.addEventListener('touchstart', e => {
+        //     if(e.touches.length == 1 && videoContainer){
+        //         isRotating = true;
+        //         lastTouchX = e.touches[0].clientX;
+        //     }
+        // });
         
-        scene.addEventListener('touchmove', e => {
-            if(isRotating && videoContainer && e.touches.length == 1){
-                e.preventDefault();
-                const deltaX = e.touches[0].clientX - lastTouchX;
-                videoContainer.rotation.y += deltaX * 0.01;
-                lastTouchX = e.touches[0].clientX;
-            }
-        });
+        // scene.addEventListener('touchmove', e => {
+        //     if(isRotating && videoContainer && e.touches.length == 1){
+        //         e.preventDefault();
+        //         const deltaX = e.touches[0].clientX - lastTouchX;
+        //         videoContainer.rotation.y += deltaX * 0.01;
+        //         lastTouchX = e.touches[0].clientX;
+        //     }
+        // });
         
-        scene.addEventListener('touchend', () => {
-            isRotating = false;
-        });
+        // scene.addEventListener('touchend', () => {
+        //     isRotating = false;
+        // });
 
         // Управление с клавиатуры для тестирования
         window.addEventListener('keydown', (e) => {
@@ -860,16 +929,28 @@
                     updateButtonPositions();
                     break;
                 case 'r':
-                    videoContainer.rotation.y += 0.1;
+                    // Вращение больше не используется, так как видео всегда смотрит в камеру
+                    // videoContainer.rotation.y += 0.1;
                     break;
                 case 'm':
                     if(videoEl) videoEl.muted = !videoEl.muted;
                     break;
                 case 'f':
-                    videoContainer.rotation.set(0, 0, 0);
+                    // Сброс вращения не нужен, так как видео всегда смотрит в камеру
+                    // videoContainer.rotation.set(0, 0, 0);
                     break;
                 case 'c':
                     cameraBtn.click();
+                    break;
+                case 'l':
+                    // Включить/выключить отслеживание камеры
+                    if (updateVideoRotationInterval) {
+                        stopVideoRotationUpdate();
+                        console.log('Отслеживание камеры выключено');
+                    } else {
+                        startVideoRotationUpdate();
+                        console.log('Отслеживание камеры включено');
+                    }
                     break;
             }
         });
@@ -880,6 +961,7 @@
                 URL.revokeObjectURL(videoEl.src);
             }
             stopTimeUpdate();
+            stopVideoRotationUpdate();
         });
 
         // Автоматическое обновление объектов рейкастера
