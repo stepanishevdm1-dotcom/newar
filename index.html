@@ -37,153 +37,88 @@
             transform: translateX(-50%) scale(1.05);
         }
         
-        /* Контейнер для управления видео */
-        #videoControls {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 10;
-            display: flex;
-            gap: 15px;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 15px 25px;
-            border-radius: 20px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        
-        .controlBtn {
-            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-            color: white;
-            padding: 16px 24px;
-            border-radius: 12px;
-            font-size: 18px;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            min-width: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        /* УВЕЛИЧИЛ кнопки */
+        #placeBtn {
+            position:fixed; 
+            bottom:20px; 
+            left:50%;
+            transform:translateX(-50%); 
+            z-index:10;
+            background: linear-gradient(135deg, #3498db 0%, #2ecc71 100%);
+            color:white;
+            padding:20px 50px; /* УВЕЛИЧЕНО */
+            border-radius:50px;
+            font-size:20px; /* УВЕЛИЧЕНО */
+            font-weight:600;
+            cursor:pointer;
+            border:none;
+            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
             transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+            letter-spacing: 0.5px;
+            min-width: 200px; /* УВЕЛИЧЕНО */
         }
         
-        .controlBtn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.5);
+        #placeBtn:hover {
+            transform: translateX(-50%) scale(1.08);
+            box-shadow: 0 8px 25px rgba(46, 204, 113, 0.6);
         }
         
-        .controlBtn#playBtn {
-            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
-        }
-        
-        .controlBtn#pauseBtn {
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-        }
-        
-        .controlBtn#stopBtn {
-            background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
-        }
-        
-        .controlBtn#placeBtn {
-            background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
-            padding: 16px 30px;
-        }
-        
-        /* Таймер видео */
         #videoTime {
             position: fixed; 
             top: 15px; 
             right: 15px;
             color: white; 
-            background: rgba(0,0,0,0.8);
-            padding: 12px 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 8px 15px;
             border-radius: 10px;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: 600;
             font-family: monospace;
             z-index: 10;
-            border: 1px solid rgba(255,255,255,0.2);
-            backdrop-filter: blur(5px);
         }
         
-        /* Индикатор загрузки */
-        #loadingIndicator {
+        /* Кнопки управления видео - УВЕЛИЧЕНЫ */
+        #controls {
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 18px;
-            background: rgba(0,0,0,0.8);
-            padding: 20px 30px;
-            border-radius: 10px;
-            display: none;
-            z-index: 100;
-        }
-        
-        /* Инструкция */
-        #instructions {
-            position: fixed;
-            top: 70px;
+            bottom: 90px; /* Поднял выше для больших кнопок */
             left: 50%;
             transform: translateX(-50%);
-            color: white;
-            background: rgba(0,0,0,0.7);
-            padding: 15px 25px;
-            border-radius: 10px;
-            text-align: center;
-            max-width: 300px;
-            font-size: 14px;
             z-index: 10;
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            gap: 15px;
         }
         
-        /* Мобильная адаптация */
-        @media (max-width: 768px) {
-            #videoControls {
-                flex-wrap: wrap;
-                justify-content: center;
-                width: 90%;
-                padding: 12px 15px;
-                gap: 10px;
-            }
-            
-            .controlBtn {
-                padding: 14px 18px;
-                font-size: 16px;
-                min-width: 50px;
-            }
-            
-            #videoTime {
-                font-size: 14px;
-                padding: 10px 15px;
-            }
+        .control-btn {
+            background: rgba(255,255,255,0.9);
+            color: #2c3e50;
+            border: none;
+            padding: 20px 25px; /* УВЕЛИЧЕНО */
+            border-radius: 15px;
+            font-size: 20px; /* УВЕЛИЧЕНО */
+            cursor: pointer;
+            min-width: 70px; /* УВЕЛИЧЕНО */
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+        }
+        
+        .control-btn:hover {
+            background: white;
+            transform: scale(1.1);
         }
     </style>
 </head>
 <body>
     <input type="file" id="fileInput" accept="video/*" />
     
-    <div id="instructions">
-        📱 1. Выберите видео<br>
-        🎯 2. Наведите камеру на плоскость<br>
-        📍 3. Нажмите "Разместить"
+    <div id="controls">
+        <button class="control-btn" id="playBtn">▶</button>
+        <button class="control-btn" id="pauseBtn">⏸</button>
+        <button class="control-btn" id="stopBtn">⏹</button>
     </div>
+    
+    <button id="placeBtn">📍 Разместить</button>
     
     <div id="videoTime">00:00 / 00:00</div>
-    
-    <div id="loadingIndicator">Загрузка видео...</div>
-    
-    <div id="videoControls" style="display:none;">
-        <button class="controlBtn" id="playBtn">▶️</button>
-        <button class="controlBtn" id="pauseBtn">⏸️</button>
-        <button class="controlBtn" id="stopBtn">⏹️</button>
-        <button class="controlBtn" id="placeBtn">📍 Разместить</button>
-    </div>
     
     <!-- AR-сцена -->
     <a-scene
@@ -207,7 +142,7 @@
                 rotation="-90 0 0"
                 transparent="true"
                 visible="false"
-                material="shader: flat;"
+                material="shader: flat; side: front;" /* ИСПРАВЛЕНО: убрано отзеркаливание */
             ></a-video>
         </a-marker>
         
@@ -218,69 +153,53 @@
         // Элементы DOM
         const fileInput = document.getElementById('fileInput');
         const videoTime = document.getElementById('videoTime');
-        const loadingIndicator = document.getElementById('loadingIndicator');
-        const videoControls = document.getElementById('videoControls');
+        const placeBtn = document.getElementById('placeBtn');
         const playBtn = document.getElementById('playBtn');
         const pauseBtn = document.getElementById('pauseBtn');
         const stopBtn = document.getElementById('stopBtn');
-        const placeBtn = document.getElementById('placeBtn');
-        const instructions = document.getElementById('instructions');
         
         // Элементы A-Frame
-        const scene = document.querySelector('a-scene');
         const arVideo = document.getElementById('arVideo');
         const videoSource = document.getElementById('videoSource');
         const videoMarker = document.getElementById('videoMarker');
         
-        // Состояние приложения
-        let isVideoPlaced = false;
-        let videoDuration = 0;
-        let updateInterval;
-        let isVideoPlaying = false;
-        let currentVideoRotation = { x: -90, y: 0, z: 0 };
+        // Состояние для исправления бага с таймером
+        let lastUpdateTime = 0;
+        let isPlaying = false;
         
         // Загрузка видео
         fileInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (!file) return;
             
-            if (!file.type.startsWith('video/')) {
-                alert('Пожалуйста, выберите видео файл');
-                return;
-            }
-            
-            loadingIndicator.style.display = 'block';
-            
             const videoURL = URL.createObjectURL(file);
             videoSource.src = videoURL;
             
             videoSource.onloadeddata = function() {
-                loadingIndicator.style.display = 'none';
-                videoControls.style.display = 'flex';
-                instructions.style.display = 'none';
-                
-                videoDuration = videoSource.duration;
+                // ИСПРАВЛЕНИЕ БАГА: Начинаем обновление таймера
+                startTimerUpdate();
                 updateVideoTime();
-                
-                // Начинаем обновление таймера
-                startTimeUpdate();
-                
-                // Включаем управление видео
-                setupVideoControls();
-            };
-            
-            videoSource.onerror = function() {
-                loadingIndicator.style.display = 'none';
-                alert('Ошибка загрузки видео. Пожалуйста, попробуйте другой файл.');
             };
         });
         
-        // Обновление времени видео (исправленный баг с паузой)
-        function updateVideoTime() {
-            if (!videoSource.src) return;
+        // ИСПРАВЛЕНИЕ БАГА С ТАЙМЕРОМ: Функция для постоянного обновления времени
+        function startTimerUpdate() {
+            // Очищаем предыдущий интервал если был
+            if (window.timerInterval) {
+                clearInterval(window.timerInterval);
+            }
             
-            const current = videoSource.currentTime;
-            const total = videoDuration;
+            // Обновляем время каждые 100мс
+            window.timerInterval = setInterval(function() {
+                if (videoSource.duration) {
+                    updateVideoTime();
+                }
+            }, 100);
+        }
+        
+        function updateVideoTime() {
+            const current = videoSource.currentTime || 0;
+            const total = videoSource.duration || 0;
             
             const formatTime = (seconds) => {
                 const mins = Math.floor(seconds / 60);
@@ -291,178 +210,84 @@
             videoTime.textContent = `${formatTime(current)} / ${formatTime(total)}`;
         }
         
-        // Запуск обновления таймера
-        function startTimeUpdate() {
-            if (updateInterval) clearInterval(updateInterval);
-            
-            updateInterval = setInterval(() => {
-                if (!videoSource.paused && videoSource.readyState >= 2) {
-                    updateVideoTime();
-                }
-            }, 100);
-        }
+        // ИСПРАВЛЕНИЕ БАГА С ОТЗЕРКАЛИВАНИЕМ: Фиксируем атрибуты видео при изменении
+        let originalWidth = 2;
+        let originalHeight = 1.125;
         
-        // Настройка управления видео
-        function setupVideoControls() {
-            // Воспроизведение
-            playBtn.addEventListener('click', () => {
-                if (videoSource.src) {
-                    videoSource.play();
-                    isVideoPlaying = true;
-                    console.log('Video playing');
-                }
-            });
-            
-            // Пауза
-            pauseBtn.addEventListener('click', () => {
-                if (videoSource.src) {
-                    videoSource.pause();
-                    isVideoPlaying = false;
-                    console.log('Video paused');
-                }
-            });
-            
-            // Стоп
-            stopBtn.addEventListener('click', () => {
-                if (videoSource.src) {
-                    videoSource.pause();
-                    videoSource.currentTime = 0;
-                    isVideoPlaying = false;
-                    updateVideoTime();
-                    console.log('Video stopped');
-                }
-            });
-            
-            // Размещение видео в AR
-            placeBtn.addEventListener('click', () => {
-                if (!videoSource.src) {
-                    alert('Сначала выберите видео!');
-                    return;
-                }
+        // Следим за изменениями видео в AR
+        arVideo.addEventListener('componentchanged', function(e) {
+            if (e.detail.name === 'rotation' || e.detail.name === 'scale') {
+                // ИСПРАВЛЕНИЕ: Восстанавливаем оригинальные размеры
+                arVideo.setAttribute('width', originalWidth);
+                arVideo.setAttribute('height', originalHeight);
                 
-                // Показываем видео и маркер
-                arVideo.setAttribute('visible', 'true');
-                videoMarker.setAttribute('visible', 'true');
-                
-                // Исправление бага с отзеркаливанием
+                // ИСПРАВЛЕНИЕ: Убедимся что видео не зеркалится
                 arVideo.setAttribute('material', 'shader: flat; side: front;');
-                
-                // Устанавливаем начальные параметры видео
-                arVideo.setAttribute('width', '2');
-                arVideo.setAttribute('height', '1.125');
-                arVideo.setAttribute('position', '0 0 0');
-                arVideo.setAttribute('rotation', currentVideoRotation);
-                
-                // Начинаем воспроизведение
+            }
+        });
+        
+        // Управление видео
+        playBtn.addEventListener('click', () => {
+            if (videoSource.src) {
                 videoSource.play();
-                isVideoPlaying = true;
-                isVideoPlaced = true;
-                
-                console.log('Video placed in AR');
-            });
-            
-            // Слушаем события видео для обновления UI
-            videoSource.addEventListener('play', () => {
-                isVideoPlaying = true;
-                console.log('Video play event');
-            });
-            
-            videoSource.addEventListener('pause', () => {
-                isVideoPlaying = false;
-                console.log('Video pause event');
-            });
-            
-            videoSource.addEventListener('ended', () => {
-                isVideoPlaying = false;
+                isPlaying = true;
+            }
+        });
+        
+        pauseBtn.addEventListener('click', () => {
+            if (videoSource.src) {
+                videoSource.pause();
+                isPlaying = false;
+            }
+        });
+        
+        stopBtn.addEventListener('click', () => {
+            if (videoSource.src) {
+                videoSource.pause();
                 videoSource.currentTime = 0;
-                console.log('Video ended');
-            });
-        }
-        
-        // Обработка событий видео в AR (исправление бага с искажением)
-        scene.addEventListener('loaded', () => {
-            // Исправляем баг с отзеркаливанием при перемещении
-            arVideo.addEventListener('componentchanged', function(e) {
-                if (e.detail.name === 'rotation') {
-                    // Сохраняем текущий поворот
-                    currentVideoRotation = arVideo.getAttribute('rotation');
-                    
-                    // Фиксируем соотношение сторон
-                    arVideo.setAttribute('width', '2');
-                    arVideo.setAttribute('height', '1.125');
-                    
-                    // Убеждаемся, что видео не зеркалится
-                    arVideo.setAttribute('material', 'shader: flat; side: front;');
-                    
-                    console.log('Video rotated:', currentVideoRotation);
-                }
-                
-                if (e.detail.name === 'scale') {
-                    // Фиксируем пропорции видео
-                    const scale = arVideo.getAttribute('scale');
-                    const fixedHeight = scale.y;
-                    const fixedWidth = fixedHeight * (2 / 1.125); // Сохраняем соотношение 16:9
-                    
-                    arVideo.setAttribute('scale', {
-                        x: fixedWidth,
-                        y: fixedHeight,
-                        z: 1
-                    });
-                    
-                    console.log('Video scale fixed:', fixedWidth, fixedHeight);
-                }
-            });
-            
-            // Автоматическое обновление времени при изменении currentTime
-            videoSource.addEventListener('timeupdate', updateVideoTime);
+                isPlaying = false;
+                updateVideoTime();
+            }
         });
         
-        // Обработка событий касания для управления на мобильных
-        let touchStartX = 0;
-        let touchStartY = 0;
-        
-        arVideo.addEventListener('touchstart', function(e) {
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
-            e.preventDefault();
-        });
-        
-        arVideo.addEventListener('touchmove', function(e) {
-            if (!touchStartX || !touchStartY) return;
-            
-            const touchX = e.touches[0].clientX;
-            const touchY = e.touches[0].clientY;
-            
-            const deltaX = touchX - touchStartX;
-            const deltaY = touchY - touchStartY;
-            
-            // Вращение видео
-            if (Math.abs(deltaX) > 10) {
-                const rotation = arVideo.getAttribute('rotation');
-                arVideo.setAttribute('rotation', {
-                    x: rotation.x,
-                    y: rotation.y + deltaX * 0.5,
-                    z: rotation.z
-                });
-                touchStartX = touchX;
+        // Размещение видео в AR
+        placeBtn.addEventListener('click', () => {
+            if (!videoSource.src) {
+                alert('Сначала выберите видео!');
+                return;
             }
             
-            e.preventDefault();
+            // Показываем видео и маркер
+            arVideo.setAttribute('visible', 'true');
+            videoMarker.setAttribute('visible', 'true');
+            
+            // ИСПРАВЛЕНИЕ: Устанавливаем фиксированные атрибуты
+            arVideo.setAttribute('width', originalWidth);
+            arVideo.setAttribute('height', originalHeight);
+            arVideo.setAttribute('material', 'shader: flat; side: front;');
+            
+            // Начинаем воспроизведение
+            videoSource.play();
+            isPlaying = true;
+            
+            // ИСПРАВЛЕНИЕ: Запускаем таймер
+            startTimerUpdate();
         });
         
-        // Предотвращаем стандартное поведение браузера
-        document.addEventListener('touchmove', function(e) {
-            if (e.target === arVideo) {
-                e.preventDefault();
-            }
-        }, { passive: false });
+        // ИСПРАВЛЕНИЕ: Слушаем события play/pause для таймера
+        videoSource.addEventListener('play', function() {
+            isPlaying = true;
+            startTimerUpdate(); // Перезапускаем таймер при старте
+        });
         
-        // Информация при загрузке
-        console.log('AR Video App loaded successfully');
-        console.log('Known issues fixed:');
-        console.log('1. Timer continues after pause/resume');
-        console.log('2. Video maintains aspect ratio when moved');
-        console.log('3. No mirroring effect on movement');
+        videoSource.addEventListener('pause', function() {
+            isPlaying = false;
+        });
+        
+        // ИСПРАВЛЕНИЕ: Также обновляем при изменении времени вручную
+        videoSource.addEventListener('timeupdate', function() {
+            updateVideoTime();
+        });
     </script>
 </body>
 </html>
