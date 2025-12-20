@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео с кнопками под видео</title>
+  <title>AR Видео с Gaze и перемоткой</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -81,14 +81,16 @@ function createButton(text, color){
 
 const playBtn = createButton('Play',0x00ff00);
 const pauseBtn = createButton('Pause',0xffff00);
-const hideBtn = createButton('Hide',0xff0000);
+const plus5Btn = createButton('+5',0x00ffff);
+const minus5Btn = createButton('-5',0xff00ff);
 
 const spacing = 0.5;
-playBtn.position.set(-spacing, -0.8, 0);
-pauseBtn.position.set(0, -0.8, 0);
-hideBtn.position.set(spacing, -0.8, 0);
+playBtn.position.set(-1.5*spacing, -0.8, 0);
+pauseBtn.position.set(-0.5*spacing, -0.8, 0);
+minus5Btn.position.set(0.5*spacing, -0.8, 0);
+plus5Btn.position.set(1.5*spacing, -0.8, 0);
 
-btnGroup.add(playBtn,pauseBtn,hideBtn);
+btnGroup.add(playBtn,pauseBtn,minus5Btn,plus5Btn);
 btnGroup.visible = false;
 
 // --------------------- Видео ---------------------
@@ -194,14 +196,15 @@ function checkGazeOnButtons(){
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2(0,0); // центр экрана
   raycaster.setFromCamera(mouse, scene.camera);
-  const intersects = raycaster.intersectObjects([playBtn,pauseBtn,hideBtn]);
+  const intersects = raycaster.intersectObjects([playBtn,pauseBtn,plus5Btn,minus5Btn]);
   if(intersects.length>0){
     const btn = intersects[0].object;
     startGaze(()=>{
       switch(btn.userData.label){
         case 'Play': videoEl.play(); break;
         case 'Pause': videoEl.pause(); break;
-        case 'Hide': videoMesh.visible=false; btnGroup.visible=false; break;
+        case '+5': videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime+5); break;
+        case '-5': videoEl.currentTime = Math.max(0, videoEl.currentTime-5); break;
       }
     });
   } else stopGaze();
