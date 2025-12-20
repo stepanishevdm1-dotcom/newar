@@ -11,10 +11,22 @@
       position:fixed; top:10px; left:50%; transform:translateX(-50%);
       z-index:10; background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
     }
+    #videoTime {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      color: white;
+      background: rgba(0,0,0,0.6);
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-family: monospace;
+      z-index: 10;
+    }
   </style>
 </head>
 <body>
 <input type="file" id="fileInput" accept="video/*">
+<div id="videoTime">00:00 / 00:00</div>
 
 <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
   <a-entity camera look-controls></a-entity>
@@ -23,6 +35,7 @@
 <script>
 const scene = document.querySelector('a-scene');
 const fileInput = document.getElementById('fileInput');
+const timeEl = document.getElementById('videoTime');
 
 let videoEl, videoMesh, videoTexture;
 let videoWidth = 1, videoHeight = 0.6;
@@ -107,6 +120,13 @@ scene.addEventListener('touchmove', e => {
     videoMesh.scale.set(startScale * scaleFactor, startScale * scaleFactor, 1);
   }
 });
+
+// Таймер видео
+setInterval(() => {
+  if(!videoEl || !videoEl.duration) return;
+  const f = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
+  timeEl.textContent = `${f(videoEl.currentTime)} / ${f(videoEl.duration)}`;
+}, 300);
 </script>
 </body>
 </html>
