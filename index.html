@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео с текстом на кнопках и gaze</title>
+  <title>AR Видео с кнопками под видео</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -56,12 +56,11 @@ let videoEl, videoMesh, videoTexture;
 let videoWidth = 1, videoHeight = 0.6;
 let firstInteraction = true;
 
-// 3D кнопки под видео
-let btnGroup;
-let playBtn, pauseBtn, hideBtn;
+// --------------------- Кнопки ---------------------
+let btnGroup = new THREE.Group();
+scene.object3D.add(btnGroup);
 
-// Создаём текстуру с текстом
-function createButtonTexture(text, color){
+function createButton(text, color){
   const canvas = document.createElement('canvas');
   canvas.width = 256; canvas.height = 128;
   const ctx = canvas.getContext('2d');
@@ -73,8 +72,24 @@ function createButtonTexture(text, color){
   ctx.textBaseline = 'middle';
   ctx.fillText(text, canvas.width/2, canvas.height/2);
   const texture = new THREE.CanvasTexture(canvas);
-  return texture;
+  const mat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+  const geom = new THREE.PlaneGeometry(0.4,0.15);
+  const mesh = new THREE.Mesh(geom, mat);
+  mesh.userData.label = text;
+  return mesh;
 }
+
+const playBtn = createButton('Play',0x00ff00);
+const pauseBtn = createButton('Pause',0xffff00);
+const hideBtn = createButton('Hide',0xff0000);
+
+const spacing = 0.5;
+playBtn.position.set(-spacing, -0.8, 0);
+pauseBtn.position.set(0, -0.8, 0);
+hideBtn.position.set(spacing, -0.8, 0);
+
+btnGroup.add(playBtn,pauseBtn,hideBtn);
+btnGroup.visible = false;
 
 // --------------------- Видео ---------------------
 fileInput.addEventListener('change', e=>{
@@ -100,29 +115,6 @@ fileInput.addEventListener('change', e=>{
       videoMesh = new THREE.Mesh(geometry, material);
       videoMesh.visible = false;
       scene.object3D.add(videoMesh);
-
-      // 3D кнопки под видео с текстом через canvas
-      btnGroup = new THREE.Group();
-      const btnGeom = new THREE.PlaneGeometry(0.4,0.15);
-      const createBtn = (text,color)=>{
-        const mat = new THREE.MeshBasicMaterial({ map:createButtonTexture(text,color), side:THREE.DoubleSide });
-        const mesh = new THREE.Mesh(btnGeom, mat);
-        mesh.userData.label = text;
-        return mesh;
-      }
-
-      playBtn = createBtn('Play',0x00ff00);
-      pauseBtn = createBtn('Pause',0xffff00);
-      hideBtn = createBtn('Hide',0xff0000);
-
-      const spacing = 0.5;
-      playBtn.position.set(-spacing,-videoHeight/2-0.2,0);
-      pauseBtn.position.set(0,-videoHeight/2-0.2,0);
-      hideBtn.position.set(spacing,-videoHeight/2-0.2,0);
-
-      btnGroup.add(playBtn,pauseBtn,hideBtn);
-      btnGroup.visible = false;
-      scene.object3D.add(btnGroup);
     } else {
       videoMesh.geometry.dispose();
       videoMesh.geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
@@ -133,7 +125,6 @@ fileInput.addEventListener('change', e=>{
 // --------------------- Показ видео ---------------------
 function showVideo(){
   if(!videoMesh || !videoEl) return;
-
   const camera = scene.camera;
   const distance = 2;
   const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
@@ -165,7 +156,7 @@ scene.addEventListener('render-target-loaded', ()=>{
 // --------------------- Масштабирование через ползунок ---------------------
 sizeSlider.addEventListener('input', ()=>{
   if(videoMesh && btnGroup){
-    let scale = parseFloat(sizeSlider.value);
+    const scale = parseFloat(sizeSlider.value);
     videoMesh.scale.set(scale,scale,1);
     btnGroup.scale.set(scale,scale,1);
   }
@@ -177,7 +168,7 @@ let gazeDuration = 3000; // 3 секунды
 function startGaze(targetFunc){
   let startTime = performance.now();
   gazeTimer = requestAnimationFrame(function tick(time){
-    let progress = (time-startTime)/gazeDuration;
+    const progress = (time-startTime)/gazeDuration;
     gazeFill.style.transform = `scaleY(${Math.min(progress,1)})`;
     if(progress>=1){
       targetFunc();
@@ -197,8 +188,8 @@ showBtnHTML.addEventListener('mouseenter', ()=>startGaze(showVideo));
 showBtnHTML.addEventListener('mouseleave', stopGaze);
 showBtnHTML.addEventListener('click', showVideo);
 
-// --------------------- 3D кнопки под видео через gaze ---------------------
-function checkGazeOn3DButtons(){
+// --------------------- Gaze на 3D кнопки ---------------------
+function checkGazeOnButtons(){
   if(!btnGroup.visible) return;
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2(0,0); // центр экрана
@@ -215,8 +206,8 @@ function checkGazeOn3DButtons(){
     });
   } else stopGaze();
 }
-scene.addEventListener('tick', checkGazeOn3DButtons);
 
+scene.addEventListener('tick', checkGazeOnButtons);
 </script>
 </body>
 </html>
