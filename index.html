@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео с 3D кнопками и gaze</title>
+  <title>AR Видео с кнопкой Show</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -11,10 +11,16 @@
       position: fixed; top:10px; left:50%; transform:translateX(-50%); z-index:100;
       background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
     }
+    #showBtnHTML {
+      position: fixed; bottom:20px; left:50%; transform: translateX(-50%);
+      padding: 10px 20px; background: rgba(0,0,0,0.5); color:white; border-radius:5px;
+      cursor: pointer; z-index:100;
+    }
   </style>
 </head>
 <body>
 <input type="file" id="fileInput" accept="video/*">
+<div id="showBtnHTML">📺 Show Video</div>
 
 <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
   <a-entity camera look-controls></a-entity>
@@ -23,14 +29,15 @@
 <script>
 const scene = document.querySelector('a-scene');
 const fileInput = document.getElementById('fileInput');
+const showBtnHTML = document.getElementById('showBtnHTML');
 
 let videoEl, videoMesh, videoTexture;
 let videoWidth = 1, videoHeight = 0.6;
 let firstInteraction = true;
 
-// 3D кнопки группа
+// 3D кнопки под видео
 let btnGroup;
-let playBtn, pauseBtn, hideBtn, showBtn;
+let playBtn, pauseBtn, hideBtn;
 
 // --------------------- Видео ---------------------
 fileInput.addEventListener('change', e => {
@@ -57,9 +64,8 @@ fileInput.addEventListener('change', e => {
       videoMesh.visible = false;
       scene.object3D.add(videoMesh);
 
-      // Создаём группу кнопок
+      // 3D кнопки под видео
       btnGroup = new THREE.Group();
-
       const btnGeom = new THREE.PlaneGeometry(0.3,0.1);
       const createBtn = (text,color) => {
         const mat = new THREE.MeshBasicMaterial({color: color, side: THREE.DoubleSide});
@@ -71,18 +77,15 @@ fileInput.addEventListener('change', e => {
       playBtn = createBtn('▶', 0x00ff00);
       pauseBtn = createBtn('⏸', 0xffff00);
       hideBtn = createBtn('✖', 0xff0000);
-      showBtn = createBtn('📺', 0x00ffff);
 
       const spacing = 0.35;
-      playBtn.position.set(-1.5*spacing, -videoHeight/2-0.15, 0);
-      pauseBtn.position.set(-0.5*spacing, -videoHeight/2-0.15, 0);
-      hideBtn.position.set(0.5*spacing, -videoHeight/2-0.15, 0);
-      showBtn.position.set(1.5*spacing, -videoHeight/2-0.15, 0);
+      playBtn.position.set(-spacing, -videoHeight/2 - 0.15, 0);
+      pauseBtn.position.set(0, -videoHeight/2 - 0.15, 0);
+      hideBtn.position.set(spacing, -videoHeight/2 - 0.15, 0);
 
-      btnGroup.add(playBtn,pauseBtn,hideBtn,showBtn);
+      btnGroup.add(playBtn,pauseBtn,hideBtn);
       btnGroup.visible = false;
       scene.object3D.add(btnGroup);
-
     } else {
       videoMesh.geometry.dispose();
       videoMesh.geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
@@ -132,7 +135,7 @@ scene.addEventListener('click', event=>{
 
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(mouse, scene.camera);
-  const intersects = raycaster.intersectObjects([playBtn,pauseBtn,hideBtn,showBtn]);
+  const intersects = raycaster.intersectObjects([playBtn,pauseBtn,hideBtn]);
 
   if(intersects.length>0){
     const btn = intersects[0].object;
@@ -140,7 +143,6 @@ scene.addEventListener('click', event=>{
       case '▶': videoEl.play(); break;
       case '⏸': videoEl.pause(); break;
       case '✖': videoMesh.visible=false; btnGroup.visible=false; break;
-      case '📺': showVideo(); break;
     }
   }
 });
@@ -148,7 +150,6 @@ scene.addEventListener('click', event=>{
 // --------------------- Масштабирование ---------------------
 let startDistance = null;
 let startScale = 1;
-
 scene.addEventListener('touchstart', e=>{
   if(e.touches.length==2 && videoMesh){
     const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -171,26 +172,25 @@ scene.addEventListener('touchmove', e=>{
   }
 });
 
-// --------------------- Gaze для Show ---------------------
+// --------------------- Gaze для кнопки Show ---------------------
 let gazeTimer = null;
 let gazeDuration = 3000; // 3 секунды
-
-function startGaze(targetBtn){
+function startGaze(){
   let startTime = performance.now();
   gazeTimer = requestAnimationFrame(function tick(time){
     let progress = (time-startTime)/gazeDuration;
     if(progress>=1){
-      targetBtn.userData.label==='📺' && showVideo();
+      showVideo();
     } else {
       gazeTimer = requestAnimationFrame(tick);
     }
   });
 }
-
 function stopGaze(){ if(gazeTimer) cancelAnimationFrame(gazeTimer); }
 
-showBtn.onmouseenter = ()=> startGaze(showBtn);
-showBtn.onmouseleave = stopGaze;
+showBtnHTML.addEventListener('mouseenter', startGaze);
+showBtnHTML.addEventListener('mouseleave', stopGaze);
+showBtnHTML.addEventListener('click', showVideo);
 
 </script>
 </body>
