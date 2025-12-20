@@ -1,499 +1,141 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>AR Video WORKING</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-    <style>
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            background: #000;
-            font-family: Arial, sans-serif;
-        }
-        
-        #fileInput {
-            position: fixed;
-            top: 15px;
-            left: 15px;
-            z-index: 10000;
-            background: rgba(30, 30, 30, 0.95);
-            color: #4CAF50;
-            border: 2px solid #4CAF50;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-size: 14px;
-            cursor: pointer;
-        }
-        
-        #videoTime {
-            position: fixed;
-            top: 15px;
-            right: 15px;
-            z-index: 10000;
-            background: rgba(30, 30, 30, 0.95);
-            color: #2196F3;
-            padding: 10px 15px;
-            border-radius: 8px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            font-weight: bold;
-            border: 2px solid #2196F3;
-        }
-        
-        #sizeInfo {
-            position: fixed;
-            bottom: 15px;
-            left: 15px;
-            z-index: 10000;
-            background: rgba(30, 30, 30, 0.95);
-            color: #FF9800;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            border: 2px solid #FF9800;
-        }
-        
-        #soundInfo {
-            position: fixed;
-            bottom: 60px;
-            left: 15px;
-            z-index: 10000;
-            background: rgba(30, 30, 30, 0.95);
-            color: #9C27B0;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            border: 2px solid #9C27B0;
-            cursor: pointer;
-        }
-        
-        .btn-hint {
-            position: fixed;
-            bottom: 15px;
-            right: 15px;
-            z-index: 10000;
-            background: rgba(30, 30, 30, 0.95);
-            color: #E91E63;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 12px;
-            text-align: center;
-            border: 2px solid #E91E63;
-        }
-        
-        .arjs-loader {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 18px;
-            z-index: 9999;
-            background: rgba(0, 0, 0, 0.8);
-            padding: 20px 30px;
-            border-radius: 10px;
-            display: none;
-        }
-    </style>
+<meta charset="utf-8">
+<title>AR Video FIXED</title>
+
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
+<style>
+body { margin:0; overflow:hidden; }
+
+#videoTime {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  color: white;
+  background: rgba(0,0,0,0.6);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-family: monospace;
+  z-index: 999;
+}
+
+#fileInput {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+}
+</style>
 </head>
+
 <body>
-    <!-- Элементы интерфейса -->
-    <input type="file" id="fileInput" accept="video/*">
-    <div id="videoTime">00:00 / 00:00</div>
-    <div id="sizeInfo">Размер: 100%</div>
-    <div id="soundInfo" onclick="toggleSound()">🔇 Звук выключен</div>
-    <div class="btn-hint">Наведите оранжевый круг на кнопку и удерживайте 2 сек</div>
-    <div class="arjs-loader" id="loader">Инициализация AR...</div>
 
-    <!-- A-Frame сцена -->
-    <a-scene 
-        embedded 
-        arjs="sourceType: webcam; debugUIEnabled: false;" 
-        vr-mode-ui="enabled: false"
-        renderer="logarithmicDepthBuffer: true;"
-        loading-screen="enabled: false">
-        
-        <!-- Камера с курсором -->
-        <a-entity camera look-controls="enabled: false">
-            <a-cursor 
-                id="mainCursor"
-                fuse="true" 
-                fuse-timeout="2000"
-                raycaster="objects: .btn-control"
-                geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
-                material="color: #FF9800; shader: flat; opacity: 0.8">
-                <a-animation attribute="material.opacity" 
-                    from="0.3" to="0.8" dur="1000" 
-                    repeat="indefinite" direction="alternate">
-                </a-animation>
-            </a-cursor>
-        </a-entity>
+<input id="fileInput" type="file" accept="video/*">
+<div id="videoTime">00:00 / 00:00</div>
 
-        <!-- Контейнер для видео и кнопок -->
-        <a-entity id="ar-video-container" position="0 1.5 -3" visible="false">
-            <!-- Видеоплоскость с уникальным ID -->
-            <a-video 
-                id="ar-video-plane"
-                width="2.0"
-                height="1.125"
-                scale="-1 1 1"
-                position="0 0 0"
-                material="shader: flat; side: front; transparent: false"
-                rotation="0 0 0">
-            </a-video>
-            
-            <!-- Панель управления под видео -->
-            <a-entity id="control-panel" position="0 -0.8 0.05">
-                <!-- Первая строка: Основное управление -->
-                <a-entity class="btn-control" position="-0.75 0.3 0" data-action="play">
-                    <a-box color="#2E7D32" width="0.4" height="0.2" depth="0.05"></a-box>
-                    <a-text value="▶" color="#FFFFFF" align="center" 
-                           position="0 0 0.03" scale="0.7 0.7 1" width="2"></a-text>
-                </a-entity>
-                
-                <a-entity class="btn-control" position="-0.25 0.3 0" data-action="pause">
-                    <a-box color="#F57C00" width="0.4" height="0.2" depth="0.05"></a-box>
-                    <a-text value="⏸" color="#FFFFFF" align="center" 
-                           position="0 0 0.03" scale="0.7 0.7 1" width="2"></a-text>
-                </a-entity>
-                
-                <a-entity class="btn-control" position="0.25 0.3 0" data-action="rewind">
-                    <a-box color="#1565C0" width="0.4" height="0.2" depth="0.05"></a-box>
-                    <a-text value="↶5s" color="#FFFFFF" align="center" 
-                           position="0 0 0.03" scale="0.5 0.5 1" width="2"></a-text>
-                </a-entity>
-                
-                <a-entity class="btn-control" position="0.75 0.3 0" data-action="forward">
-                    <a-box color="#1565C0" width="0.4" height="0.2" depth="0.05"></a-box>
-                    <a-text value="↷5s" color="#FFFFFF" align="center" 
-                           position="0 0 0.03" scale="0.5 0.5 1" width="2"></a-text>
-                </a-entity>
-                
-                <!-- Вторая строка: Управление размером -->
-                <a-entity class="btn-control" position="-0.5 0 0" data-action="smaller">
-                    <a-box color="#424242" width="0.4" height="0.2" depth="0.05"></a-box>
-                    <a-text value="➖" color="#FFFFFF" align="center" 
-                           position="0 0 0.03" scale="0.7 0.7 1" width="2"></a-text>
-                </a-entity>
-                
-                <a-entity class="btn-control" position="0 0 0" data-action="bigger">
-                    <a-box color="#424242" width="0.4" height="0.2" depth="0.05"></a-box>
-                    <a-text value="➕" color="#FFFFFF" align="center" 
-                           position="0 0 0.03" scale="0.7 0.7 1" width="2"></a-text>
-                </a-entity>
-                
-                <a-entity class="btn-control" position="0.5 0 0" data-action="resetsize">
-                    <a-box color="#616161" width="0.4" height="0.2" depth="0.05"></a-box>
-                    <a-text value="Сброс" color="#FFFFFF" align="center" 
-                           position="0 0 0.03" scale="0.4 0.4 1" width="2"></a-text>
-                </a-entity>
-                
-                <!-- Третья строка: Управление звуком -->
-                <a-entity class="btn-control" position="0 -0.3 0" data-action="togglesound">
-                    <a-box color="#7B1FA2" width="0.6" height="0.2" depth="0.05"></a-box>
-                    <a-text value="🔊 Звук" color="#FFFFFF" align="center" 
-                           position="0 0 0.03" scale="0.35 0.35 1" width="2"></a-text>
-                </a-entity>
-            </a-entity>
-        </a-entity>
-    </a-scene>
+<a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false">
 
-    <script>
-        // Основные переменные
-        let videoElement = null;
-        let currentScale = 1.0;
-        let soundEnabled = false;
-        const MIN_SCALE = 0.5;
-        const MAX_SCALE = 2.0;
-        const SCALE_STEP = 0.25;
+  <a-assets>
+    <video id="videoAsset" playsinline webkit-playsinline muted></video>
+  </a-assets>
 
-        // Элементы DOM
-        const fileInput = document.getElementById('fileInput');
-        const videoTimeDisplay = document.getElementById('videoTime');
-        const sizeInfoDisplay = document.getElementById('sizeInfo');
-        const soundInfoDisplay = document.getElementById('soundInfo');
-        const loader = document.getElementById('loader');
-        const videoContainer = document.getElementById('ar-video-container');
-        const videoPlane = document.getElementById('ar-video-plane');
+  <!-- Камера + курсор -->
+  <a-entity camera look-controls>
+    <a-cursor
+      fuse="true"
+      fuse-timeout="3000"
+      geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.025"
+      material="color: white; shader: flat">
+    </a-cursor>
+  </a-entity>
 
-        // Форматирование времени
-        function formatTime(seconds) {
-            if (isNaN(seconds)) return "00:00";
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        }
+  <!-- Видео -->
+  <a-video
+    id="videoPlane"
+    src="#videoAsset"
+    position="0 0 -2"
+    width="1.2"
+    height="0.7"
+    rotation="0 180 0"
+    visible="false">
+  </a-video>
 
-        // Обновление отображения времени
-        function updateTimeDisplay() {
-            if (!videoElement) return;
-            
-            const current = videoElement.currentTime;
-            const duration = videoElement.duration;
-            
-            videoTimeDisplay.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
-        }
+  <!-- Кнопки -->
+  <a-entity id="buttons" position="0 -0.4 -2" visible="false">
 
-        // Обновление информации о размере
-        function updateSizeDisplay() {
-            sizeInfoDisplay.textContent = `Размер: ${Math.round(currentScale * 100)}%`;
-            videoPlane.setAttribute('width', 2.0 * currentScale);
-            videoPlane.setAttribute('height', 1.125 * currentScale);
-        }
+    <a-plane color="#00ff00" position="-0.6 0 0"
+      width="0.35" height="0.15"
+      text="value: Play; align:center" play-btn></a-plane>
 
-        // Переключение звука
-        function toggleSound() {
-            if (!videoElement) return;
-            
-            soundEnabled = !soundEnabled;
-            videoElement.muted = !soundEnabled;
-            
-            if (soundEnabled) {
-                soundInfoDisplay.textContent = "🔊 Звук включен";
-                soundInfoDisplay.style.color = "#4CAF50";
-                soundInfoDisplay.style.borderColor = "#4CAF50";
-            } else {
-                soundInfoDisplay.textContent = "🔇 Звук выключен";
-                soundInfoDisplay.style.color = "#9C27B0";
-                soundInfoDisplay.style.borderColor = "#9C27B0";
-            }
-            
-            // Сохраняем в localStorage
-            localStorage.setItem('arVideoSoundEnabled', soundEnabled);
-        }
+    <a-plane color="#ffff00" position="-0.2 0 0"
+      width="0.35" height="0.15"
+      text="value: Pause; align:center" pause-btn></a-plane>
 
-        // Загрузка видео
-        fileInput.addEventListener('change', async function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            console.log("Загрузка видеофайла:", file.name);
-            
-            // Показать загрузчик
-            loader.style.display = 'block';
-            loader.textContent = 'Загрузка видео...';
-            
-            try {
-                // Очистка предыдущего видео
-                if (videoElement) {
-                    URL.revokeObjectURL(videoElement.src);
-                    if (videoElement.parentNode) {
-                        videoElement.parentNode.removeChild(videoElement);
-                    }
-                }
-                
-                // Создание нового видеоэлемента
-                videoElement = document.createElement('video');
-                videoElement.id = 'source-video-' + Date.now();
-                videoElement.crossOrigin = 'anonymous';
-                videoElement.playsInline = true;
-                videoElement.loop = true;
-                videoElement.muted = !soundEnabled; // Начальное состояние звука
-                
-                // Установка источника
-                const videoURL = URL.createObjectURL(file);
-                videoElement.src = videoURL;
-                
-                // Добавление в DOM (скрыто)
-                videoElement.style.display = 'none';
-                document.body.appendChild(videoElement);
-                
-                // Ждем загрузки метаданных
-                await new Promise((resolve, reject) => {
-                    videoElement.onloadedmetadata = () => {
-                        console.log("Метаданные загружены, размер:", 
-                            videoElement.videoWidth, "x", videoElement.videoHeight);
-                        resolve();
-                    };
-                    videoElement.onerror = reject;
-                    setTimeout(() => reject(new Error("Таймаут загрузки видео")), 10000);
-                });
-                
-                // Настройка видеоплоскости в A-Frame
-                videoPlane.setAttribute('src', '#' + videoElement.id);
-                
-                // Показать контейнер
-                videoContainer.setAttribute('visible', 'true');
-                
-                // Сброс масштаба
-                currentScale = 1.0;
-                updateSizeDisplay();
-                
-                // Запуск воспроизведения
-                try {
-                    await videoElement.play();
-                    console.log("Воспроизведение начато");
-                } catch (playErr) {
-                    console.log("Автовоспроизведение заблокировано:", playErr.message);
-                    // Создаем кнопку для ручного запуска
-                    const playBtn = document.createElement('button');
-                    playBtn.textContent = 'Начать воспроизведение';
-                    playBtn.style.cssText = `
-                        position: fixed; top: 60px; left: 15px; z-index: 10001;
-                        background: #4CAF50; color: white; border: none;
-                        padding: 10px 15px; border-radius: 5px; cursor: pointer;
-                    `;
-                    playBtn.onclick = () => {
-                        videoElement.play();
-                        document.body.removeChild(playBtn);
-                    };
-                    document.body.appendChild(playBtn);
-                }
-                
-                // Запуск таймера обновления времени
-                setInterval(updateTimeDisplay, 300);
-                
-                console.log("Видео успешно загружено и настроено");
-                
-            } catch (error) {
-                console.error("Ошибка загрузки видео:", error);
-                alert("Ошибка загрузки видео: " + error.message);
-            } finally {
-                // Скрыть загрузчик
-                loader.style.display = 'none';
-            }
-        });
+    <a-plane color="#00ffff" position="0.2 0 0"
+      width="0.35" height="0.15"
+      text="value: +5; align:center" plus-btn></a-plane>
 
-        // Инициализация AR.js
-        window.addEventListener('load', function() {
-            console.log("Страница загружена, инициализация AR...");
-            
-            // Показать индикатор загрузки AR
-            loader.style.display = 'block';
-            
-            // Ждем загрузки A-Frame
-            document.querySelector('a-scene').addEventListener('loaded', function() {
-                console.log("A-Frame сцена загружена");
-                loader.style.display = 'none';
-                
-                // Загрузка настроек звука из localStorage
-                const savedSound = localStorage.getItem('arVideoSoundEnabled');
-                if (savedSound !== null) {
-                    soundEnabled = savedSound === 'true';
-                    if (videoElement) {
-                        videoElement.muted = !soundEnabled;
-                    }
-                    toggleSound(); // Обновить отображение
-                }
-                
-                // Настройка обработчиков кнопок
-                setupButtonHandlers();
-            });
-        });
+    <a-plane color="#ff00ff" position="0.6 0 0"
+      width="0.35" height="0.15"
+      text="value: -5; align:center" minus-btn></a-plane>
 
-        // Настройка обработчиков кнопок
-        function setupButtonHandlers() {
-            console.log("Настройка обработчиков кнопок...");
-            
-            const buttons = document.querySelectorAll('.btn-control');
-            console.log("Найдено кнопок:", buttons.length);
-            
-            buttons.forEach(btn => {
-                // Очищаем старые обработчики
-                btn.removeEventListener('fuse', handleButtonClick);
-                btn.removeEventListener('click', handleButtonClick);
-                
-                // Добавляем новый обработчик fuse
-                btn.addEventListener('fuse', handleButtonClick);
-                
-                // Для отладки: также добавляем обработчик клика
-                btn.addEventListener('click', function(e) {
-                    console.log("Клик по кнопке (отладка):", this.getAttribute('data-action'));
-                    handleButtonClick.call(this, e);
-                });
-            });
-            
-            console.log("Обработчики кнопок настроены");
-        }
+  </a-entity>
 
-        // Обработчик нажатия кнопок
-        function handleButtonClick(event) {
-            const action = this.getAttribute('data-action');
-            console.log("Кнопка активирована:", action);
-            
-            if (!videoElement) {
-                console.log("Видео не загружено!");
-                return;
-            }
-            
-            // Анимация нажатия
-            const originalScale = this.getAttribute('scale') || '1 1 1';
-            this.setAttribute('scale', '0.9 0.9 0.9');
-            
-            setTimeout(() => {
-                this.setAttribute('scale', originalScale);
-            }, 200);
-            
-            // Выполнение действия
-            switch(action) {
-                case 'play':
-                    videoElement.play();
-                    console.log("Воспроизведение");
-                    break;
-                    
-                case 'pause':
-                    videoElement.pause();
-                    console.log("Пауза");
-                    break;
-                    
-                case 'rewind':
-                    videoElement.currentTime = Math.max(0, videoElement.currentTime - 5);
-                    console.log("Перемотка назад на 5 сек");
-                    break;
-                    
-                case 'forward':
-                    videoElement.currentTime = Math.min(
-                        videoElement.duration || Infinity, 
-                        videoElement.currentTime + 5
-                    );
-                    console.log("Перемотка вперед на 5 сек");
-                    break;
-                    
-                case 'smaller':
-                    currentScale = Math.max(MIN_SCALE, currentScale - SCALE_STEP);
-                    updateSizeDisplay();
-                    console.log("Уменьшение размера:", currentScale);
-                    break;
-                    
-                case 'bigger':
-                    currentScale = Math.min(MAX_SCALE, currentScale + SCALE_STEP);
-                    updateSizeDisplay();
-                    console.log("Увеличение размера:", currentScale);
-                    break;
-                    
-                case 'resetsize':
-                    currentScale = 1.0;
-                    updateSizeDisplay();
-                    console.log("Сброс размера");
-                    break;
-                    
-                case 'togglesound':
-                    toggleSound();
-                    console.log("Переключение звука:", soundEnabled);
-                    break;
-            }
-            
-            // Обновление времени сразу после действия
-            updateTimeDisplay();
-        }
+</a-scene>
 
-        // Очистка при закрытии
-        window.addEventListener('beforeunload', function() {
-            if (videoElement && videoElement.src) {
-                URL.revokeObjectURL(videoElement.src);
-            }
-        });
+<script>
+const videoEl = document.getElementById('videoAsset');
+const videoPlane = document.getElementById('videoPlane');
+const buttons = document.getElementById('buttons');
+const timeEl = document.getElementById('videoTime');
+const fileInput = document.getElementById('fileInput');
 
-        // Инструкция для пользователя
-        console.log("AR Видеоплеер загружен");
-        console.log("Инструкция:");
-        console.log("1. Нажмите кнопку выбора файла для загрузки видео");
-        console.log("2. Разрешите доступ к камере");
-        console.log("3. Наведите оранжевый круг на кнопку в AR-пространстве");
-        console.log("4. Удерживайте курсор на кнопке 2 секунды для активации");
-    </script>
+fileInput.onchange = e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  videoEl.src = URL.createObjectURL(file);
+  videoEl.load();
+  videoEl.muted = true;
+
+  videoEl.onloadeddata = () => {
+    videoPlane.setAttribute('visible', true);
+    buttons.setAttribute('visible', true);
+    videoEl.play();
+  };
+};
+
+// Таймер
+setInterval(() => {
+  if (!videoEl.duration) return;
+
+  const f = t =>
+    `${String(Math.floor(t/60)).padStart(2,'0')}:${String(Math.floor(t%60)).padStart(2,'0')}`;
+
+  timeEl.textContent = `${f(videoEl.currentTime)} / ${f(videoEl.duration)}`;
+}, 300);
+
+// Fuse-кнопки
+AFRAME.registerComponent('play-btn', {
+  init() { this.el.addEventListener('fuse', () => videoEl.play()); }
+});
+
+AFRAME.registerComponent('pause-btn', {
+  init() { this.el.addEventListener('fuse', () => videoEl.pause()); }
+});
+
+AFRAME.registerComponent('plus-btn', {
+  init() { this.el.addEventListener('fuse', () => videoEl.currentTime += 5); }
+});
+
+AFRAME.registerComponent('minus-btn', {
+  init() { this.el.addEventListener('fuse', () => videoEl.currentTime -= 5); }
+});
+</script>
+
 </body>
 </html>
