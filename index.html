@@ -1,176 +1,307 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<title>AR Видео с кнопкой разместить</title>
-<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-<style>
-  body { margin:0; overflow:hidden; }
-  #fileInput {
-    position:fixed; top:10px; left:50%; transform:translateX(-50%);
-    z-index:10; background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
-  }
-  #placeBtn {
-    position:fixed; bottom:10px; left:50%; transform:translateX(-50%);
-    z-index:10; background: rgba(0,0,0,0.5); color:white; padding:10px 20px; border-radius:5px;
-    font-size:16px; cursor:pointer;
-  }
-  #videoTime {
-    position: fixed;
-    top: 10px;
-    right: 10px;
-    color: white;
-    background: rgba(0,0,0,0.6);
-    padding: 5px 10px;
-    border-radius: 5px;
-    font-family: monospace;
-    z-index: 10;
-  }
-</style>
+    <meta charset="utf-8">
+    <title>AR Видео с кнопкой разместить</title>
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <style>
+        body { margin:0; overflow:hidden; }
+        #fileInput {
+            position:fixed; top:10px; left:50%; 
+            transform:translateX(-50%); z-index:10;
+            background: rgba(0,0,0,0.5); color:white;
+            padding:5px 10px; border-radius:5px;
+        }
+        #placeBtn {
+            position:fixed; bottom:10px; left:50%;
+            transform:translateX(-50%); z-index:10;
+            background: rgba(0,0,0,0.5); color:white;
+            padding:10px 20px; border-radius:5px;
+            font-size:16px; cursor:pointer;
+        }
+        #videoTime {
+            position: fixed; top: 10px; right: 10px;
+            color: white; background: rgba(0,0,0,0.6);
+            padding: 5px 10px; border-radius: 5px;
+            font-family: monospace; z-index: 10;
+        }
+    </style>
 </head>
 <body>
+    <input type="file" id="fileInput" accept="video/*">
+    <div id="videoTime">00:00 / 00:00</div>
+    <div id="placeBtn">Разместить видео</div>
+    
+    <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
+        <a-entity camera look-controls>
+            <a-cursor fuse="true" fuse-timeout="2000" 
+                     raycaster="objects: .clickable"
+                     geometry="primitive:ring; radiusInner:0.01; radiusOuter:0.02"
+                     material="color:white; shader:flat">
+            </a-cursor>
+        </a-entity>
+    </a-scene>
+    
+    <script>
+        const scene = document.querySelector('a-scene');
+        const fileInput = document.getElementById('fileInput');
+        const placeBtn = document.getElementById('placeBtn');
+        const timeEl = document.getElementById('videoTime');
+        
+        let videoEl, videoMesh, videoTexture;
+        let videoContainer; // Контейнер для видео и кнопок
+        let currentScale = 1;
+        let firstInteraction = true;
+        let buttonsGroup; // Группа для кнопок, которая будет масштабироваться с видео
 
-<input type="file" id="fileInput" accept="video/*">
-<div id="videoTime">00:00 / 00:00</div>
-<div id="placeBtn">Разместить видео</div>
+        // Загрузка видео
+        fileInput.addEventListener('change', e => {
+            const file = e.target.files[0];
+            if(!file) return;
+            
+            // Освобождаем предыдущий URL, если был
+            if(videoEl && videoEl.src) {
+                URL.revokeObjectURL(videoEl.src);
+            }
+            
+            const url = URL.createObjectURL(file);
+            videoEl = document.createElement('video');
+            videoEl.src = url;
+            videoEl.loop = true;
+            videoEl.muted = true;
+            videoEl.playsInline = true;
+            videoEl.crossOrigin = 'anonymous';
+            
+            videoEl.addEventListener('loadeddata', () => {
+                // Правильный расчет пропорций с учетом ориентации
+                const aspectRatio = videoEl.videoWidth / videoEl.videoHeight;
+                
+                // Если видео вертикальное (высота > ширины)
+                if (videoEl.videoHeight > videoEl.videoWidth) {
+                    // Для вертикального видео
+                    videoWidth = 0.6; // Фиксированная ширина
+                    videoHeight = videoWidth / aspectRatio; // Высота рассчитывается
+                } else {
+                    // Для горизонтального видео
+                    videoHeight = 1; // Фиксированная высота
+                    videoWidth = videoHeight * aspectRatio; // Ширина рассчитывается
+                }
+                
+                if (videoTexture) videoTexture.dispose();
+                videoTexture = new THREE.VideoTexture(videoEl);
+                videoTexture.minFilter = THREE.LinearFilter;
+                videoTexture.magFilter = THREE.LinearFilter;
+                videoTexture.format = THREE.RGBAFormat;
+            });
+        });
 
-<a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
-  <a-entity camera look-controls>
-    <a-cursor 
-      fuse="true" 
-      fuse-timeout="2000" 
-      raycaster="objects: .clickable"
-      geometry="primitive:ring; radiusInner:0.01; radiusOuter:0.02"
-      material="color:white; shader:flat">
-    </a-cursor>
-  </a-entity>
-</a-scene>
+        // Таймер видео
+        setInterval(() => {
+            if(!videoEl || !videoEl.duration) return;
+            const f = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
+            timeEl.textContent = `${f(videoEl.currentTime)} / ${f(videoEl.duration)}`;
+        }, 300);
 
-<script>
-const scene = document.querySelector('a-scene');
-const fileInput = document.getElementById('fileInput');
-const placeBtn = document.getElementById('placeBtn');
-const timeEl = document.getElementById('videoTime');
+        // Размещение видео по кнопке
+        placeBtn.addEventListener('click', () => {
+            if(!videoEl || !videoTexture) return;
+            
+            // Позиция перед камерой
+            const camera = scene.camera;
+            const distance = 2;
+            const pos = camera.position.clone().add(
+                camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(distance)
+            );
+            
+            // Удаляем старый контейнер, если есть
+            if (videoContainer) {
+                scene.object3D.remove(videoContainer);
+            }
+            
+            // Создаем контейнер для видео и кнопок
+            videoContainer = new THREE.Group();
+            scene.object3D.add(videoContainer);
+            
+            // Создаем Mesh для видео
+            const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
+            const material = new THREE.MeshBasicMaterial({
+                map: videoTexture,
+                side: THREE.DoubleSide,
+                transparent: true
+            });
+            
+            videoMesh = new THREE.Mesh(geometry, material);
+            videoContainer.add(videoMesh);
+            
+            // Позиционируем контейнер
+            videoContainer.position.copy(pos);
+            
+            // Поворачиваем контейнер к камере
+            videoContainer.lookAt(camera.position);
+            
+            currentScale = 1;
+            videoContainer.scale.set(currentScale, currentScale, currentScale);
+            
+            if(firstInteraction){
+                videoEl.muted = false;
+                videoEl.play().catch(e => console.log('Play error:', e));
+                firstInteraction = false;
+            }
+            
+            createButtons();
+        });
 
-let videoEl, videoMesh, videoTexture;
-let videoWidth = 1, videoHeight = 1.5;
-let firstInteraction = true;
+        // Масштабирование пальцами
+        let startDistance = null;
+        let startScale = 1;
+        
+        scene.addEventListener('touchstart', e => {
+            if(e.touches.length == 2 && videoContainer){
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                startDistance = Math.sqrt(dx*dx + dy*dy);
+                startScale = videoContainer.scale.x;
+            }
+        });
+        
+        scene.addEventListener('touchmove', e => {
+            if(e.touches.length == 2 && videoContainer && startDistance){
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const currentDistance = Math.sqrt(dx*dx + dy*dy);
+                const scaleFactor = currentDistance / startDistance;
+                
+                // Ограничиваем масштабирование
+                const newScale = Math.max(0.1, Math.min(5, startScale * scaleFactor));
+                videoContainer.scale.set(newScale, newScale, newScale);
+                currentScale = newScale;
+                
+                // Обновляем позицию кнопок при масштабировании
+                updateButtonsPosition();
+            }
+        });
+        
+        scene.addEventListener('touchend', () => {
+            startDistance = null;
+        });
 
-// Загрузка видео
-fileInput.addEventListener('change', e => {
-  const file = e.target.files[0];
-  if(!file) return;
-  const url = URL.createObjectURL(file);
-
-  videoEl = document.createElement('video');
-  videoEl.src = url;
-  videoEl.loop = true;
-  videoEl.muted = true;
-  videoEl.playsInline = true;
-  videoEl.crossOrigin = 'anonymous';
-
-  videoEl.addEventListener('loadeddata', () => {
-    videoHeight = 1; 
-    videoWidth = videoEl.videoWidth / videoEl.videoHeight;
-    videoTexture = new THREE.VideoTexture(videoEl);
-    videoTexture.minFilter = THREE.LinearFilter;
-    videoTexture.magFilter = THREE.LinearFilter;
-    videoTexture.format = THREE.RGBFormat;
-  });
-});
-
-// Таймер видео
-setInterval(() => {
-  if(!videoEl || videoEl.readyState < 2) return;
-  const f = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
-  timeEl.textContent = `${f(videoEl.currentTime)} / ${f(videoEl.duration)}`;
-}, 300);
-
-// Размещение видео
-placeBtn.addEventListener('click', () => {
-  if(!videoEl || !videoTexture) return;
-
-  const camera = scene.camera;
-  const distance = 2;
-  const pos = camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(distance));
-
-  if(!videoMesh){
-    const geometry = new THREE.PlaneGeometry(videoHeight, videoWidth); // вертикальное видео
-    const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
-    videoMesh = new THREE.Mesh(geometry, material);
-    videoMesh.position.copy(pos);
-    videoMesh.lookAt(camera.position);
-    scene.object3D.add(videoMesh);
-  } else {
-    videoMesh.position.copy(pos);
-    videoMesh.lookAt(camera.position);
-    videoMesh.visible = true;
-  }
-
-  if(firstInteraction){
-    videoEl.muted = false;
-    videoEl.play().catch(()=>{});
-    firstInteraction = false;
-  }
-
-  createButtons();
-});
-
-// Масштабирование пальцами
-let startDistance = null;
-let startScale = 1;
-scene.addEventListener('touchstart', e => {
-  if(e.touches.length==2 && videoMesh){
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    startDistance = Math.sqrt(dx*dx + dy*dy);
-    startScale = videoMesh.scale.x;
-  }
-});
-scene.addEventListener('touchmove', e => {
-  if(e.touches.length==2 && videoMesh && startDistance){
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    const scaleFactor = Math.sqrt(dx*dx+dy*dy)/startDistance;
-    videoMesh.scale.set(startScale*scaleFactor, startScale*scaleFactor, 1);
-  }
-});
-
-// Создание кнопок как дочерних объектов видео
-function createButtons(){
-  if(videoMesh.getObjectByName('playBtn')) return;
-
-  const btnY = -videoWidth/2 - 0.2;
-
-  const playBtn = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.4,0.15),
-    new THREE.MeshBasicMaterial({color:0x00ff00})
-  );
-  playBtn.name = 'playBtn';
-  playBtn.position.set(-0.25, btnY, 0);
-  videoMesh.add(playBtn);
-
-  const pauseBtn = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.4,0.15),
-    new THREE.MeshBasicMaterial({color:0xff0000})
-  );
-  pauseBtn.name = 'pauseBtn';
-  pauseBtn.position.set(0.25, btnY, 0);
-  videoMesh.add(pauseBtn);
-
-  addFuse(playBtn, () => videoEl.play());
-  addFuse(pauseBtn, () => videoEl.pause());
-}
-
-// Fuse 3 секунды
-function addFuse(mesh, callback){
-  let timer = null;
-  mesh.cursorHover = false;
-
-  mesh.on('mouseenter', ()=>{ timer = setTimeout(callback, 3000); });
-  mesh.on('mouseleave', ()=>{ if(timer) clearTimeout(timer); });
-}
-</script>
+        // Создание кнопок под видео
+        function createButtons(){
+            // Удаляем старые кнопки, если есть
+            if(document.getElementById('playBtn')) {
+                scene.removeChild(document.getElementById('playBtn'));
+            }
+            if(document.getElementById('pauseBtn')) {
+                scene.removeChild(document.getElementById('pauseBtn'));
+            }
+            if(buttonsGroup) {
+                videoContainer.remove(buttonsGroup);
+            }
+            
+            // Создаем группу для кнопок
+            buttonsGroup = new THREE.Group();
+            videoContainer.add(buttonsGroup);
+            
+            // Позиция кнопок под видео (в локальных координатах контейнера)
+            const buttonY = -videoHeight/2 - 0.15;
+            const buttonSpacing = 0.3;
+            
+            // Создаем кнопки как 3D объекты
+            const playGeometry = new THREE.PlaneGeometry(0.4, 0.15);
+            const pauseGeometry = new THREE.PlaneGeometry(0.4, 0.15);
+            
+            const playMaterial = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+            const pauseMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            
+            const playBtnMesh = new THREE.Mesh(playGeometry, playMaterial);
+            const pauseBtnMesh = new THREE.Mesh(pauseGeometry, pauseMaterial);
+            
+            playBtnMesh.position.set(-buttonSpacing, buttonY, 0);
+            pauseBtnMesh.position.set(buttonSpacing, buttonY, 0);
+            
+            // Добавляем текст на кнопки
+            addTextToButton(playBtnMesh, 'Play', -0.15, 0, 0.01);
+            addTextToButton(pauseBtnMesh, 'Pause', -0.2, 0, 0.01);
+            
+            buttonsGroup.add(playBtnMesh);
+            buttonsGroup.add(pauseBtnMesh);
+            
+            // Добавляем обработчики кликов через raycaster
+            playBtnMesh.userData = { type: 'button', action: 'play' };
+            pauseBtnMesh.userData = { type: 'button', action: 'pause' };
+            
+            // Настраиваем raycaster для обнаружения кнопок
+            const cursor = document.querySelector('a-cursor');
+            if (cursor && cursor.components.raycaster) {
+                cursor.components.raycaster.refreshObjects();
+            }
+        }
+        
+        // Добавление текста на кнопки
+        function addTextToButton(mesh, text, x, y, z) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 256;
+            canvas.height = 128;
+            
+            context.fillStyle = '#000000';
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            
+            context.font = '40px Arial';
+            context.fillStyle = '#ffffff';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(text, canvas.width/2, canvas.height/2);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const textMaterial = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                side: THREE.DoubleSide
+            });
+            
+            const textGeometry = new THREE.PlaneGeometry(0.35, 0.1);
+            const textMesh = new THREE.Mesh(textGeometry, textMaterial);
+            textMesh.position.set(x, y, z + 0.001); // Немного перед кнопкой
+            
+            mesh.add(textMesh);
+        }
+        
+        // Обновление позиции кнопок при масштабировании
+        function updateButtonsPosition() {
+            if (!buttonsGroup || !videoMesh) return;
+            
+            // Кнопки уже находятся в правильном положении относительно видео
+            // так как они являются дочерними элементами контейнера
+            // и масштабируются вместе с ним
+        }
+        
+        // Обработка кликов по кнопкам
+        document.addEventListener('click', (e) => {
+            // Эта функция будет обрабатывать клики по кнопкам через стандартный клик
+            // Для AR лучше использовать fuse взаимодействие
+        });
+        
+        // Альтернатива: используем mouseenter/mouseleave для fuse взаимодействия
+        scene.addEventListener('mouseenter', (e) => {
+            if (e.target.userData && e.target.userData.type === 'button') {
+                setTimeout(() => {
+                    if (e.target.userData.action === 'play') {
+                        if (videoEl) videoEl.play();
+                    } else if (e.target.userData.action === 'pause') {
+                        if (videoEl) videoEl.pause();
+                    }
+                }, 2000); // 2 секунды fuse
+            }
+        });
+        
+        // Освобождаем ресурсы при закрытии
+        window.addEventListener('beforeunload', () => {
+            if (videoEl && videoEl.src) {
+                URL.revokeObjectURL(videoEl.src);
+            }
+        });
+    </script>
 </body>
 </html>
