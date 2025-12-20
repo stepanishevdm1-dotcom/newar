@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео с оригинальными пропорциями</title>
+  <title>AR Видео вертикально</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -41,7 +41,7 @@ fileInput.addEventListener('change', e => {
   videoEl.crossOrigin = 'anonymous';
 
   videoEl.addEventListener('loadeddata', () => {
-    // Сохраняем оригинальные пропорции
+    // сохраняем оригинальные пропорции
     videoWidth = videoEl.videoWidth / videoEl.videoHeight;
     videoHeight = 1;
 
@@ -60,7 +60,7 @@ fileInput.addEventListener('change', e => {
   });
 });
 
-// Установка позиции при тапе
+// Ставим видео по тапу вертикально
 scene.addEventListener('click', event => {
   if(!videoMesh) return;
 
@@ -75,12 +75,12 @@ scene.addEventListener('click', event => {
 
   videoMesh.position.copy(pos);
   videoMesh.visible = true;
-  videoMesh.rotation.set(-Math.PI/2, 0, 0); // ровное
+  videoMesh.rotation.set(0, 0, 0); // вертикально
   videoMesh.scale.set(1,1,1); // масштаб 1:1, пропорции исходные
   videoEl.play().catch(()=>{});
 });
 
-// Масштабирование пропорционально исходным сторонам
+// Масштабирование пальцами пропорционально
 let startDistance = null;
 let startScale = 1;
 
@@ -89,7 +89,7 @@ scene.addEventListener('touchstart', e => {
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     startDistance = Math.sqrt(dx*dx + dy*dy);
-    startScale = videoMesh.scale.x; // единый коэффициент масштаба
+    startScale = videoMesh.scale.x;
   }
 });
 
@@ -100,7 +100,6 @@ scene.addEventListener('touchmove', e => {
     const newDistance = Math.sqrt(dx*dx + dy*dy);
     const scaleFactor = newDistance / startDistance;
 
-    // Масштаб одинаково по X и Y, пропорции исходные
     videoMesh.scale.set(startScale * scaleFactor, startScale * scaleFactor, 1);
   }
 });
