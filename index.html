@@ -1,136 +1,279 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<title>AR Video WORKING</title>
-
-<!-- A‑Frame (1.6.0 — рекомендованная для AR.js) -->
-<script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
-
-<!-- AR.js для A‑Frame (Marker/Location/Video AR) -->
-<script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
-
-<style>
-body { margin:0; overflow:hidden; }
-#videoTime {
-  position: fixed;
-  top: 10px;
-  right: 10px;
-  color: white;
-  background: rgba(0,0,0,0.6);
-  padding: 6px 10px;
-  font-family: monospace;
-  z-index: 999;
-}
-#fileInput {
-  position: fixed;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 999;
-}
-</style>
+    <meta charset="utf-8">
+    <title>AR Video Controller</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+        #fileInput {
+            position: fixed; top: 10px; left: 10px; z-index: 1000;
+            background: rgba(20,20,20,0.9); color: #0f0;
+            border: 1px solid #0f0; padding: 8px; border-radius: 4px;
+        }
+        #videoTime {
+            position: fixed; top: 10px; right: 10px; z-index: 1000;
+            background: rgba(20,20,20,0.9); color: #0ff;
+            padding: 8px 12px; border-radius: 4px; font-family: monospace;
+            border: 1px solid #0ff;
+        }
+        #sizeInfo {
+            position: fixed; bottom: 10px; left: 10px; z-index: 1000;
+            background: rgba(20,20,20,0.9); color: #ff0;
+            padding: 6px 10px; border-radius: 4px; font-size: 14px;
+            border: 1px solid #ff0;
+        }
+        .btn-hint {
+            position: fixed; bottom: 10px; right: 10px; z-index: 1000;
+            background: rgba(20,20,20,0.9); color: #f0f;
+            padding: 6px 10px; border-radius: 4px; font-size: 12px;
+            border: 1px solid #f0f;
+        }
+    </style>
 </head>
-
 <body>
+    <!-- Элементы интерфейса -->
+    <input type="file" id="fileInput" accept="video/*">
+    <div id="videoTime">00:00 / 00:00</div>
+    <div id="sizeInfo">Размер: 100%</div>
+    <div class="btn-hint">Наведите курсор на кнопку</div>
 
-<input id="fileInput" type="file" accept="video/*">
-<div id="videoTime">00:00 / 00:00</div>
+    <!-- A-Frame сцена -->
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
+        <!-- Камера с курсором -->
+        <a-entity camera look-controls="enabled: false">
+            <a-cursor 
+                fuse="true" 
+                fuse-timeout="1500"
+                raycaster="objects: .control-btn"
+                geometry="primitive: ring; radiusInner: 0.016; radiusOuter: 0.024"
+                material="color: orange; shader: flat">
+            </a-cursor>
+        </a-entity>
 
-<a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+        <!-- Основной контейнер для видео и кнопок -->
+        <a-entity id="videoContainer" position="0 0 -2">
+            <!-- Видеоплоскость -->
+            <a-video 
+                id="videoElement"
+                visible="false"
+                width="1.6" 
+                height="0.9"
+                scale="-1 1 1"
+                material="shader: flat; side: double">
+            </a-video>
 
-  <!-- Камера + курсор fuse (3s) -->
-  <a-entity camera look-controls>
-    <a-cursor
-      fuse="true"
-      fuse-timeout="3000"
-      geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.025"
-      material="color: white; shader: flat">
-    </a-cursor>
-  </a-entity>
+            <!-- Панель кнопок управления -->
+            <a-entity id="controlPanel" position="0 -0.65 0" visible="false">
+                <!-- Ряд 1: Управление воспроизведением -->
+                <a-entity class="control-btn" position="-0.3 0.22 0" data-action="play">
+                    <a-plane color="#006400" width="0.28" height="0.12"></a-plane>
+                    <a-text value="▶" color="#0f0" align="center" position="0 0 0.01" scale="0.5 0.5 1"></a-text>
+                </a-entity>
+                
+                <a-entity class="control-btn" position="0 0.22 0" data-action="pause">
+                    <a-plane color="#8B6914" width="0.28" height="0.12"></a-plane>
+                    <a-text value="⏸" color="#ff0" align="center" position="0 0 0.01" scale="0.5 0.5 1"></a-text>
+                </a-entity>
+                
+                <a-entity class="control-btn" position="0.3 0.22 0" data-action="stop">
+                    <a-plane color="#8B0000" width="0.28" height="0.12"></a-plane>
+                    <a-text value="⏹" color="#f00" align="center" position="0 0 0.01" scale="0.5 0.5 1"></a-text>
+                </a-entity>
 
-  <!-- Видео -->
-  <a-video
-    id="videoPlane"
-    visible="false"
-    position="0 0 -2"
-    width="1.2"
-    height="0.7"
-    rotation="0 180 0">
-  </a-video>
+                <!-- Ряд 2: Перемотка и размер -->
+                <a-entity class="control-btn" position="-0.45 0 0" data-action="rewind">
+                    <a-plane color="#4B0082" width="0.28" height="0.12"></a-plane>
+                    <a-text value="↶5s" color="#dda0dd" align="center" position="0 0 0.01" scale="0.4 0.4 1"></a-text>
+                </a-entity>
+                
+                <a-entity class="control-btn" position="-0.15 0 0" data-action="forward">
+                    <a-plane color="#2F4F4F" width="0.28" height="0.12"></a-plane>
+                    <a-text value="↷5s" color="#a0dda0" align="center" position="0 0 0.01" scale="0.4 0.4 1"></a-text>
+                </a-entity>
+                
+                <a-entity class="control-btn" position="0.15 0 0" data-action="smaller">
+                    <a-plane color="#333" width="0.28" height="0.12"></a-plane>
+                    <a-text value="➖" color="#ccc" align="center" position="0 0 0.01" scale="0.5 0.5 1"></a-text>
+                </a-entity>
+                
+                <a-entity class="control-btn" position="0.45 0 0" data-action="bigger">
+                    <a-plane color="#333" width="0.28" height="0.12"></a-plane>
+                    <a-text value="➕" color="#ccc" align="center" position="0 0 0.01" scale="0.5 0.5 1"></a-text>
+                </a-entity>
 
-  <!-- Кнопки управления -->
-  <a-entity id="buttons" position="0 -0.5 -2" visible="false">
-    <a-plane class="btn" color="#00ff00" position="-0.6 0 0"
-      width="0.35" height="0.15"
-      text="value: Play; align:center; width:3"
-      play-btn></a-plane>
+                <!-- Ряд 3: Сброс размера -->
+                <a-entity class="control-btn" position="0 -0.22 0" data-action="resetsize">
+                    <a-plane color="#555" width="0.4" height="0.12"></a-plane>
+                    <a-text value="Сбросить размер" color="#fff" align="center" position="0 0 0.01" scale="0.25 0.25 1"></a-text>
+                </a-entity>
+            </a-entity>
+        </a-entity>
+    </a-scene>
 
-    <a-plane class="btn" color="#ffff00" position="-0.2 0 0"
-      width="0.35" height="0.15"
-      text="value: Pause; align:center; width:3"
-      pause-btn></a-plane>
+    <script>
+        // Основные переменные
+        let videoElement = null;
+        let currentScale = 1.0;
+        const MIN_SCALE = 0.5;
+        const MAX_SCALE = 2.0;
+        const SCALE_STEP = 0.2;
 
-    <a-plane class="btn" color="#00ffff" position="0.2 0 0"
-      width="0.35" height="0.15"
-      text="value: +5; align:center; width:3"
-      plus-btn></a-plane>
+        // Элементы DOM
+        const fileInput = document.getElementById('fileInput');
+        const videoTimeDisplay = document.getElementById('videoTime');
+        const sizeInfoDisplay = document.getElementById('sizeInfo');
+        const videoPlane = document.getElementById('videoElement');
+        const controlPanel = document.getElementById('controlPanel');
+        const videoContainer = document.getElementById('videoContainer');
 
-    <a-plane class="btn" color="#ff00ff" position="0.6 0 0"
-      width="0.35" height="0.15"
-      text="value: -5; align:center; width:3"
-      minus-btn></a-plane>
-  </a-entity>
+        // Форматирование времени
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
 
-</a-scene>
+        // Обновление отображения времени
+        function updateTimeDisplay() {
+            if (!videoElement) return;
+            
+            const current = videoElement.currentTime;
+            const duration = videoElement.duration || 0;
+            
+            if (duration > 0 && !isNaN(duration)) {
+                videoTimeDisplay.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
+            } else {
+                videoTimeDisplay.textContent = `${formatTime(current)} / --:--`;
+            }
+        }
 
-<script>
-let videoEl;
-const videoPlane = document.getElementById('videoPlane');
-const buttons = document.getElementById('buttons');
-const timeEl = document.getElementById('videoTime');
-const fileInput = document.getElementById('fileInput');
+        // Обновление информации о размере
+        function updateSizeDisplay() {
+            sizeInfoDisplay.textContent = `Размер: ${Math.round(currentScale * 100)}%`;
+            videoPlane.setAttribute('width', 1.6 * currentScale);
+            videoPlane.setAttribute('height', 0.9 * currentScale);
+        }
 
-// Когда файл выбран
-fileInput.onchange = e => {
-  const file = e.target.files[0];
-  if (!file) return;
+        // Обработка загрузки видеофайла
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            // Очистка предыдущего видео, если было
+            if (videoElement) {
+                URL.revokeObjectURL(videoElement.src);
+                document.body.removeChild(videoElement);
+            }
+            
+            // Создание нового видеоэлемента
+            videoElement = document.createElement('video');
+            videoElement.src = URL.createObjectURL(file);
+            videoElement.loop = true;
+            videoElement.playsInline = true;
+            videoElement.crossOrigin = 'anonymous';
+            videoElement.muted = true; // Упрощает автовоспроизведение
+            
+            // Добавление на страницу (нужно для A-Frame)
+            videoElement.style.display = 'none';
+            document.body.appendChild(videoElement);
+            
+            // Настройка видеоплоскости
+            videoPlane.setAttribute('src', `#${videoElement.id}`);
+            videoPlane.setAttribute('visible', 'true');
+            controlPanel.setAttribute('visible', 'true');
+            
+            // Сброс масштаба
+            currentScale = 1.0;
+            updateSizeDisplay();
+            
+            // Попытка запустить воспроизведение
+            videoElement.play().catch(err => {
+                console.log('Автовоспроизведение заблокировано:', err.message);
+                // Можно добавить кнопку для ручного запуска
+            });
+            
+            // Запуск обновления времени
+            setInterval(updateTimeDisplay, 300);
+        });
 
-  videoEl = document.createElement('video');
-  videoEl.src = URL.createObjectURL(file);
-  videoEl.loop = true;
-  videoEl.muted = true;
-  videoEl.playsInline = true;
-  videoEl.setAttribute('webkit-playsinline', '');
+        // Система управления через fuse
+        document.querySelector('a-scene').addEventListener('loaded', function() {
+            console.log('Сцена загружена, настройка кнопок...');
+            
+            // Обработчик для всех кнопок управления
+            document.querySelectorAll('.control-btn').forEach(btn => {
+                btn.addEventListener('fuse', function() {
+                    const action = this.getAttribute('data-action');
+                    console.log('Активирована кнопка:', action);
+                    
+                    // Простая анимация нажатия
+                    this.setAttribute('animation', {
+                        property: 'scale',
+                        to: '0.85 0.85 1',
+                        dur: 150,
+                        easing: 'easeOutQuad',
+                        dir: 'alternate'
+                    });
+                    
+                    // Выполнение действия
+                    if (!videoElement) {
+                        console.log('Видео не загружено');
+                        return;
+                    }
+                    
+                    switch(action) {
+                        case 'play':
+                            videoElement.play();
+                            break;
+                        case 'pause':
+                            videoElement.pause();
+                            break;
+                        case 'stop':
+                            videoElement.pause();
+                            videoElement.currentTime = 0;
+                            break;
+                        case 'rewind':
+                            videoElement.currentTime = Math.max(0, videoElement.currentTime - 5);
+                            break;
+                        case 'forward':
+                            videoElement.currentTime = Math.min(
+                                videoElement.duration || Infinity, 
+                                videoElement.currentTime + 5
+                            );
+                            break;
+                        case 'smaller':
+                            currentScale = Math.max(MIN_SCALE, currentScale - SCALE_STEP);
+                            updateSizeDisplay();
+                            break;
+                        case 'bigger':
+                            currentScale = Math.min(MAX_SCALE, currentScale + SCALE_STEP);
+                            updateSizeDisplay();
+                            break;
+                        case 'resetsize':
+                            currentScale = 1.0;
+                            updateSizeDisplay();
+                            break;
+                    }
+                    
+                    // Сброс анимации
+                    setTimeout(() => {
+                        this.removeAttribute('animation');
+                    }, 200);
+                });
+            });
+            
+            console.log('Кнопки настроены');
+        });
 
-  videoPlane.setAttribute('src', videoEl);
-  videoPlane.setAttribute('visible', true);
-  buttons.setAttribute('visible', true);
-
-  videoEl.play().catch(console.warn);
-};
-
-// Таймер
-setInterval(() => {
-  if (!videoEl) return;
-  const fmt = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
-  timeEl.textContent = `${fmt(videoEl.currentTime)} / ${isNaN(videoEl.duration) ? '00:00' : fmt(videoEl.duration)}`;
-}, 300);
-
-// Fuse‑кнопки A‑Frame компоненты
-AFRAME.registerComponent('play-btn', {
-  init() { this.el.addEventListener('fuse', () => videoEl && videoEl.play()); }
-});
-AFRAME.registerComponent('pause-btn', {
-  init() { this.el.addEventListener('fuse', () => videoEl && videoEl.pause()); }
-});
-AFRAME.registerComponent('plus-btn', {
-  init() { this.el.addEventListener('fuse', () => videoEl && (videoEl.currentTime += 5)); }
-});
-AFRAME.registerComponent('minus-btn', {
-  init() { this.el.addEventListener('fuse', () => videoEl && (videoEl.currentTime -= 5)); }
-});
-</script>
-
+        // Очистка при закрытии
+        window.addEventListener('beforeunload', function() {
+            if (videoElement && videoElement.src) {
+                URL.revokeObjectURL(videoElement.src);
+            }
+        });
+    </script>
 </body>
 </html>
