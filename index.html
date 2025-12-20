@@ -11,10 +11,16 @@
     z-index: 10; background: rgba(0,0,0,0.5); color: white;
     padding: 5px 10px; border-radius: 5px;
   }
+  #startAR {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 10; padding: 10px 20px; font-size:16px;
+  }
 </style>
 </head>
 <body>
+
 <input type="file" id="fileInput" accept="video/*">
+<button id="startAR">Начать AR</button>
 
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js';
@@ -24,114 +30,116 @@ let camera, scene, renderer;
 let reticle, controller;
 let videoMesh, videoTexture, videoElement;
 
-init();
-animate();
+let hitTestSource = null;
+let localSpace = null;
 
-function init() {
-  scene = new THREE.Scene();
+const fileInput = document.getElementById('fileInput');
+const startBtn = document.getElementById('startAR');
 
-  camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
+startBtn.addEventListener('click', async () => {
+    init();
+    document.body.removeChild(startBtn);
+    document.body.removeChild(fileInput);
+    document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
+});
 
-  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  renderer.xr.enabled = true;
-  document.body.appendChild(renderer.domElement);
-
-  const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
-  scene.add(light);
-
-  // Reticle
-  const geometry = new THREE.RingGeometry(0.07,0.09,32).rotateX(-Math.PI/2);
-  const material = new THREE.MeshBasicMaterial({ color:0x00ff00 });
-  reticle = new THREE.Mesh(geometry, material);
-  reticle.matrixAutoUpdate = false;
-  reticle.visible = false;
-  scene.add(reticle);
-
-  // Controller
-  controller = renderer.xr.getController(0);
-  controller.addEventListener('select', placeVideo);
-  scene.add(controller);
-
-  // File input
-  const fileInput = document.getElementById('fileInput');
-  fileInput.addEventListener('change', e => {
+fileInput.addEventListener('change', e => {
     const file = e.target.files[0];
-    if(!file) return;
-    const url = URL.createObjectURL(file);
+    if (!file) return;
 
     videoElement = document.createElement('video');
-    videoElement.src = url;
+    videoElement.src = URL.createObjectURL(file);
     videoElement.loop = true;
-    videoElement.muted = true; // для автоплей
+    videoElement.muted = true; // обязательно для автоплей
     videoElement.playsInline = true;
-    videoElement.autoplay = true;
 
-    videoElement.addEventListener('loadeddata', ()=>{
-      videoTexture = new THREE.VideoTexture(videoElement);
-      const geom = new THREE.PlaneGeometry(0.5, 0.3);
-      const mat = new THREE.MeshBasicMaterial({ map:videoTexture, side:THREE.DoubleSide });
-      videoMesh = new THREE.Mesh(geom, mat);
-      videoMesh.visible = false;
-      scene.add(videoMesh);
-    });
-    videoElement.play();
-  });
-
-  // AR Button
-  document.body.appendChild(ARButton.createButton(renderer, { requiredFeatures: ['hit-test'] }));
-
-  // Hit test source
-  let hitTestSource = null;
-  let localReferenceSpace = null;
-
-  renderer.xr.addEventListener('sessionstart', async () => {
-    const session = renderer.xr.getSession();
-    localReferenceSpace = await session.requestReferenceSpace('local');
-    const viewerSpace = await session.requestReferenceSpace('viewer');
-    hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
-
-    session.addEventListener('end', ()=>{
-      hitTestSource = null;
+    videoElement.addEventListener('loadeddata', () => {
+        videoTexture = new THREE.VideoTexture(videoElement);
+        const geom = new THREE.PlaneGeometry(0.5, 0.3);
+        const mat = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
+        videoMesh = new THREE.Mesh(geom, mat);
+        videoMesh.visible = false;
+        scene.add(videoMesh);
     });
 
-    renderer.setAnimationLoop((time, frame)=>{
-      if(frame && hitTestSource){
-        const hitTestResults = frame.getHitTestResults(hitTestSource);
-        if(hitTestResults.length>0){
-          const hit = hitTestResults[0];
-          const pose = hit.getPose(localReferenceSpace);
-          reticle.visible = true;
-          reticle.matrix.fromArray(pose.transform.matrix);
-        } else {
-          reticle.visible = false;
-        }
-      }
-      renderer.render(scene, camera);
-    });
-  });
+    // Автовоспроизведение после клика
+    videoElement.play().catch(()=>{});
+});
 
-  window.addEventListener('resize', ()=>{
-    camera.aspect = window.innerWidth/window.innerHeight;
-    camera.updateProjectionMatrix();
+function init() {
+    scene = new THREE.Scene();
+
+    camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+    renderer.xr.enabled = true;
+    document.body.appendChild(renderer.domElement);
+
+    const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+    scene.add(light);
+
+    // Reticle
+    const geometry = new THREE.RingGeometry(0.07, 0.09, 32).rotateX(-Math.PI/2);
+    const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+    reticle = new THREE.Mesh(geometry, material);
+    reticle.matrixAutoUpdate = false;
+    reticle.visible = false;
+    scene.add(reticle);
+
+    // Controller
+    controller = renderer.xr.getController(0);
+    controller.addEventListener('select', placeVideo);
+    scene.add(controller);
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Настройка hit-test после старта сессии
+    renderer.xr.addEventListener('sessionstart', async () => {
+        const session = renderer.xr.getSession();
+        localSpace = await session.requestReferenceSpace('local');
+        const viewerSpace = await session.requestReferenceSpace('viewer');
+        hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+
+        session.addEventListener('end', () => {
+            hitTestSource = null;
+        });
+
+        renderer.setAnimationLoop((time, frame) => {
+            if (frame && hitTestSource) {
+                const hitTestResults = frame.getHitTestResults(hitTestSource);
+                if (hitTestResults.length > 0) {
+                    const pose = hitTestResults[0].getPose(localSpace);
+                    reticle.visible = true;
+                    reticle.matrix.fromArray(pose.transform.matrix);
+                } else {
+                    reticle.visible = false;
+                }
+            }
+            renderer.render(scene, camera);
+        });
+    });
 }
 
-function placeVideo(){
-  if(videoMesh && reticle.visible){
-    videoMesh.position.setFromMatrixPosition(reticle.matrix);
-    videoMesh.quaternion.setFromRotationMatrix(reticle.matrix);
-    videoMesh.visible = true;
+function placeVideo() {
+    if (videoMesh && reticle.visible) {
+        videoMesh.position.setFromMatrixPosition(reticle.matrix);
+        videoMesh.quaternion.setFromRotationMatrix(reticle.matrix);
+        videoMesh.visible = true;
 
-    if(videoElement.muted) videoElement.muted = false; // включаем звук
-    videoElement.play();
-  }
+        if (videoElement.muted) videoElement.muted = false;
+        videoElement.play();
+    }
 }
 
-function animate(){
-  renderer.setAnimationLoop(()=>{ renderer.render(scene,camera); });
+function animate() {
+    renderer.setAnimationLoop(() => renderer.render(scene, camera));
 }
 </script>
+
 </body>
 </html>
