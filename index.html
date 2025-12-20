@@ -2,42 +2,50 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео с кнопкой Show</title>
+  <title>AR Видео с кнопками</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
     body { margin:0; overflow:hidden; }
     #fileInput {
-      position: fixed; top:10px; left:50%; transform:translateX(-50%); z-index:100;
-      background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
+      position:fixed; top:10px; left:50%; transform:translateX(-50%);
+      z-index:100; background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
     }
-    #showBtnHTML {
-      position: fixed; bottom:20px; left:50%; transform: translateX(-50%);
-      padding: 10px 20px; background: rgba(0,0,0,0.5); color:white; border-radius:5px;
-      cursor: pointer; z-index:100;
+    .video-controls {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 15px; z-index:100;
+    }
+    .control-btn {
+      padding: 10px 15px; border-radius: 5px;
+      background: rgba(0,0,0,0.5); color: white; cursor: pointer;
     }
   </style>
 </head>
 <body>
 <input type="file" id="fileInput" accept="video/*">
-<div id="showBtnHTML">📺 Show Video</div>
+<div class="video-controls">
+  <div class="control-btn" id="playBtn">▶ Play</div>
+  <div class="control-btn" id="pauseBtn">⏸ Pause</div>
+  <div class="control-btn" id="hideBtn">✖ Hide</div>
+  <div class="control-btn" id="showBtn">📺 Show</div>
+</div>
 
-<a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+<a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
   <a-entity camera look-controls></a-entity>
 </a-scene>
 
 <script>
 const scene = document.querySelector('a-scene');
 const fileInput = document.getElementById('fileInput');
-const showBtnHTML = document.getElementById('showBtnHTML');
+
+const playBtn = document.getElementById('playBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const hideBtn = document.getElementById('hideBtn');
+const showBtn = document.getElementById('showBtn');
 
 let videoEl, videoMesh, videoTexture;
 let videoWidth = 1, videoHeight = 0.6;
 let firstInteraction = true;
-
-// 3D кнопки под видео
-let btnGroup;
-let playBtn, pauseBtn, hideBtn;
 
 // --------------------- Видео ---------------------
 fileInput.addEventListener('change', e => {
@@ -63,29 +71,6 @@ fileInput.addEventListener('change', e => {
       videoMesh = new THREE.Mesh(geometry, material);
       videoMesh.visible = false;
       scene.object3D.add(videoMesh);
-
-      // 3D кнопки под видео
-      btnGroup = new THREE.Group();
-      const btnGeom = new THREE.PlaneGeometry(0.3,0.1);
-      const createBtn = (text,color) => {
-        const mat = new THREE.MeshBasicMaterial({color: color, side: THREE.DoubleSide});
-        const mesh = new THREE.Mesh(btnGeom, mat);
-        mesh.userData.label = text;
-        return mesh;
-      }
-
-      playBtn = createBtn('▶', 0x00ff00);
-      pauseBtn = createBtn('⏸', 0xffff00);
-      hideBtn = createBtn('✖', 0xff0000);
-
-      const spacing = 0.35;
-      playBtn.position.set(-spacing, -videoHeight/2 - 0.15, 0);
-      pauseBtn.position.set(0, -videoHeight/2 - 0.15, 0);
-      hideBtn.position.set(spacing, -videoHeight/2 - 0.15, 0);
-
-      btnGroup.add(playBtn,pauseBtn,hideBtn);
-      btnGroup.visible = false;
-      scene.object3D.add(btnGroup);
     } else {
       videoMesh.geometry.dispose();
       videoMesh.geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
@@ -93,105 +78,38 @@ fileInput.addEventListener('change', e => {
   });
 });
 
-// --------------------- Показ видео ---------------------
-function showVideo() {
+// --------------------- Кнопки ---------------------
+playBtn.addEventListener('click', () => { if(videoEl) videoEl.play(); });
+pauseBtn.addEventListener('click', () => { if(videoEl) videoEl.pause(); });
+hideBtn.addEventListener('click', () => { if(videoMesh) videoMesh.visible = false; });
+
+// --------------------- Показ видео перед камерой ---------------------
+showBtn.addEventListener('click', () => {
   if(!videoMesh || !videoEl) return;
 
   const camera = scene.camera;
-  const distance = 2; 
-  const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+  const distance = 2; // 2 метра перед камерой
+  const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
   const pos = camera.position.clone().add(dir.multiplyScalar(distance));
 
   videoMesh.position.copy(pos);
   videoMesh.visible = true;
-
-  btnGroup.position.copy(pos);
-  btnGroup.visible = true;
 
   if(firstInteraction){
     videoEl.muted = false;
     videoEl.play().catch(()=>{});
     firstInteraction = false;
   }
-}
+});
 
 // --------------------- Billboard ---------------------
-scene.addEventListener('render-target-loaded', ()=>{
-  scene.addEventListener('tick', ()=>{
+scene.addEventListener('render-target-loaded', () => {
+  scene.addEventListener('tick', () => {
     if(videoMesh && videoMesh.visible){
       videoMesh.lookAt(scene.camera.position);
-      btnGroup.lookAt(scene.camera.position);
     }
   });
 });
-
-// --------------------- 3D кнопки клики ---------------------
-scene.addEventListener('click', event=>{
-  if(!btnGroup.visible) return;
-
-  const mouse = new THREE.Vector2();
-  mouse.x = (event.clientX / window.innerWidth)*2-1;
-  mouse.y = -(event.clientY / window.innerHeight)*2+1;
-
-  const raycaster = new THREE.Raycaster();
-  raycaster.setFromCamera(mouse, scene.camera);
-  const intersects = raycaster.intersectObjects([playBtn,pauseBtn,hideBtn]);
-
-  if(intersects.length>0){
-    const btn = intersects[0].object;
-    switch(btn.userData.label){
-      case '▶': videoEl.play(); break;
-      case '⏸': videoEl.pause(); break;
-      case '✖': videoMesh.visible=false; btnGroup.visible=false; break;
-    }
-  }
-});
-
-// --------------------- Масштабирование ---------------------
-let startDistance = null;
-let startScale = 1;
-scene.addEventListener('touchstart', e=>{
-  if(e.touches.length==2 && videoMesh){
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    startDistance = Math.sqrt(dx*dx+dy*dy);
-    startScale = videoMesh.scale.x;
-  }
-});
-
-scene.addEventListener('touchmove', e=>{
-  if(e.touches.length==2 && videoMesh && startDistance){
-    const dx = e.touches[0].clientX - e.touches[1].clientX;
-    const dy = e.touches[0].clientY - e.touches[1].clientY;
-    const newDistance = Math.sqrt(dx*dx+dy*dy);
-    const scaleFactor = newDistance/startDistance;
-
-    let newScale = Math.min(Math.max(startScale*scaleFactor,0.2),5);
-    videoMesh.scale.set(newScale,newScale,1);
-    btnGroup.scale.set(newScale,newScale,1);
-  }
-});
-
-// --------------------- Gaze для кнопки Show ---------------------
-let gazeTimer = null;
-let gazeDuration = 3000; // 3 секунды
-function startGaze(){
-  let startTime = performance.now();
-  gazeTimer = requestAnimationFrame(function tick(time){
-    let progress = (time-startTime)/gazeDuration;
-    if(progress>=1){
-      showVideo();
-    } else {
-      gazeTimer = requestAnimationFrame(tick);
-    }
-  });
-}
-function stopGaze(){ if(gazeTimer) cancelAnimationFrame(gazeTimer); }
-
-showBtnHTML.addEventListener('mouseenter', startGaze);
-showBtnHTML.addEventListener('mouseleave', stopGaze);
-showBtnHTML.addEventListener('click', showVideo);
-
 </script>
 </body>
 </html>
