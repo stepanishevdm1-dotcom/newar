@@ -1,487 +1,329 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>AR Video Player</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            margin: 0;
-            overflow: hidden;
-            font-family: Arial, sans-serif;
-            background: #000;
-        }
-        
-        #videoTime {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            color: #00ff00;
-            background: rgba(20, 20, 20, 0.9);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-family: monospace;
-            font-size: 14px;
-            z-index: 999;
-            border: 1px solid #00ff00;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
-        }
-        
-        #fileInput {
-            position: fixed;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 999;
-            background: rgba(20, 20, 20, 0.9);
-            color: #00ff00;
-            border: 1px solid #00ff00;
-            padding: 8px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
-        }
-        
-        #fileInput::-webkit-file-upload-button {
-            background: rgba(0, 255, 0, 0.2);
-            color: #00ff00;
-            border: 1px solid #00ff00;
-            padding: 4px 8px;
-            border-radius: 4px;
-            cursor: pointer;
-            margin-right: 10px;
-        }
-        
-        .loading {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #00ff00;
-            background: rgba(20, 20, 20, 0.9);
-            padding: 20px 30px;
-            border-radius: 10px;
-            z-index: 1000;
-            display: none;
-            border: 1px solid #00ff00;
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.4);
-        }
-        
-        .controls-info {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            color: #00ffff;
-            background: rgba(20, 20, 20, 0.8);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 12px;
-            z-index: 999;
-            border: 1px solid #00ffff;
-        }
-    </style>
+<meta charset="utf-8">
+<title>AR Video WORKING</title>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+<style>
+body { margin:0; overflow:hidden; background: #000; }
+#videoTime {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    color: #0f0;
+    background: rgba(0,0,0,0.8);
+    padding: 6px 10px;
+    border-radius: 5px;
+    font-family: monospace;
+    z-index: 999;
+    border: 1px solid #0f0;
+}
+#fileInput {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    background: rgba(0,0,0,0.8);
+    color: #0f0;
+    border: 1px solid #0f0;
+    padding: 6px 12px;
+    border-radius: 5px;
+}
+.info {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #0ff;
+    background: rgba(0,0,0,0.8);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 12px;
+    z-index: 999;
+}
+</style>
 </head>
 <body>
-    <input id="fileInput" type="file" accept="video/*">
-    <div id="videoTime">00:00 / 00:00</div>
-    <div id="loading" class="loading">Загрузка видео...</div>
-    <div class="controls-info">Наведите курсор на кнопку на 1 сек</div>
+<input id="fileInput" type="file" accept="video/*">
+<div id="videoTime">00:00 / 00:00</div>
+<div class="info">Наведите на кнопку и держите 2 секунды</div>
+
+<a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false" vr-mode-ui="enabled: false">
+    <!-- КАМЕРА + КУРСОР -->
+    <a-entity camera look-controls="enabled: false">
+        <a-cursor 
+            fuse="true" 
+            fuse-timeout="2000"
+            raycaster="objects: .btn"
+            geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
+            material="color: #ff9900; shader: flat">
+        </a-cursor>
+    </a-entity>
     
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
-        <!-- Камера с курсором -->
-        <a-entity camera look-controls="enabled: false">
-            <a-cursor 
-                fuse="true" 
-                fuse-timeout="1000" 
-                raycaster="objects: .btn"
-                geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.025"
-                material="color: #ff9900; shader: flat">
-            </a-cursor>
+    <!-- ВИДЕО -->
+    <a-video 
+        id="videoPlane" 
+        visible="false" 
+        position="0 0 -2" 
+        width="1.6" 
+        height="0.9" 
+        scale="-1 1 1"
+        material="shader: flat; side: double">
+    </a-video>
+    
+    <!-- КНОПКИ УПРАВЛЕНИЯ -->
+    <a-entity id="buttons" position="0 -0.5 -2" visible="false">
+        <!-- Play -->
+        <a-entity class="btn" position="-0.8 0 0">
+            <a-plane color="#006600" width="0.4" height="0.18"></a-plane>
+            <a-text value="▶" color="#0f0" align="center" position="0 0 0.01" scale="0.7 0.7 1"></a-text>
         </a-entity>
         
-        <!-- Видеоплейер -->
-        <a-entity id="videoPlayer" position="0 0 -2" visible="false">
-            <!-- Видео плоскость -->
-            <a-video 
-                id="videoPlane"
-                width="1.6"
-                height="0.9"
-                scale="-1 1 1"
-                material="shader: flat; side: double">
-            </a-video>
-            
-            <!-- Кнопки управления видео -->
-            <a-entity id="videoButtons" position="0 -0.55 0">
-                <!-- Play -->
-                <a-entity class="btn" position="-0.6 0 0">
-                    <a-plane 
-                        color="#006600"
-                        width="0.35"
-                        height="0.15"
-                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200"
-                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200">
-                    </a-plane>
-                    <a-text 
-                        value="▶"
-                        align="center"
-                        position="0 0 0.01"
-                        scale="0.6 0.6 1"
-                        color="#00ff00">
-                    </a-text>
-                </a-entity>
-                
-                <!-- Pause -->
-                <a-entity class="btn" position="-0.2 0 0">
-                    <a-plane 
-                        color="#666600"
-                        width="0.35"
-                        height="0.15"
-                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200"
-                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200">
-                    </a-plane>
-                    <a-text 
-                        value="⏸"
-                        align="center"
-                        position="0 0 0.01"
-                        scale="0.6 0.6 1"
-                        color="#ffff00">
-                    </a-text>
-                </a-entity>
-                
-                <!-- +5 секунд -->
-                <a-entity class="btn" position="0.2 0 0">
-                    <a-plane 
-                        color="#006666"
-                        width="0.35"
-                        height="0.15"
-                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200"
-                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200">
-                    </a-plane>
-                    <a-text 
-                        value="+5s"
-                        align="center"
-                        position="0 0 0.01"
-                        scale="0.5 0.5 1"
-                        color="#00ffff">
-                    </a-text>
-                </a-entity>
-                
-                <!-- -5 секунд -->
-                <a-entity class="btn" position="0.6 0 0">
-                    <a-plane 
-                        color="#660066"
-                        width="0.35"
-                        height="0.15"
-                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200"
-                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200">
-                    </a-plane>
-                    <a-text 
-                        value="-5s"
-                        align="center"
-                        position="0 0 0.01"
-                        scale="0.5 0.5 1"
-                        color="#ff00ff">
-                    </a-text>
-                </a-entity>
-            </a-entity>
-            
-            <!-- Кнопки изменения размера -->
-            <a-entity id="sizeButtons" position="0 -0.75 0">
-                <!-- Увеличить -->
-                <a-entity class="size-btn" position="-0.3 0 0">
-                    <a-plane 
-                        color="#333333"
-                        width="0.25"
-                        height="0.12"
-                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200"
-                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200">
-                    </a-plane>
-                    <a-text 
-                        value="+ Размер"
-                        align="center"
-                        position="0 0 0.01"
-                        scale="0.35 0.35 1"
-                        color="#ffffff">
-                    </a-text>
-                </a-entity>
-                
-                <!-- Уменьшить -->
-                <a-entity class="size-btn" position="0.3 0 0">
-                    <a-plane 
-                        color="#333333"
-                        width="0.25"
-                        height="0.12"
-                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200"
-                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200">
-                    </a-plane>
-                    <a-text 
-                        value="- Размер"
-                        align="center"
-                        position="0 0 0.01"
-                        scale="0.35 0.35 1"
-                        color="#ffffff">
-                    </a-text>
-                </a-entity>
-            </a-entity>
-            
-            <!-- Индикатор загрузки -->
-            <a-entity id="loadingIndicator" position="0 0 0.01" visible="false">
-                <a-ring color="#00ff00" radius-inner="0.08" radius-outer="0.12">
-                    <a-animation attribute="rotation" dur="1000" to="0 0 360" repeat="indefinite"></a-animation>
-                </a-ring>
-                <a-text value="Загрузка..." align="center" position="0 -0.15 0" scale="0.4 0.4 1" color="#00ff00"></a-text>
-            </a-entity>
+        <!-- Pause -->
+        <a-entity class="btn" position="-0.4 0 0">
+            <a-plane color="#663300" width="0.4" height="0.18"></a-plane>
+            <a-text value="⏸" color="#ff0" align="center" position="0 0 0.01" scale="0.7 0.7 1"></a-text>
         </a-entity>
-    </a-scene>
+        
+        <!-- +5 секунд -->
+        <a-entity class="btn" position="0 0 0">
+            <a-plane color="#003366" width="0.4" height="0.18"></a-plane>
+            <a-text value="+5s" color="#0ff" align="center" position="0 0 0.01" scale="0.5 0.5 1"></a-text>
+        </a-entity>
+        
+        <!-- -5 секунд -->
+        <a-entity class="btn" position="0.4 0 0">
+            <a-plane color="#660066" width="0.4" height="0.18"></a-plane>
+            <a-text value="-5s" color="#f0f" align="center" position="0 0 0.01" scale="0.5 0.5 1"></a-text>
+        </a-entity>
+        
+        <!-- Увеличить размер -->
+        <a-entity class="btn" position="0.8 0 0">
+            <a-plane color="#333333" width="0.4" height="0.18"></a-plane>
+            <a-text value="+ Размер" color="#fff" align="center" position="0 0 0.01" scale="0.35 0.35 1"></a-text>
+        </a-entity>
+    </a-entity>
     
-    <script>
-        let videoEl = null;
-        let currentVideoScale = 1.0;
-        const MIN_SCALE = 0.5;
-        const MAX_SCALE = 2.0;
-        const SCALE_STEP = 0.2;
+    <!-- КНОПКИ РАЗМЕРА -->
+    <a-entity id="sizeButtons" position="0 -0.8 -2" visible="false">
+        <!-- Уменьшить размер -->
+        <a-entity class="btn size-btn" position="-0.2 0 0">
+            <a-plane color="#333333" width="0.3" height="0.14"></a-plane>
+            <a-text value="-" color="#fff" align="center" position="0 0 0.01" scale="0.5 0.5 1"></a-text>
+        </a-entity>
         
-        const videoPlayer = document.getElementById('videoPlayer');
-        const videoPlane = document.getElementById('videoPlane');
-        const timeEl = document.getElementById('videoTime');
-        const fileInput = document.getElementById('fileInput');
-        const loading = document.getElementById('loading');
-        const loadingIndicator = document.getElementById('loadingIndicator');
+        <!-- Текущий размер -->
+        <a-text value="Размер: 100%" color="#fff" align="center" position="0 0 0" scale="0.4 0.4 1"></a-text>
         
-        // Форматирование времени
-        const formatTime = (seconds) => {
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-        };
-        
-        // Загрузка видео
-        fileInput.onchange = async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            // Показать индикатор загрузки
-            loading.style.display = 'block';
-            loadingIndicator.setAttribute('visible', true);
-            
-            try {
-                // Создать элемент видео
-                videoEl = document.createElement('video');
-                videoEl.id = 'ar-video-' + Date.now();
-                videoEl.src = URL.createObjectURL(file);
-                videoEl.loop = true;
-                videoEl.playsInline = true;
-                videoEl.crossOrigin = 'anonymous';
-                videoEl.preload = 'metadata';
-                
-                // Дождаться загрузки метаданных
-                await new Promise((resolve, reject) => {
-                    videoEl.onloadedmetadata = () => {
-                        console.log('Video metadata loaded');
-                        resolve();
-                    };
-                    videoEl.onerror = reject;
-                    setTimeout(() => reject(new Error('Timeout loading video')), 15000);
-                });
-                
-                // Установить видео в плоскость
-                videoPlane.setAttribute('src', '#' + videoEl.id);
-                document.body.appendChild(videoEl);
-                
-                // Сбросить масштаб
-                currentVideoScale = 1.0;
-                updateVideoScale();
-                
-                // Показать плеер
-                videoPlayer.setAttribute('visible', true);
-                
-                // Начать воспроизведение
-                try {
-                    await videoEl.play();
-                } catch (err) {
-                    console.log('Автовоспроизведение не удалось, ждем взаимодействия пользователя');
-                    // Можно показать кнопку play здесь
-                }
-                
-            } catch (error) {
-                console.error('Ошибка загрузки видео:', error);
-                alert('Ошибка загрузки видео: ' + error.message);
-            } finally {
-                // Скрыть индикатор загрузки
-                loading.style.display = 'none';
-                loadingIndicator.setAttribute('visible', false);
-            }
-        };
-        
-        // Обновление таймера
-        setInterval(() => {
-            if (!videoEl || videoEl.paused) return;
-            
-            const current = videoEl.currentTime;
-            const duration = videoEl.duration || 0;
-            
-            if (!isNaN(duration) && duration > 0) {
-                timeEl.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
-            } else {
-                timeEl.textContent = `${formatTime(current)} / --:--`;
-            }
-        }, 250);
-        
-        // Обновление масштаба видео
-        function updateVideoScale() {
-            videoPlane.setAttribute('width', 1.6 * currentVideoScale);
-            videoPlane.setAttribute('height', 0.9 * currentVideoScale);
-        }
-        
-        // Компоненты для кнопок
-        AFRAME.registerComponent('play-btn', {
-            init() {
-                this.el.addEventListener('fuse', () => {
-                    console.log('Play button clicked');
-                    if (videoEl) {
-                        videoEl.play().catch(e => console.log('Play error:', e));
-                        // Анимация нажатия
-                        this.el.setAttribute('animation__click', 'property: scale; to: 0.9 0.9 1; dur: 100; easing: easeOutCubic');
-                        setTimeout(() => {
-                            this.el.removeAttribute('animation__click');
-                        }, 100);
-                    }
+        <!-- Увеличить размер -->
+        <a-entity class="btn size-btn" position="0.2 0 0">
+            <a-plane color="#333333" width="0.3" height="0.14"></a-plane>
+            <a-text value="+" color="#fff" align="center" position="0 0 0.01" scale="0.5 0.5 1"></a-text>
+        </a-entity>
+    </a-entity>
+</a-scene>
+
+<script>
+let videoEl;
+let currentScale = 1.0;
+const videoPlane = document.getElementById('videoPlane');
+const buttons = document.getElementById('buttons');
+const sizeButtons = document.getElementById('sizeButtons');
+const timeEl = document.getElementById('videoTime');
+const fileInput = document.getElementById('fileInput');
+
+// Загрузка видео
+fileInput.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    videoEl = document.createElement('video');
+    videoEl.src = URL.createObjectURL(file);
+    videoEl.loop = true;
+    videoEl.playsInline = true;
+    videoEl.crossOrigin = 'anonymous';
+    videoEl.setAttribute('playsinline', '');
+    videoEl.setAttribute('webkit-playsinline', '');
+    
+    videoPlane.setAttribute('src', videoEl);
+    videoPlane.setAttribute('visible', true);
+    buttons.setAttribute('visible', true);
+    sizeButtons.setAttribute('visible', true);
+    
+    // Обновить отображение размера
+    updateSizeDisplay();
+    
+    // Попробовать запустить видео
+    videoEl.play().catch(e => {
+        console.log("Автовоспроизведение заблокировано, требуется взаимодействие");
+    });
+};
+
+// Обновление таймера
+setInterval(() => {
+    if (!videoEl) return;
+    const f = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
+    timeEl.textContent = `${f(videoEl.currentTime)} / ${isNaN(videoEl.duration) ? '00:00' : f(videoEl.duration)}`;
+}, 300);
+
+// Обновить отображение размера
+function updateSizeDisplay() {
+    const sizeText = sizeButtons.querySelector('a-text[value^="Размер:"]');
+    if (sizeText) {
+        sizeText.setAttribute('value', `Размер: ${Math.round(currentScale * 100)}%`);
+    }
+    videoPlane.setAttribute('width', 1.6 * currentScale);
+    videoPlane.setAttribute('height', 0.9 * currentScale);
+}
+
+// Компоненты для кнопок управления
+AFRAME.registerComponent('play-btn', {
+    init() {
+        this.el.addEventListener('fuse', () => {
+            console.log('Play clicked');
+            if (videoEl) {
+                videoEl.play();
+                // Анимация
+                this.el.setAttribute('animation', {
+                    property: 'scale',
+                    to: '0.9 0.9 1',
+                    dur: 150,
+                    easing: 'easeOutQuad',
+                    dir: 'alternate'
                 });
             }
         });
-        
-        AFRAME.registerComponent('pause-btn', {
-            init() {
-                this.el.addEventListener('fuse', () => {
-                    console.log('Pause button clicked');
-                    if (videoEl) {
-                        videoEl.pause();
-                        // Анимация нажатия
-                        this.el.setAttribute('animation__click', 'property: scale; to: 0.9 0.9 1; dur: 100; easing: easeOutCubic');
-                        setTimeout(() => {
-                            this.el.removeAttribute('animation__click');
-                        }, 100);
-                    }
+    }
+});
+
+AFRAME.registerComponent('pause-btn', {
+    init() {
+        this.el.addEventListener('fuse', () => {
+            console.log('Pause clicked');
+            if (videoEl) {
+                videoEl.pause();
+                // Анимация
+                this.el.setAttribute('animation', {
+                    property: 'scale',
+                    to: '0.9 0.9 1',
+                    dur: 150,
+                    easing: 'easeOutQuad',
+                    dir: 'alternate'
                 });
             }
         });
-        
-        AFRAME.registerComponent('plus-btn', {
-            init() {
-                this.el.addEventListener('fuse', () => {
-                    console.log('+5 button clicked');
-                    if (videoEl && !isNaN(videoEl.duration)) {
-                        videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime + 5);
-                        // Анимация нажатия
-                        this.el.setAttribute('animation__click', 'property: scale; to: 0.9 0.9 1; dur: 100; easing: easeOutCubic');
-                        setTimeout(() => {
-                            this.el.removeAttribute('animation__click');
-                        }, 100);
-                    }
+    }
+});
+
+AFRAME.registerComponent('plus-btn', {
+    init() {
+        this.el.addEventListener('fuse', () => {
+            console.log('+5 clicked');
+            if (videoEl) {
+                videoEl.currentTime += 5;
+                // Анимация
+                this.el.setAttribute('animation', {
+                    property: 'scale',
+                    to: '0.9 0.9 1',
+                    dur: 150,
+                    easing: 'easeOutQuad',
+                    dir: 'alternate'
                 });
             }
         });
-        
-        AFRAME.registerComponent('minus-btn', {
-            init() {
-                this.el.addEventListener('fuse', () => {
-                    console.log('-5 button clicked');
-                    if (videoEl) {
-                        videoEl.currentTime = Math.max(0, videoEl.currentTime - 5);
-                        // Анимация нажатия
-                        this.el.setAttribute('animation__click', 'property: scale; to: 0.9 0.9 1; dur: 100; easing: easeOutCubic');
-                        setTimeout(() => {
-                            this.el.removeAttribute('animation__click');
-                        }, 100);
-                    }
+    }
+});
+
+AFRAME.registerComponent('minus-btn', {
+    init() {
+        this.el.addEventListener('fuse', () => {
+            console.log('-5 clicked');
+            if (videoEl) {
+                videoEl.currentTime -= 5;
+                // Анимация
+                this.el.setAttribute('animation', {
+                    property: 'scale',
+                    to: '0.9 0.9 1',
+                    dur: 150,
+                    easing: 'easeOutQuad',
+                    dir: 'alternate'
                 });
             }
         });
-        
-        AFRAME.registerComponent('increase-size-btn', {
-            init() {
-                this.el.addEventListener('fuse', () => {
-                    console.log('Increase size button clicked');
-                    currentVideoScale = Math.min(MAX_SCALE, currentVideoScale + SCALE_STEP);
-                    updateVideoScale();
-                    
-                    // Анимация нажатия
-                    this.el.setAttribute('animation__click', 'property: scale; to: 0.9 0.9 1; dur: 100; easing: easeOutCubic');
-                    setTimeout(() => {
-                        this.el.removeAttribute('animation__click');
-                    }, 100);
-                });
-            }
+    }
+});
+
+AFRAME.registerComponent('size-up-btn', {
+    init() {
+        this.el.addEventListener('fuse', () => {
+            console.log('Size up clicked');
+            currentScale = Math.min(2.0, currentScale + 0.2);
+            updateSizeDisplay();
+            // Анимация
+            this.el.setAttribute('animation', {
+                property: 'scale',
+                to: '0.9 0.9 1',
+                dur: 150,
+                easing: 'easeOutQuad',
+                dir: 'alternate'
+            });
         });
-        
-        AFRAME.registerComponent('decrease-size-btn', {
-            init() {
-                this.el.addEventListener('fuse', () => {
-                    console.log('Decrease size button clicked');
-                    currentVideoScale = Math.max(MIN_SCALE, currentVideoScale - SCALE_STEP);
-                    updateVideoScale();
-                    
-                    // Анимация нажатия
-                    this.el.setAttribute('animation__click', 'property: scale; to: 0.9 0.9 1; dur: 100; easing: easeOutCubic');
-                    setTimeout(() => {
-                        this.el.removeAttribute('animation__click');
-                    }, 100);
-                });
-            }
+    }
+});
+
+AFRAME.registerComponent('size-down-btn', {
+    init() {
+        this.el.addEventListener('fuse', () => {
+            console.log('Size down clicked');
+            currentScale = Math.max(0.5, currentScale - 0.2);
+            updateSizeDisplay();
+            // Анимация
+            this.el.setAttribute('animation', {
+                property: 'scale',
+                to: '0.9 0.9 1',
+                dur: 150,
+                easing: 'easeOutQuad',
+                dir: 'alternate'
+            });
         });
-        
-        // Назначить компоненты кнопкам управления видео
-        document.querySelectorAll('#videoButtons .btn').forEach((btn, index) => {
-            switch(index) {
-                case 0:
-                    btn.setAttribute('play-btn', '');
-                    break;
-                case 1:
-                    btn.setAttribute('pause-btn', '');
-                    break;
-                case 2:
-                    btn.setAttribute('plus-btn', '');
-                    break;
-                case 3:
-                    btn.setAttribute('minus-btn', '');
-                    break;
-            }
-        });
-        
-        // Назначить компоненты кнопкам изменения размера
-        document.querySelectorAll('#sizeButtons .size-btn').forEach((btn, index) => {
-            if (index === 0) {
-                btn.setAttribute('increase-size-btn', '');
-            } else {
-                btn.setAttribute('decrease-size-btn', '');
-            }
-        });
-        
-        // Добавить обработчики событий для отладки
-        document.querySelectorAll('.btn, .size-btn').forEach(btn => {
-            btn.addEventListener('mouseenter', () => console.log('Mouse enter button'));
-            btn.addEventListener('mouseleave', () => console.log('Mouse leave button'));
-        });
-        
-        // Освобождение ресурсов при закрытии
-        window.addEventListener('beforeunload', () => {
-            if (videoEl && videoEl.src) {
-                URL.revokeObjectURL(videoEl.src);
-            }
-        });
-        
-        // Авто-скрытие подсказки через 10 секунд
-        setTimeout(() => {
-            document.querySelector('.controls-info').style.opacity = '0.5';
-        }, 10000);
-    </script>
+    }
+});
+
+// Привязка компонентов к кнопкам после загрузки сцены
+document.querySelector('a-scene').addEventListener('loaded', function() {
+    console.log('Scene loaded, attaching button components');
+    
+    // Получаем все кнопки
+    const btns = document.querySelectorAll('.btn');
+    
+    // Привязываем компоненты в правильном порядке
+    if (btns[0]) btns[0].setAttribute('play-btn', '');
+    if (btns[1]) btns[1].setAttribute('pause-btn', '');
+    if (btns[2]) btns[2].setAttribute('plus-btn', '');
+    if (btns[3]) btns[3].setAttribute('minus-btn', '');
+    if (btns[4]) btns[4].setAttribute('size-up-btn', '');
+    
+    // Кнопки изменения размера
+    const sizeBtns = document.querySelectorAll('.size-btn');
+    if (sizeBtns[0]) sizeBtns[0].setAttribute('size-down-btn', '');
+    if (sizeBtns[1]) sizeBtns[1].setAttribute('size-up-btn', '');
+    
+    console.log('Button components attached:', btns.length, 'buttons found');
+});
+
+// Отладка событий
+document.addEventListener('click', (e) => {
+    console.log('Click event:', e.target);
+});
+
+// Освобождение ресурсов
+window.addEventListener('beforeunload', () => {
+    if (videoEl && videoEl.src) {
+        URL.revokeObjectURL(videoEl.src);
+    }
+});
+</script>
 </body>
 </html>
