@@ -41,7 +41,7 @@ const buttonData = [
   {name:'-5', offsetX:0.45, action:()=>videoEl.currentTime-=5},
 ];
 
-// ----------------- Загрузка видео -----------------
+// ----------------- Загрузка видео заранее -----------------
 fileInput.addEventListener('change', e=>{
   const file = e.target.files[0];
   if(!file) return;
@@ -53,6 +53,7 @@ fileInput.addEventListener('change', e=>{
   videoEl.muted = false;
   videoEl.playsInline = true;
   videoEl.crossOrigin = 'anonymous';
+  videoEl.preload = 'auto';
 
   videoEl.addEventListener('loadeddata', ()=>{
     videoWidth = videoEl.videoWidth / videoEl.videoHeight;
@@ -66,7 +67,7 @@ fileInput.addEventListener('change', e=>{
       videoMesh.visible=false;
       scene.object3D.add(videoMesh);
 
-      createButtons(); // кнопки создаются заранее, но скрыты
+      createButtons();
       buttonGroup.visible=false;
     }else{
       videoMesh.geometry.dispose();
@@ -83,16 +84,14 @@ function createButtons(){
     btn.setAttribute('geometry','primitive: plane; width:0.25; height:0.08');
     btn.setAttribute('material','color:blue; opacity:0.6');
 
-    // текст
     const text = document.createElement('a-entity');
     text.setAttribute('text',`value:${b.name}; align:center; color:white; width:2`);
     text.object3D.position.set(0,0,0.01);
     btn.appendChild(text);
 
-    // прогресс-кружок
     const progress = document.createElement('a-entity');
     progress.setAttribute('geometry','primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:0');
-    progress.setAttribute('material','color:white; shader:flat; opacity:0.8');
+    progress.setAttribute('material','color:black; shader:flat; opacity:0.8');
     progress.object3D.position.set(0,0,0.02);
     btn.appendChild(progress);
 
@@ -103,7 +102,6 @@ function createButtons(){
       if(this.progress>=1){ b.action(); this.progress=0; this.setAttribute('geometry',`primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:0`);}
     }
 
-    // наведение
     let hovering=false;
     btn.addEventListener('mouseenter', ()=>hovering=true);
     btn.addEventListener('mouseleave', ()=>{
@@ -125,8 +123,8 @@ function createButtons(){
   scene.object3D.add(buttonGroup);
 }
 
-// ----------------- Установка видео и показ кнопок по нажатию -----------------
-scene.addEventListener('click', event=>{
+// ----------------- Появление видео и кнопок по нажатию -----------------
+scene.addEventListener('click', ()=>{
   if(!videoMesh || !videoEl) return;
 
   const vector=new THREE.Vector3(0,0,-1);
@@ -138,14 +136,11 @@ scene.addEventListener('click', event=>{
   videoMesh.position.copy(pos);
   videoMesh.visible=true;
 
-  // показываем кнопки и размещаем их под видео
   buttonGroup.visible=true;
   buttonGroup.position.set(0,-videoHeight/2-0.15,0);
 
-  if(firstInteraction){
-    videoEl.play().catch(()=>{});
-    firstInteraction=false;
-  }
+  // важный момент: для мобильных браузеров нужно активировать play через событие касания
+  videoEl.play().catch(()=>{});
 });
 
 // ----------------- Масштабирование всего вместе -----------------
@@ -166,7 +161,6 @@ scene.addEventListener('touchmove', e=>{
     const scaleFactor=newDistance/startDistance;
     videoMesh.scale.set(startScale*scaleFactor,startScale*scaleFactor,1);
 
-    // масштабируем всю группу кнопок вместе
     buttonGroup.scale.set(scaleFactor,scaleFactor,1);
   }
 });
