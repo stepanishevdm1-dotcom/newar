@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео с сеткой пола</title>
+  <title>AR Видео в воздухе</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -12,34 +12,27 @@
       z-index: 10; background: rgba(0,0,0,0.5); color: white;
       padding: 5px 10px; border-radius: 5px;
     }
+    #distanceRange {
+      position: fixed; top: 50px; left: 50%; transform: translateX(-50%);
+      z-index: 10; width: 200px;
+    }
   </style>
 </head>
 <body>
 
 <input type="file" id="fileInput" accept="video/*">
+<label>
+  Расстояние: <input type="range" id="distanceRange" min="0.5" max="5" step="0.1" value="2">
+</label>
 
 <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
   <a-entity camera look-controls></a-entity>
-
-  <!-- Сетка пола для визуальной ориентации -->
-  <a-entity id="floorGrid" position="0 0 0">
-    <!-- Создаём несколько линий сетки -->
-    <a-box position="0 0 0" width="5" height="0.01" depth="0.01" color="#0f0"></a-box>
-    <a-box position="0 0 1" width="5" height="0.01" depth="0.01" color="#0f0"></a-box>
-    <a-box position="0 0 2" width="5" height="0.01" depth="0.01" color="#0f0"></a-box>
-    <a-box position="0 0 -1" width="5" height="0.01" depth="0.01" color="#0f0"></a-box>
-    <a-box position="0 0 -2" width="5" height="0.01" depth="0.01" color="#0f0"></a-box>
-
-    <a-box position="2 0 0" width="0.01" height="0.01" depth="5" color="#0f0"></a-box>
-    <a-box position="1 0 0" width="0.01" height="0.01" depth="5" color="#0f0"></a-box>
-    <a-box position="-1 0 0" width="0.01" height="0.01" depth="5" color="#0f0"></a-box>
-    <a-box position="-2 0 0" width="0.01" height="0.01" depth="5" color="#0f0"></a-box>
-  </a-entity>
 </a-scene>
 
 <script>
 const scene = document.querySelector('a-scene');
 const fileInput = document.getElementById('fileInput');
+const distanceRange = document.getElementById('distanceRange');
 
 let arVideo;
 
@@ -53,7 +46,6 @@ fileInput.addEventListener('change', e => {
     arVideo.setAttribute('src', url);
     arVideo.setAttribute('width', '1');
     arVideo.setAttribute('height', '0.6');
-    arVideo.setAttribute('rotation', '-90 0 0');
     arVideo.setAttribute('visible', 'false');
     scene.appendChild(arVideo);
   } else {
@@ -61,18 +53,17 @@ fileInput.addEventListener('change', e => {
   }
 });
 
-// При тапе по экрану ставим видео в точку касания
+// При тапе по экрану ставим видео в воздухе
 scene.addEventListener('click', function(event){
   if(!arVideo) return;
 
-  // Получаем координаты экрана
   const touchX = event.clientX / window.innerWidth * 2 - 1;
   const touchY = - (event.clientY / window.innerHeight) * 2 + 1;
 
   const camera = scene.camera;
   const vector = new THREE.Vector3(touchX, touchY, -1).unproject(camera);
   const dir = vector.sub(camera.position).normalize();
-  const distance = 2; // Расстояние от камеры до “пола”
+  const distance = parseFloat(distanceRange.value);
   const pos = camera.position.clone().add(dir.multiplyScalar(distance));
 
   arVideo.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
