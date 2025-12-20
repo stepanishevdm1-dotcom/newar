@@ -2,15 +2,15 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>AR Видео с кнопками</title>
+<title>AR Видео простое</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 <style>
-  body { margin:0; overflow:hidden; }
-  #fileInput {
-    position:fixed; top:10px; left:50%; transform:translateX(-50%);
-    z-index:10; background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
-  }
+body { margin:0; overflow:hidden; }
+#fileInput {
+  position:fixed; top:10px; left:50%; transform:translateX(-50%);
+  z-index:10; background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
+}
 </style>
 </head>
 <body>
@@ -18,7 +18,7 @@
 
 <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
   <a-entity id="camera" camera look-controls>
-    <a-entity id="cursor" cursor="fuse: true; fuseTimeout: 3000" position="0 0 -1"
+    <a-entity cursor="fuse:true; fuseTimeout:3000" position="0 0 -1"
               geometry="primitive:ring; radiusInner:0.005; radiusOuter:0.01"
               material="color:black; shader:flat"></a-entity>
   </a-entity>
@@ -31,17 +31,7 @@ const fileInput = document.getElementById('fileInput');
 
 let videoEl, videoMesh, videoTexture;
 let videoWidth=1, videoHeight=0.6;
-let firstInteraction=true;
-let buttonGroup;
 
-const buttonData = [
-  {name:'Произвести', offsetX:-0.45, action:()=>videoEl.play()},
-  {name:'Пауза', offsetX:-0.15, action:()=>videoEl.pause()},
-  {name:'+5', offsetX:0.15, action:()=>videoEl.currentTime+=5},
-  {name:'-5', offsetX:0.45, action:()=>videoEl.currentTime-=5},
-];
-
-// ----------------- Загрузка видео заранее -----------------
 fileInput.addEventListener('change', e=>{
   const file = e.target.files[0];
   if(!file) return;
@@ -50,10 +40,9 @@ fileInput.addEventListener('change', e=>{
   videoEl = document.createElement('video');
   videoEl.src = url;
   videoEl.loop = true;
-  videoEl.muted = false;
   videoEl.playsInline = true;
+  videoEl.muted = false;
   videoEl.crossOrigin = 'anonymous';
-  videoEl.preload = 'auto';
 
   videoEl.addEventListener('loadeddata', ()=>{
     videoWidth = videoEl.videoWidth / videoEl.videoHeight;
@@ -66,106 +55,30 @@ fileInput.addEventListener('change', e=>{
       videoMesh = new THREE.Mesh(geometry, material);
       videoMesh.visible=false;
       scene.object3D.add(videoMesh);
-
-      createButtons();
-      buttonGroup.visible=false;
-    }else{
+    } else {
       videoMesh.geometry.dispose();
       videoMesh.geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
     }
   });
 });
 
-// ----------------- Создание кнопок -----------------
-function createButtons(){
-  buttonGroup = new THREE.Group();
-  buttonData.forEach(b=>{
-    const btn = document.createElement('a-entity');
-    btn.setAttribute('geometry','primitive: plane; width:0.25; height:0.08');
-    btn.setAttribute('material','color:blue; opacity:0.6');
-
-    const text = document.createElement('a-entity');
-    text.setAttribute('text',`value:${b.name}; align:center; color:white; width:2`);
-    text.object3D.position.set(0,0,0.01);
-    btn.appendChild(text);
-
-    const progress = document.createElement('a-entity');
-    progress.setAttribute('geometry','primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:0');
-    progress.setAttribute('material','color:black; shader:flat; opacity:0.8');
-    progress.object3D.position.set(0,0,0.02);
-    btn.appendChild(progress);
-
-    progress.progress=0;
-    progress.updateProgress=function(dt){
-      this.progress+=dt/3000;
-      this.setAttribute('geometry',`primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:${Math.min(this.progress*360,360)}`);
-      if(this.progress>=1){ b.action(); this.progress=0; this.setAttribute('geometry',`primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:0`);}
-    }
-
-    let hovering=false;
-    btn.addEventListener('mouseenter', ()=>hovering=true);
-    btn.addEventListener('mouseleave', ()=>{
-      hovering=false;
-      progress.progress=0;
-      progress.setAttribute('geometry',`primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:0`);
-    });
-
-    scene.addEventListener('tick', ()=>{
-      if(hovering) progress.updateProgress(16);
-    });
-
-    btn.object3D.position.x=b.offsetX;
-    btn.object3D.position.y=-0.9;
-    btn.object3D.position.z=-1.5;
-
-    buttonGroup.add(btn.object3D);
-  });
-  scene.object3D.add(buttonGroup);
-}
-
-// ----------------- Появление видео и кнопок по нажатию -----------------
+// Появление видео по первому клику
 scene.addEventListener('click', ()=>{
   if(!videoMesh || !videoEl) return;
 
-  const vector=new THREE.Vector3(0,0,-1);
+  const vector = new THREE.Vector3(0,0,-1);
   vector.unproject(camera.object3D.children[0]);
-  const dir=vector.sub(camera.object3D.position).normalize();
-  const distance=2;
-  const pos=camera.object3D.position.clone().add(dir.multiplyScalar(distance));
+  const dir = vector.sub(camera.object3D.position).normalize();
+  const distance = 2;
+  const pos = camera.object3D.position.clone().add(dir.multiplyScalar(distance));
 
   videoMesh.position.copy(pos);
-  videoMesh.visible=true;
+  videoMesh.visible = true;
 
-  buttonGroup.visible=true;
-  buttonGroup.position.set(0,-videoHeight/2-0.15,0);
-
-  // важный момент: для мобильных браузеров нужно активировать play через событие касания
   videoEl.play().catch(()=>{});
 });
 
-// ----------------- Масштабирование всего вместе -----------------
-let startDistance=null, startScale=1;
-scene.addEventListener('touchstart', e=>{
-  if(e.touches.length==2 && videoMesh){
-    const dx=e.touches[0].clientX-e.touches[1].clientX;
-    const dy=e.touches[0].clientY-e.touches[1].clientY;
-    startDistance=Math.sqrt(dx*dx+dy*dy);
-    startScale=videoMesh.scale.x;
-  }
-});
-scene.addEventListener('touchmove', e=>{
-  if(e.touches.length==2 && videoMesh && startDistance){
-    const dx=e.touches[0].clientX-e.touches[1].clientX;
-    const dy=e.touches[0].clientY-e.touches[1].clientY;
-    const newDistance=Math.sqrt(dx*dx+dy*dy);
-    const scaleFactor=newDistance/startDistance;
-    videoMesh.scale.set(startScale*scaleFactor,startScale*scaleFactor,1);
-
-    buttonGroup.scale.set(scaleFactor,scaleFactor,1);
-  }
-});
-
-// ----------------- Видео всегда смотрит на камеру -----------------
+// Видео всегда смотрит на камеру
 scene.addEventListener('tick', ()=>{
   if(videoMesh && videoMesh.visible){
     videoMesh.lookAt(camera.object3D.position);
