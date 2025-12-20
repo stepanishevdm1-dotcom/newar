@@ -17,7 +17,11 @@
 <input type="file" id="fileInput" accept="video/*">
 
 <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
-  <a-entity id="camera" camera look-controls></a-entity>
+  <a-entity id="camera" camera look-controls>
+    <a-entity id="cursor" cursor="fuse:false" position="0 0 -1"
+              geometry="primitive:ring; radiusInner:0.01; radiusOuter:0.015"
+              material="color:black; shader:flat"></a-entity>
+  </a-entity>
 </a-scene>
 
 <script>
@@ -27,19 +31,13 @@ const fileInput = document.getElementById('fileInput');
 let videoEl, videoMesh, videoTexture;
 let videoWidth = 1, videoHeight = 0.6;
 let firstInteraction = true;
-let buttonGroup = null;
+let buttonsCreated = false;
+let buttonEntities = [];
 
-const buttonsData = [
-  {name:'Произвести', action:()=>videoEl.play()},
-  {name:'Пауза', action:()=>videoEl.pause()},
-  {name:'+5', action:()=>videoEl.currentTime+=5},
-  {name:'-5', action:()=>videoEl.currentTime-=5},
-];
-
-// ------------------- Загрузка видео -------------------
-fileInput.addEventListener('change', e=>{
+fileInput.addEventListener('change', e => {
   const file = e.target.files[0];
   if(!file) return;
+
   const url = URL.createObjectURL(file);
 
   videoEl = document.createElement('video');
@@ -59,10 +57,8 @@ fileInput.addEventListener('change', e=>{
       const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
       videoMesh = new THREE.Mesh(geometry, material);
       videoMesh.visible = false;
-
-      // Инвертируем по X, чтобы убрать зеркальность
+      // отражаем, чтобы убрать зеркальность
       videoMesh.scale.x = -1;
-
       scene.object3D.add(videoMesh);
     } else {
       videoMesh.geometry.dispose();
@@ -76,11 +72,10 @@ scene.addEventListener('click', async event => {
   if(!videoMesh || !videoEl) return;
 
   if(firstInteraction){
-    try{ await videoEl.play(); } catch(e){}
+    try { await videoEl.play(); } catch(e){}
     firstInteraction = false;
   }
 
-  // Позиция видео
   const touchX = event.clientX / window.innerWidth * 2 - 1;
   const touchY = - (event.clientY / window.innerHeight) * 2 + 1;
   const camera = scene.camera;
@@ -93,76 +88,62 @@ scene.addEventListener('click', async event => {
   videoMesh.visible = true;
   videoMesh.rotation.set(0, Math.PI, 0);
 
-  // Создаем кнопки один раз
-  if(!buttonGroup){
-    buttonGroup = new THREE.Group();
-    const spacing = 0.3;
+  // создаем кнопки только один раз
+  if(!buttonsCreated){
+    const buttonNames = ['Произвести','Пауза','+5','-5'];
+    const actions = [
+      ()=>videoEl.play(),
+      ()=>videoEl.pause(),
+      ()=>videoEl.currentTime+=5,
+      ()=>videoEl.currentTime-=5
+    ];
 
-    buttonsData.forEach((b,i)=>{
-      const btnGeom = new THREE.PlaneGeometry(0.25,0.08);
-      const btnMat = new THREE.MeshBasicMaterial({color:0x0000ff, transparent:true, opacity:0.6});
-      const btnMesh = new THREE.Mesh(btnGeom, btnMat);
+    buttonNames.forEach((name,i)=>{
+      const btn = document.createElement('a-plane');
+      btn.setAttribute('width',0.25);
+      btn.setAttribute('height',0.08);
+      btn.setAttribute('color','blue');
+      btn.setAttribute('opacity',0.6);
 
-      // Текст на кнопке
-      const loader = new THREE.FontLoader();
-      loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', function(font){
-        const textGeom = new THREE.TextGeometry(b.name,{
-          font: font,
-          size:0.04,
-          height:0.01
-        });
-        const textMat = new THREE.MeshBasicMaterial({color:0xffffff});
-        const textMesh = new THREE.Mesh(textGeom,textMat);
-        textGeom.computeBoundingBox();
-        const textWidth = textGeom.boundingBox.max.x - textGeom.boundingBox.min.x;
-        textMesh.position.set(-textWidth/2, -0.02, 0.01);
-        btnMesh.add(textMesh);
+      const text = document.createElement('a-text');
+      text.setAttribute('value',name);
+      text.setAttribute('align','center');
+      text.setAttribute('color','white');
+      text.setAttribute('width',2);
+      text.setAttribute('position','0 0 0.01');
+      btn.appendChild(text);
+
+      btn.object3D.position.set((i-1.5)*0.3,-videoHeight/2-0.15,0);
+
+      // гейзинг
+      let hoverTime=0;
+      btn.addEventListener('mouseenter', ()=>{
+        btn.hovering=true;
+      });
+      btn.addEventListener('mouseleave', ()=>{
+        btn.hovering=false;
+        hoverTime=0;
       });
 
-      // Прогресс-кружок
-      const circleGeom = new THREE.RingGeometry(0.01,0.015,32,1,0,0);
-      const circleMat = new THREE.MeshBasicMaterial({color:0x000000, side:THREE.DoubleSide});
-      const circleMesh = new THREE.Mesh(circleGeom, circleMat);
-      circleMesh.position.set(0,0,0.02);
-      circleMesh.progress=0;
-      btnMesh.add(circleMesh);
-
-      // Наведение через центр камеры (raycaster)
-      let hovering=false;
-      btnMesh.onHover=true;
       scene.addEventListener('tick', ()=>{
-        if(!btnMesh.onHover) return;
-        const camDir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-        const ray = new THREE.Ray(camera.position, camDir);
-        const intersects = ray.intersectObject(btnMesh,true);
-        hovering = intersects.length>0;
-
-        if(hovering){
-          circleMesh.progress += scene.clock? scene.clock.getDelta()/3 : 0.016/3;
-          circleMesh.geometry.dispose();
-          circleMesh.geometry = new THREE.RingGeometry(0.01,0.015,32,1,0,circleMesh.progress*2*Math.PI);
-          if(circleMesh.progress>=1){
-            b.action();
-            circleMesh.progress=0;
-            circleMesh.geometry.dispose();
-            circleMesh.geometry = new THREE.RingGeometry(0.01,0.015,32,1,0,0);
+        if(btn.hovering){
+          hoverTime += scene.clock ? scene.clock.getDelta() : 0.016;
+          if(hoverTime>=3){
+            actions[i]();
+            hoverTime=0;
           }
-        } else {
-          circleMesh.progress=0;
-          circleMesh.geometry.dispose();
-          circleMesh.geometry = new THREE.RingGeometry(0.01,0.015,32,1,0,0);
         }
       });
 
-      btnMesh.position.set((i-1.5)*spacing,-videoHeight/2-0.15,-1.5);
-      buttonGroup.add(btnMesh);
+      videoMesh.add(btn.object3D); // кнопки привязаны к видео
+      buttonEntities.push(btn);
     });
 
-    scene.object3D.add(buttonGroup);
+    buttonsCreated=true;
   }
 });
 
-// ------------------- Масштабирование -------------------
+// ------------------- Масштабирование пальцами -------------------
 let startDistance = null;
 let startScale = 1;
 scene.addEventListener('touchstart', e=>{
@@ -182,7 +163,9 @@ scene.addEventListener('touchmove', e=>{
     const scaleFactor = newDistance / startDistance;
 
     videoMesh.scale.set(startScale*scaleFactor,startScale*scaleFactor,1);
-    if(buttonGroup) buttonGroup.scale.set(scaleFactor,scaleFactor,1);
+    buttonEntities.forEach(btn=>{
+      btn.object3D.scale.set(scaleFactor,scaleFactor,1);
+    });
   }
 });
 
