@@ -54,26 +54,27 @@ body { margin:0; overflow:hidden; }
     position="0 0 -2"
     width="1.2"
     height="0.7"
-    scale="-1 1 1">
+    rotation="0 0 0"
+    material="shader: flat; side: double">
   </a-video>
 
   <!-- КНОПКИ -->
-  <a-entity id="buttons" position="0 -0.4 -2" visible="false">
+  <a-entity id="buttons" position="0 -0.6 -2" visible="false">
 
-    <a-plane class="btn" color="#00ff00" position="-0.6 0 0" width="0.35" height="0.15"
-      text="value: Play; align:center"
+    <a-plane class="btn" color="#00ff00" position="-0.6 0 0" width="0.4" height="0.2"
+      text="value: Play; align:center; width:2"
       play-btn></a-plane>
 
-    <a-plane class="btn" color="#ffff00" position="-0.2 0 0" width="0.35" height="0.15"
-      text="value: Pause; align:center"
+    <a-plane class="btn" color="#ffff00" position="-0.2 0 0" width="0.4" height="0.2"
+      text="value: Pause; align:center; width:2"
       pause-btn></a-plane>
 
-    <a-plane class="btn" color="#00ffff" position="0.2 0 0" width="0.35" height="0.15"
-      text="value: +5; align:center"
+    <a-plane class="btn" color="#00ffff" position="0.2 0 0" width="0.4" height="0.2"
+      text="value: +5; align:center; width:2"
       plus-btn></a-plane>
 
-    <a-plane class="btn" color="#ff00ff" position="0.6 0 0" width="0.35" height="0.15"
-      text="value: -5; align:center"
+    <a-plane class="btn" color="#ff00ff" position="0.6 0 0" width="0.4" height="0.2"
+      text="value: -5; align:center; width:2"
       minus-btn></a-plane>
 
   </a-entity>
@@ -97,12 +98,16 @@ fileInput.onchange = e => {
   videoEl.loop = true;
   videoEl.playsInline = true;
   videoEl.crossOrigin = 'anonymous';
+  videoEl.muted = true; // нужно для autoplay в браузерах
 
-  videoPlane.setAttribute('src', videoEl);
-  videoPlane.setAttribute('visible', true);
-  buttons.setAttribute('visible', true);
+  // Ждём, пока метаданные видео загрузятся
+  videoEl.addEventListener('loadedmetadata', () => {
+    videoPlane.setAttribute('src', videoEl);
+    videoPlane.setAttribute('visible', true);
+    buttons.setAttribute('visible', true);
 
-  videoEl.play();
+    videoEl.play();
+  });
 };
 
 // Обновление таймера каждые 300 мс
