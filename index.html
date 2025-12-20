@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео на маркере</title>
+  <title>AR Видео на плоскости</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -15,33 +15,58 @@
   </style>
 </head>
 <body>
+
 <input type="file" id="fileInput" accept="video/*">
 
 <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
-  
-  <!-- Маркер (показывает видео, когда камеру наводят на него) -->
-  <a-marker preset="hiro">
-    <a-video id="arVideo" src="" width="1" height="0.6" rotation="-90 0 0" visible="false"></a-video>
-  </a-marker>
-  
-  <a-entity camera></a-entity>
+  <a-entity camera look-controls></a-entity>
 </a-scene>
 
 <script>
-  const fileInput = document.getElementById('fileInput');
-  const arVideo = document.getElementById('arVideo');
+const scene = document.querySelector('a-scene');
+const fileInput = document.getElementById('fileInput');
 
-  fileInput.addEventListener('change', e => {
-    const file = e.target.files[0];
-    if(!file) return;
+let arVideo;
 
-    const url = URL.createObjectURL(file);
+fileInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+
+  if(!arVideo){
+    arVideo = document.createElement('a-video');
     arVideo.setAttribute('src', url);
-    arVideo.setAttribute('visible', 'true');
+    arVideo.setAttribute('width', '1');
+    arVideo.setAttribute('height', '0.6');
+    arVideo.setAttribute('rotation', '-90 0 0');
+    arVideo.setAttribute('visible', 'false');
+    scene.appendChild(arVideo);
+  } else {
+    arVideo.setAttribute('src', url);
+  }
+});
 
-    // Автовоспроизведение видео
-    arVideo.components.material.material.map.image.play?.();
-  });
+// При тапе по экрану ставим видео в точку касания
+scene.addEventListener('click', function(event){
+  if(!arVideo) return;
+
+  // Получаем координаты экрана
+  const touchX = event.clientX / window.innerWidth * 2 - 1;
+  const touchY = - (event.clientY / window.innerHeight) * 2 + 1;
+
+  const camera = scene.camera;
+  const vector = new THREE.Vector3(touchX, touchY, -1).unproject(camera);
+  const dir = vector.sub(camera.position).normalize();
+  const distance = 2; // Расстояние от камеры до пола (можно менять)
+  const pos = camera.position.clone().add(dir.multiplyScalar(distance));
+
+  arVideo.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
+  arVideo.setAttribute('visible', 'true');
+
+  // Автовоспроизведение видео
+  arVideo.components.material.material.map.image.play?.();
+});
 </script>
+
 </body>
 </html>
