@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео вертикально с аудио</title>
+  <title>AR Видео вертикально с аудио + таймер</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -41,6 +41,7 @@ let videoEl, videoMesh, videoTexture;
 let videoWidth = 1, videoHeight = 0.6;
 let firstInteraction = true;
 
+// Загрузка видео
 fileInput.addEventListener('change', e => {
   const file = e.target.files[0];
   if(!file) return;
@@ -50,10 +51,11 @@ fileInput.addEventListener('change', e => {
   videoEl = document.createElement('video');
   videoEl.src = url;
   videoEl.loop = true;
-  videoEl.muted = false; // звук включен
+  videoEl.muted = true;           // для автоплея на мобильном Chrome
   videoEl.playsInline = true;
   videoEl.crossOrigin = 'anonymous';
 
+  // Создаем mesh только после loadeddata
   videoEl.addEventListener('loadeddata', () => {
     videoWidth = videoEl.videoWidth / videoEl.videoHeight;
     videoHeight = 1;
@@ -69,10 +71,13 @@ fileInput.addEventListener('change', e => {
       videoMesh.geometry.dispose();
       videoMesh.geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
     }
+
+    // Автоплей muted
+    videoEl.play().catch(()=>{});
   });
 });
 
-// Ставим видео вертикально по тапу
+// Размещение видео по тапу
 scene.addEventListener('click', event => {
   if(!videoMesh || !videoEl) return;
 
@@ -89,7 +94,7 @@ scene.addEventListener('click', event => {
   videoMesh.visible = true;
   videoMesh.rotation.set(0, Math.PI, 0); // вертикально
 
-  // при первом взаимодействии разрешаем звук и автоплей
+  // Первый жест: включаем звук
   if(firstInteraction){
     videoEl.muted = false;
     videoEl.play().catch(()=>{});
@@ -97,7 +102,7 @@ scene.addEventListener('click', event => {
   }
 });
 
-// Масштабирование пальцами пропорционально
+// Масштабирование пальцами
 let startDistance = null;
 let startScale = 1;
 
