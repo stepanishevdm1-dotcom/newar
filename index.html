@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео с изменяемым размером</title>
+  <title>AR Видео с текстом на кнопках и gaze</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -22,13 +22,13 @@
     }
     #gaze-circle {
       position: fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-      width: 40px; height: 40px; border: 2px solid white; border-radius: 50%;
+      width: 30px; height: 30px; border: 2px solid white; border-radius: 50%;
       z-index:100; pointer-events: none;
     }
     #gaze-fill {
       position: absolute; top:0; left:0; width:100%; height:100%;
       background: rgba(255,255,255,0.5); border-radius:50%;
-      transform: scaleY(0); transform-origin: bottom; transition: transform 0.1s linear;
+      transform: scaleY(0); transform-origin: bottom; transition: transform 0.05s linear;
     }
   </style>
 </head>
@@ -59,6 +59,7 @@ let firstInteraction = true;
 // 3D кнопки под видео
 let btnGroup;
 let playBtn, pauseBtn, hideBtn;
+let btnTextMeshes = [];
 
 // --------------------- Видео ---------------------
 fileInput.addEventListener('change', e=>{
@@ -85,23 +86,36 @@ fileInput.addEventListener('change', e=>{
       videoMesh.visible = false;
       scene.object3D.add(videoMesh);
 
-      // 3D кнопки под видео
+      // 3D кнопки под видео с текстом
       btnGroup = new THREE.Group();
-      const btnGeom = new THREE.PlaneGeometry(0.3,0.1);
+      const btnGeom = new THREE.PlaneGeometry(0.4,0.15);
       const createBtn = (text,color)=>{
         const mat = new THREE.MeshBasicMaterial({color:color, side:THREE.DoubleSide});
         const mesh = new THREE.Mesh(btnGeom, mat);
         mesh.userData.label = text;
+
+        // Текст на кнопке
+        const loader = new THREE.FontLoader();
+        loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', font=>{
+          const txtGeom = new THREE.TextGeometry(text,{font:font,size:0.07,height:0.01});
+          const txtMat = new THREE.MeshBasicMaterial({color:0x000000});
+          const txtMesh = new THREE.Mesh(txtGeom, txtMat);
+          txtMesh.position.set(-0.18, -0.035, 0.01);
+          mesh.add(txtMesh);
+          btnTextMeshes.push(txtMesh);
+        });
+
         return mesh;
       }
-      playBtn = createBtn('▶',0x00ff00);
-      pauseBtn = createBtn('⏸',0xffff00);
-      hideBtn = createBtn('✖',0xff0000);
 
-      const spacing = 0.35;
-      playBtn.position.set(-spacing,-videoHeight/2-0.15,0);
-      pauseBtn.position.set(0,-videoHeight/2-0.15,0);
-      hideBtn.position.set(spacing,-videoHeight/2-0.15,0);
+      playBtn = createBtn('Play',0x00ff00);
+      pauseBtn = createBtn('Pause',0xffff00);
+      hideBtn = createBtn('Hide',0xff0000);
+
+      const spacing = 0.5;
+      playBtn.position.set(-spacing,-videoHeight/2-0.2,0);
+      pauseBtn.position.set(0,-videoHeight/2-0.2,0);
+      hideBtn.position.set(spacing,-videoHeight/2-0.2,0);
 
       btnGroup.add(playBtn,pauseBtn,hideBtn);
       btnGroup.visible = false;
@@ -191,9 +205,9 @@ function checkGazeOn3DButtons(){
     const btn = intersects[0].object;
     startGaze(()=>{
       switch(btn.userData.label){
-        case '▶': videoEl.play(); break;
-        case '⏸': videoEl.pause(); break;
-        case '✖': videoMesh.visible=false; btnGroup.visible=false; break;
+        case 'Play': videoEl.play(); break;
+        case 'Pause': videoEl.pause(); break;
+        case 'Hide': videoMesh.visible=false; btnGroup.visible=false; break;
       }
     });
   } else stopGaze();
