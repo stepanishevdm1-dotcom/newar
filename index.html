@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео ровное и фиксированное</title>
+  <title>AR Видео ровное, без сжатия</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -68,12 +68,12 @@ scene.addEventListener('click', event => {
 
   videoMesh.position.copy(pos);
   videoMesh.visible = true;
-  videoMesh.rotation.set(-Math.PI/2, 0, 0); // всегда ровное
-  videoMesh.scale.set(1, 0.6, 1); // фиксированные пропорции
+  videoMesh.rotation.set(-Math.PI/2, 0, 0); // ровное
+  videoMesh.scale.set(1, 0.6, 1); // фиксированная пропорция
   videoEl.play().catch(()=>{});
 });
 
-// Масштабирование одинаково по X и Y (pinch)
+// Масштабирование пальцами без искажения
 let startDistance = null;
 let startScale = 1;
 
@@ -82,7 +82,7 @@ scene.addEventListener('touchstart', e => {
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     startDistance = Math.sqrt(dx*dx + dy*dy);
-    startScale = videoMesh.scale.x;
+    startScale = videoMesh.scale.x; // масштабируем одинаково
   }
 });
 
@@ -93,8 +93,8 @@ scene.addEventListener('touchmove', e => {
     const newDistance = Math.sqrt(dx*dx + dy*dy);
     const scaleFactor = newDistance / startDistance;
 
-    // Масштаб одинаково, сохраняем пропорции 1:0.6
-    videoMesh.scale.set(startScale * scaleFactor, startScale * scaleFactor * 0.6, 1);
+    // Масштаб одинаково по X и Y, пропорции сохраняются
+    videoMesh.scale.set(startScale * scaleFactor, startScale * scaleFactor, 1);
   }
 });
 </script>
