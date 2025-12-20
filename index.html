@@ -3,6 +3,9 @@
 <head>
     <meta charset="utf-8">
     <title>AR Видео с кнопкой разместить</title>
+    <!-- Метатеги, важные для работы видео на iOS -->
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
@@ -21,10 +24,10 @@
             z-index:10;
             background: rgba(255,255,255,0.95);
             color:#2c3e50;
-            padding:12px 25px;
+            padding:15px 30px; /* Увеличено */
             border-radius:50px;
             border:2px solid #3498db;
-            font-size:14px;
+            font-size:16px; /* Увеличено */
             font-weight:600;
             cursor:pointer;
             box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
@@ -37,25 +40,23 @@
             transform: translateX(-50%) scale(1.05);
         }
         
-        /* УВЕЛИЧИЛ кнопки */
         #placeBtn {
             position:fixed; 
-            bottom:20px; 
+            bottom:25px; /* Немного выше */
             left:50%;
             transform:translateX(-50%); 
             z-index:10;
             background: linear-gradient(135deg, #3498db 0%, #2ecc71 100%);
             color:white;
-            padding:20px 50px; /* УВЕЛИЧЕНО */
+            padding:18px 50px; /* Значительно увеличено */
             border-radius:50px;
-            font-size:20px; /* УВЕЛИЧЕНО */
+            font-size:18px; /* Увеличено */
             font-weight:600;
             cursor:pointer;
             border:none;
             box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
             transition: all 0.3s ease;
             letter-spacing: 0.5px;
-            min-width: 200px; /* УВЕЛИЧЕНО */
         }
         
         #placeBtn:hover {
@@ -63,231 +64,198 @@
             box-shadow: 0 8px 25px rgba(46, 204, 113, 0.6);
         }
         
+        /* Завершённый стиль для таймера */
         #videoTime {
             position: fixed; 
             top: 15px; 
             right: 15px;
             color: white; 
             background: rgba(0,0,0,0.7);
-            padding: 8px 15px;
-            border-radius: 10px;
-            font-size: 14px;
+            padding: 10px 20px; /* Увеличено */
+            border-radius: 25px;
+            font-size: 16px; /* Увеличено */
             font-weight: 600;
-            font-family: monospace;
             z-index: 10;
+            font-family: monospace; /* Для цифр */
         }
         
-        /* Кнопки управления видео - УВЕЛИЧЕНЫ */
-        #controls {
-            position: fixed;
-            bottom: 90px; /* Поднял выше для больших кнопок */
-            left: 50%;
-            transform: translateX(-50%);
+        /* Новый элемент для контроля видео (воспроизведение/пауза) */
+        #videoControlBtn {
+            position: fixed; 
+            bottom: 25px; 
+            right: 25px;
             z-index: 10;
-            display: flex;
-            gap: 15px;
-        }
-        
-        .control-btn {
-            background: rgba(255,255,255,0.9);
-            color: #2c3e50;
+            background: rgba(231, 76, 60, 0.9);
+            color: white;
             border: none;
-            padding: 20px 25px; /* УВЕЛИЧЕНО */
-            border-radius: 15px;
-            font-size: 20px; /* УВЕЛИЧЕНО */
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
             cursor: pointer;
-            min-width: 70px; /* УВЕЛИЧЕНО */
-            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-            transition: all 0.2s;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: all 0.2s ease;
         }
-        
-        .control-btn:hover {
-            background: white;
+        #videoControlBtn:hover {
+            background: rgba(231, 76, 60, 1);
             transform: scale(1.1);
         }
     </style>
 </head>
 <body>
-    <input type="file" id="fileInput" accept="video/*" />
-    
-    <div id="controls">
-        <button class="control-btn" id="playBtn">▶</button>
-        <button class="control-btn" id="pauseBtn">⏸</button>
-        <button class="control-btn" id="stopBtn">⏹</button>
-    </div>
-    
-    <button id="placeBtn">📍 Разместить</button>
-    
+    <!-- Кнопка для выбора видеофайла -->
+    <input type="file" id="fileInput" accept="video/*">
+    <!-- Кнопка для размещения видео в AR -->
+    <button id="placeBtn">Разместить видео</button>
+    <!-- Кнопка для управления воспроизведением -->
+    <button id="videoControlBtn">⏸</button>
+    <!-- Дисплей для отображения текущего времени видео -->
     <div id="videoTime">00:00 / 00:00</div>
-    
+
     <!-- AR-сцена -->
-    <a-scene
-        vr-mode-ui="enabled: false"
-        arjs="sourceType: webcam; debugUIEnabled: false;"
-        renderer="antialias: true; alpha: true"
-        embedded
-    >
-        <a-assets>
-            <video id="videoSource" autoplay loop crossorigin="anonymous" style="display:none;"></video>
-        </a-assets>
-        
-        <!-- Маркер для размещения видео -->
-        <a-marker id="videoMarker" type="pattern" preset="custom" url="data/marker.patt" visible="false">
+    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
+        <!-- Маркер, на котором будет размещено видео -->
+        <a-marker preset="hiro" id="video-marker">
+            <!-- 
+                Видеоэлемент A-Frame с исправленными атрибутами:
+                - shader: standard (вместо flat) корректно отображает текстуру с двух сторон.
+                - side: double (вместо front) предотвращает "исчезновение" при повороте.
+                - width и height заданы в метрах с сохранением соотношения сторон (например, 16:9).
+                - position поднимает видео над маркером для лучшей видимости.
+            -->
             <a-video 
-                id="arVideo"
-                src="#videoSource"
-                width="2" 
-                height="1.125"
-                position="0 0 0"
-                rotation="-90 0 0"
-                transparent="true"
-                visible="false"
-                material="shader: flat; side: front;" /* ИСПРАВЛЕНО: убрано отзеркаливание */
-            ></a-video>
+                id="ar-video" 
+                src="" 
+                width="1.6" 
+                height="0.9" 
+                position="0 0.5 0"
+                shader="standard" 
+                side="double"
+                visible="false">
+            </a-video>
         </a-marker>
-        
         <a-entity camera></a-entity>
     </a-scene>
 
     <script>
-        // Элементы DOM
+        // Получение ссылок на DOM-элементы
         const fileInput = document.getElementById('fileInput');
-        const videoTime = document.getElementById('videoTime');
         const placeBtn = document.getElementById('placeBtn');
-        const playBtn = document.getElementById('playBtn');
-        const pauseBtn = document.getElementById('pauseBtn');
-        const stopBtn = document.getElementById('stopBtn');
+        const videoControlBtn = document.getElementById('videoControlBtn');
+        const videoTimeDisplay = document.getElementById('videoTime');
+        const arVideoEl = document.getElementById('ar-video');
         
-        // Элементы A-Frame
-        const arVideo = document.getElementById('arVideo');
-        const videoSource = document.getElementById('videoSource');
-        const videoMarker = document.getElementById('videoMarker');
-        
-        // Состояние для исправления бага с таймером
-        let lastUpdateTime = 0;
-        let isPlaying = false;
-        
-        // Загрузка видео
-        fileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const videoURL = URL.createObjectURL(file);
-            videoSource.src = videoURL;
-            
-            videoSource.onloadeddata = function() {
-                // ИСПРАВЛЕНИЕ БАГА: Начинаем обновление таймера
-                startTimerUpdate();
-                updateVideoTime();
-            };
-        });
-        
-        // ИСПРАВЛЕНИЕ БАГА С ТАЙМЕРОМ: Функция для постоянного обновления времени
-        function startTimerUpdate() {
-            // Очищаем предыдущий интервал если был
-            if (window.timerInterval) {
-                clearInterval(window.timerInterval);
-            }
-            
-            // Обновляем время каждые 100мс
-            window.timerInterval = setInterval(function() {
-                if (videoSource.duration) {
-                    updateVideoTime();
-                }
-            }, 100);
-        }
-        
-        function updateVideoTime() {
-            const current = videoSource.currentTime || 0;
-            const total = videoSource.duration || 0;
-            
-            const formatTime = (seconds) => {
-                const mins = Math.floor(seconds / 60);
-                const secs = Math.floor(seconds % 60);
-                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-            };
-            
-            videoTime.textContent = `${formatTime(current)} / ${formatTime(total)}`;
-        }
-        
-        // ИСПРАВЛЕНИЕ БАГА С ОТЗЕРКАЛИВАНИЕМ: Фиксируем атрибуты видео при изменении
-        let originalWidth = 2;
-        let originalHeight = 1.125;
-        
-        // Следим за изменениями видео в AR
-        arVideo.addEventListener('componentchanged', function(e) {
-            if (e.detail.name === 'rotation' || e.detail.name === 'scale') {
-                // ИСПРАВЛЕНИЕ: Восстанавливаем оригинальные размеры
-                arVideo.setAttribute('width', originalWidth);
-                arVideo.setAttribute('height', originalHeight);
-                
-                // ИСПРАВЛЕНИЕ: Убедимся что видео не зеркалится
-                arVideo.setAttribute('material', 'shader: flat; side: front;');
-            }
-        });
-        
-        // Управление видео
-        playBtn.addEventListener('click', () => {
-            if (videoSource.src) {
-                videoSource.play();
-                isPlaying = true;
-            }
-        });
-        
-        pauseBtn.addEventListener('click', () => {
-            if (videoSource.src) {
-                videoSource.pause();
-                isPlaying = false;
-            }
-        });
-        
-        stopBtn.addEventListener('click', () => {
-            if (videoSource.src) {
-                videoSource.pause();
-                videoSource.currentTime = 0;
-                isPlaying = false;
-                updateVideoTime();
-            }
-        });
-        
-        // Размещение видео в AR
-        placeBtn.addEventListener('click', () => {
-            if (!videoSource.src) {
-                alert('Сначала выберите видео!');
+        let currentVideo = null; // Ссылка на объект HTML5 Video
+        let isVideoPlaced = false; // Флаг, размещено ли видео в AR
+        let videoDuration = 0; // Длительность текущего видео
+
+        // 1. Обработка выбора файла
+        fileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file || !file.type.startsWith('video/')) {
+                alert('Пожалуйста, выберите видеофайл.');
                 return;
             }
             
-            // Показываем видео и маркер
-            arVideo.setAttribute('visible', 'true');
-            videoMarker.setAttribute('visible', 'true');
+            // Освобождение ресурсов предыдущего видео
+            if (currentVideo) {
+                currentVideo.pause();
+                currentVideo.src = '';
+            }
             
-            // ИСПРАВЛЕНИЕ: Устанавливаем фиксированные атрибуты
-            arVideo.setAttribute('width', originalWidth);
-            arVideo.setAttribute('height', originalHeight);
-            arVideo.setAttribute('material', 'shader: flat; side: front;');
+            // Создание нового объекта Video и URL для него
+            const videoURL = URL.createObjectURL(file);
+            currentVideo = document.createElement('video');
+            currentVideo.src = videoURL;
+            currentVideo.loop = true; // Зацикливание видео
+            currentVideo.crossOrigin = 'anonymous'; // Для работы с WebGL текстурой
             
-            // Начинаем воспроизведение
-            videoSource.play();
-            isPlaying = true;
+            // Установка атрибутов для корректной работы на iOS
+            currentVideo.setAttribute('playsinline', '');
+            currentVideo.setAttribute('webkit-playsinline', '');
             
-            // ИСПРАВЛЕНИЕ: Запускаем таймер
-            startTimerUpdate();
+            // Обработка загрузки метаданных видео (длительность)
+            currentVideo.addEventListener('loadedmetadata', function() {
+                videoDuration = currentVideo.duration;
+                updateTimeDisplay(0, videoDuration);
+                console.log('Видео загружено. Длительность:', videoDuration);
+            });
+            
+            // Обновление таймера во время воспроизведения
+            currentVideo.addEventListener('timeupdate', function() {
+                if (videoDuration > 0) {
+                    updateTimeDisplay(currentVideo.currentTime, videoDuration);
+                }
+            });
+            
+            // Связывание HTML5 Video с 3D-элементом A-Frame
+            arVideoEl.setAttribute('src', currentVideo);
+            isVideoPlaced = false;
+            arVideoEl.setAttribute('visible', 'false');
+            videoControlBtn.textContent = '⏸';
+            alert('Видео загружено. Наведите камеру на маркер Hiro и нажмите "Разместить видео".');
         });
-        
-        // ИСПРАВЛЕНИЕ: Слушаем события play/pause для таймера
-        videoSource.addEventListener('play', function() {
-            isPlaying = true;
-            startTimerUpdate(); // Перезапускаем таймер при старте
+
+        // 2. Обработка нажатия кнопки "Разместить видео"
+        placeBtn.addEventListener('click', function() {
+            if (!currentVideo) {
+                alert('Сначала выберите видеофайл.');
+                return;
+            }
+            // Делаем видео видимым в AR-сцене
+            arVideoEl.setAttribute('visible', 'true');
+            isVideoPlaced = true;
+            console.log('Видео размещено в AR.');
         });
-        
-        videoSource.addEventListener('pause', function() {
-            isPlaying = false;
+
+        // 3. Обработка нажатия кнопки управления воспроизведением
+        videoControlBtn.addEventListener('click', function() {
+            if (!currentVideo) return;
+            
+            if (currentVideo.paused) {
+                // Если видео на паузе - возобновить
+                const playPromise = currentVideo.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(error => {
+                        console.log("Автовоспроизведение предотвращено:", error);
+                        // На iOS требуется пользовательское взаимодействие
+                        alert('Для воспроизведения нажмите на видео в AR-сцене или на эту кнопку еще раз.');
+                    });
+                }
+                videoControlBtn.textContent = '⏸';
+            } else {
+                // Если видео воспроизводится - поставить на паузу
+                currentVideo.pause();
+                videoControlBtn.textContent = '▶';
+            }
         });
-        
-        // ИСПРАВЛЕНИЕ: Также обновляем при изменении времени вручную
-        videoSource.addEventListener('timeupdate', function() {
-            updateVideoTime();
+
+        // 4. Функция обновления отображения таймера
+        function updateTimeDisplay(currentTime, totalTime) {
+            const formatTime = (time) => {
+                const mins = Math.floor(time / 60);
+                const secs = Math.floor(time % 60);
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            };
+            videoTimeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(totalTime)}`;
+        }
+
+        // 5. Обработка клика по самому видео в AR-сцене для запуска
+        arVideoEl.addEventListener('click', function(evt) {
+            if (!currentVideo) return;
+            // Этот клик считается пользовательским взаимодействием, необходимым для iOS
+            if (currentVideo.paused) {
+                currentVideo.play();
+                videoControlBtn.textContent = '⏸';
+            } else {
+                currentVideo.pause();
+                videoControlBtn.textContent = '▶';
+            }
+            evt.stopPropagation(); // Предотвращение всплытия события
         });
+
+        // Инициализация: скрываем видео при запуске
+        arVideoEl.setAttribute('visible', 'false');
     </script>
 </body>
 </html>
