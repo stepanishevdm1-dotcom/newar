@@ -60,7 +60,7 @@
         let videoContainer;
         let currentScale = 1;
         let firstInteraction = true;
-        let buttonsGroup;
+        let playButton, pauseButton; // Отдельные ссылки на кнопки
 
         // Загрузка видео
         fileInput.addEventListener('change', e => {
@@ -113,6 +113,18 @@
         placeBtn.addEventListener('click', () => {
             if(!videoEl || !videoTexture) return;
             
+            // Удаляем старый контейнер, если есть
+            if (videoContainer) {
+                scene.object3D.remove(videoContainer);
+                // Удаляем старые кнопки из сцены
+                if (playButton && playButton.parentNode) {
+                    scene.removeChild(playButton);
+                }
+                if (pauseButton && pauseButton.parentNode) {
+                    scene.removeChild(pauseButton);
+                }
+            }
+            
             // Позиция перед камерой
             const camera = scene.camera;
             const distance = 1.5;
@@ -120,12 +132,7 @@
                 camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(distance)
             );
             
-            // Удаляем старый контейнер, если есть
-            if (videoContainer) {
-                scene.object3D.remove(videoContainer);
-            }
-            
-            // Создаем контейнер для видео и кнопок
+            // Создаем контейнер ТОЛЬКО для видео
             videoContainer = new THREE.Group();
             scene.object3D.add(videoContainer);
             
@@ -154,7 +161,7 @@
                 firstInteraction = false;
             }
             
-            createButtons();
+            createButtons(pos);
         });
 
         // Масштабирование пальцами
@@ -180,6 +187,9 @@
                 const newScale = Math.max(0.1, Math.min(5, startScale * scaleFactor));
                 videoContainer.scale.set(newScale, newScale, newScale);
                 currentScale = newScale;
+                
+                // Обновляем позиции кнопок при масштабировании видео
+                updateButtonsPosition();
             }
         });
         
@@ -187,51 +197,37 @@
             startDistance = null;
         });
 
-        // Создание кнопок под видео
-        function createButtons() {
-            if (buttonsGroup) {
-                videoContainer.remove(buttonsGroup);
+        // Создание кнопок под видео (отдельно от видео контейнера)
+        function createButtons(videoPos) {
+            // Удаляем старые кнопки, если есть
+            if (playButton && playButton.parentNode) {
+                scene.removeChild(playButton);
+            }
+            if (pauseButton && pauseButton.parentNode) {
+                scene.removeChild(pauseButton);
             }
             
-            buttonsGroup = new THREE.Group();
-            videoContainer.add(buttonsGroup);
-            
-            // Позиция кнопок под видео
-            const buttonY = -videoHeight/2 - 0.15;
-            const buttonSpacing = 0.25;
-            
-            // Создаем кнопки как A-Frame элементы для работы с fuse
-            createAFrameButton('play-btn', -buttonSpacing, buttonY, 0.001, '#4CAF50', '▶', 'play');
-            createAFrameButton('pause-btn', 0, buttonY, 0.001, '#FF9800', '⏸', 'pause');
-            createAFrameButton('close-btn', buttonSpacing, buttonY, 0.001, '#F44336', '✕', 'close');
+            // Создаем кнопки как отдельные A-Frame элементы
+            playButton = createButton('play-btn', videoPos, -0.15, '#4CAF50', 'Play', 'play');
+            pauseButton = createButton('pause-btn', videoPos, 0.15, '#FF9800', 'Pause', 'pause');
         }
         
-        // Создание кнопки как A-Frame элемента
-        function createAFrameButton(id, x, y, z, color, text, action) {
-            // Создаем элемент a-entity
+        // Создание одной кнопки
+        function createButton(id, videoPos, xOffset, color, text, action) {
             const btn = document.createElement('a-entity');
             btn.setAttribute('id', id);
             btn.setAttribute('cursor-listener', '');
             btn.setAttribute('class', 'clickable');
             
-            // Позиция в локальных координатах контейнера
-            const worldPos = new THREE.Vector3(x, y, z);
-            worldPos.applyMatrix4(videoContainer.matrixWorld);
+            // Рассчитываем начальную позицию кнопки
+            const buttonPos = calculateButtonPosition(videoPos, xOffset);
+            btn.setAttribute('position', buttonPos);
             
-            btn.setAttribute('position', {
-                x: worldPos.x,
-                y: worldPos.y,
-                z: worldPos.z
-            });
-            
-            // Родительский контейнер для трансформаций
-            btn.setAttribute('parent', videoContainer);
-            
-            // Геометрия кнопки
+            // Геометрия кнопки (цилиндр для объема)
             btn.setAttribute('geometry', {
                 primitive: 'cylinder',
-                radius: 0.06,
-                height: 0.01
+                radius: 0.08,
+                height: 0.02
             });
             
             btn.setAttribute('material', {
@@ -240,17 +236,28 @@
                 transparent: true
             });
             
-            // Текст на кнопке
+            // Текст на кнопке - БОЛЬШЕ и ЧЕТЧЕ
             btn.setAttribute('text', {
                 value: text,
                 align: 'center',
                 color: 'white',
-                width: 0.3
+                width: 0.6,
+                height: 0.3,
+                wrapCount: 15,
+                font: 'roboto',
+                baseline: 'center',
+                anchor: 'center'
             });
             
-            // Добавляем обработчики событий
+            // Сохраняем данные для обновления позиции
+            btn.userData = {
+                videoPos: videoPos.clone(),
+                xOffset: xOffset,
+                action: action
+            };
+            
+            // Обработчики событий
             btn.addEventListener('mouseenter', function() {
-                // Подсветка кнопки при наведении
                 this.setAttribute('material', 'opacity', 1);
                 this.setAttribute('animation', {
                     property: 'scale',
@@ -261,7 +268,6 @@
             });
             
             btn.addEventListener('mouseleave', function() {
-                // Возвращаем кнопку в исходное состояние
                 this.setAttribute('material', 'opacity', 0.8);
                 this.setAttribute('animation', {
                     property: 'scale',
@@ -271,12 +277,10 @@
                 });
             });
             
-            // Обработчик fuse-события (когда курсор заполнился)
+            // Обработчик fuse-события
             btn.addEventListener('fusing', function(e) {
                 const progress = e.detail.progress;
-                // Можно добавить визуальную обратную связь при заполнении
                 if (progress === 1) {
-                    // Выполняем действие, когда fuse завершен
                     executeButtonAction(action);
                     
                     // Анимация нажатия
@@ -300,26 +304,60 @@
                 }
             });
             
-            // Также обрабатываем клик для десктопных устройств
+            // Клик для десктопа
             btn.addEventListener('click', function() {
                 executeButtonAction(action);
             });
             
-            // Добавляем в сцену
             scene.appendChild(btn);
-            
-            // Сохраняем ссылку на кнопку в группу
-            btn.userData = {
-                localPosition: new THREE.Vector3(x, y, z),
-                action: action
-            };
-            
-            if (!buttonsGroup.userData.buttons) {
-                buttonsGroup.userData.buttons = [];
-            }
-            buttonsGroup.userData.buttons.push(btn);
-            
             return btn;
+        }
+        
+        // Расчет позиции кнопки относительно видео
+        function calculateButtonPosition(videoPos, xOffset) {
+            if (!videoContainer) return videoPos;
+            
+            // Копируем позицию видео
+            const pos = videoPos.clone();
+            
+            // Добавляем смещение по X
+            pos.x += xOffset;
+            
+            // Смещаем кнопки вниз относительно видео
+            // Используем мировые координаты видео для расчета
+            const videoWorldPos = new THREE.Vector3();
+            videoMesh.getWorldPosition(videoWorldPos);
+            
+            // Вычисляем нижний край видео в мировых координатах
+            const videoBottom = new THREE.Vector3(0, -videoHeight/2, 0);
+            videoBottom.applyMatrix4(videoMesh.matrixWorld);
+            
+            // Позиционируем кнопки ниже видео
+            pos.y = videoBottom.y - 0.2; // 0.2 метра ниже видео
+            
+            return pos;
+        }
+        
+        // Обновление позиций кнопок при масштабировании видео
+        function updateButtonsPosition() {
+            if (!videoContainer || !videoMesh) return;
+            
+            // Получаем текущую мировую позицию видео
+            const videoWorldPos = new THREE.Vector3();
+            videoMesh.getWorldPosition(videoWorldPos);
+            
+            // Обновляем позиции кнопок
+            if (playButton && playButton.userData) {
+                const playPos = calculateButtonPosition(videoWorldPos, playButton.userData.xOffset);
+                playButton.setAttribute('position', playPos);
+                playButton.userData.videoPos = videoWorldPos.clone();
+            }
+            
+            if (pauseButton && pauseButton.userData) {
+                const pausePos = calculateButtonPosition(videoWorldPos, pauseButton.userData.xOffset);
+                pauseButton.setAttribute('position', pausePos);
+                pauseButton.userData.videoPos = videoWorldPos.clone();
+            }
         }
         
         // Выполнение действия кнопки
@@ -331,6 +369,15 @@
                     if (videoEl) {
                         videoEl.play();
                         console.log('Play video');
+                        // Визуальная обратная связь
+                        if (playButton) {
+                            playButton.setAttribute('material', 'color', '#2E7D32'); // Темно-зеленый
+                            setTimeout(() => {
+                                if (playButton) {
+                                    playButton.setAttribute('material', 'color', '#4CAF50');
+                                }
+                            }, 300);
+                        }
                     }
                     break;
                     
@@ -338,56 +385,23 @@
                     if (videoEl) {
                         videoEl.pause();
                         console.log('Pause video');
-                    }
-                    break;
-                    
-                case 'close':
-                    // Удаляем видео и все кнопки
-                    if (videoContainer) {
-                        // Удаляем A-Frame кнопки из сцены
-                        if (buttonsGroup && buttonsGroup.userData.buttons) {
-                            buttonsGroup.userData.buttons.forEach(btn => {
-                                if (btn.parentNode) {
-                                    scene.removeChild(btn);
+                        // Визуальная обратная связь
+                        if (pauseButton) {
+                            pauseButton.setAttribute('material', 'color', '#EF6C00'); // Темно-оранжевый
+                            setTimeout(() => {
+                                if (pauseButton) {
+                                    pauseButton.setAttribute('material', 'color', '#FF9800');
                                 }
-                            });
-                        }
-                        
-                        // Удаляем контейнер
-                        scene.object3D.remove(videoContainer);
-                        videoContainer = null;
-                        buttonsGroup = null;
-                        
-                        // Останавливаем видео
-                        if (videoEl) {
-                            videoEl.pause();
+                            }, 300);
                         }
                     }
                     break;
             }
         }
         
-        // Функция для обновления позиций кнопок при масштабировании/перемещении видео
-        function updateButtonsPosition() {
-            if (!buttonsGroup || !buttonsGroup.userData.buttons) return;
-            
-            buttonsGroup.userData.buttons.forEach(btn => {
-                if (btn.userData && btn.userData.localPosition) {
-                    const worldPos = btn.userData.localPosition.clone();
-                    worldPos.applyMatrix4(videoContainer.matrixWorld);
-                    
-                    btn.setAttribute('position', {
-                        x: worldPos.x,
-                        y: worldPos.y,
-                        z: worldPos.z
-                    });
-                }
-            });
-        }
-        
-        // Обновляем позиции кнопок при анимациях
+        // Функция для обновления позиций кнопок в реальном времени
         function animationLoop() {
-            if (videoContainer && buttonsGroup && buttonsGroup.userData.buttons) {
+            if (videoContainer && videoMesh) {
                 updateButtonsPosition();
             }
             requestAnimationFrame(animationLoop);
@@ -396,13 +410,6 @@
         // Запускаем цикл анимации
         animationLoop();
         
-        // Освобождаем ресурсы при закрытии
-        window.addEventListener('beforeunload', () => {
-            if (videoEl && videoEl.src) {
-                URL.revokeObjectURL(videoEl.src);
-            }
-        });
-        
         // Обновляем raycaster при добавлении новых объектов
         scene.addEventListener('object3dset', function() {
             const cursor = document.getElementById('main-cursor');
@@ -410,6 +417,13 @@
                 setTimeout(() => {
                     cursor.components.raycaster.refreshObjects();
                 }, 100);
+            }
+        });
+        
+        // Освобождаем ресурсы при закрытии
+        window.addEventListener('beforeunload', () => {
+            if (videoEl && videoEl.src) {
+                URL.revokeObjectURL(videoEl.src);
             }
         });
     </script>
