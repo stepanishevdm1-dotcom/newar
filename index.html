@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>AR Видео с кнопками и текстом</title>
+<title>AR Видео с кнопками</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 <style>
@@ -16,11 +16,11 @@
 <body>
 <input type="file" id="fileInput" accept="video/*">
 
-<a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
+<a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
   <a-entity id="camera" camera look-controls>
-    <a-entity id="cursor" cursor="fuse: true; fuseTimeout: 3000" position="0 0 -1"
-              geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.015"
-              material="color: yellow; shader: flat"></a-entity>
+    <a-entity cursor="fuse: true; fuseTimeout: 3000" position="0 0 -1"
+              geometry="primitive:ring;radiusInner:0.005;radiusOuter:0.01"
+              material="color:yellow; shader:flat"></a-entity>
   </a-entity>
 </a-scene>
 
@@ -56,7 +56,7 @@ fileInput.addEventListener('change', e => {
       const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
       videoMesh = new THREE.Mesh(geometry, material);
       videoMesh.visible = false;
-      videoMesh.scale.x = -1; // исправляем зеркалирование
+      videoMesh.scale.x = -1; // зеркалирование
       scene.object3D.add(videoMesh);
     } else {
       videoMesh.geometry.dispose();
@@ -69,10 +69,8 @@ fileInput.addEventListener('change', e => {
 scene.addEventListener('click', event => {
   if(!videoMesh || !videoEl) return;
 
-  const touchX = event.clientX / window.innerWidth * 2 - 1;
-  const touchY = - (event.clientY / window.innerHeight) * 2 + 1;
-
-  const vector = new THREE.Vector3(touchX, touchY, -1).unproject(camera.object3D.children[0]);
+  const vector = new THREE.Vector3(0,0,-1);
+  vector.unproject(camera.object3D.children[0]);
   const dir = vector.sub(camera.object3D.position).normalize();
   const distance = 2;
   const pos = camera.object3D.position.clone().add(dir.multiplyScalar(distance));
@@ -86,7 +84,7 @@ scene.addEventListener('click', event => {
   }
 });
 
-// ----------------- Масштабирование -----------------
+// ----------------- Масштабирование пальцами -----------------
 let startDistance = null;
 let startScale = 1;
 scene.addEventListener('touchstart', e => {
@@ -128,16 +126,15 @@ buttonData.forEach(b=>{
   btn.setAttribute('material','color:blue; opacity:0.6');
   btn.object3D.position.set(b.x,b.y,-1.5);
 
-  // надпись на кнопке
+  // надпись
   const text = document.createElement('a-entity');
   text.setAttribute('text', `value:${b.name}; align:center; color:white; width:2`);
-  text.object3D.position.set(0,0,0.01); // немного перед плоскостью
+  text.object3D.position.set(0,0,0.01);
   btn.appendChild(text);
 
   btn.action = b.action;
   scene.appendChild(btn);
 
-  // фокус 3 сек
   let focusTimer = null;
   btn.addEventListener('mouseenter', ()=>{ 
     focusTimer = setTimeout(()=>{ b.action(); },3000); 
