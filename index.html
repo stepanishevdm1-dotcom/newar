@@ -1,39 +1,46 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<title>AR Видео рабочее</title>
-<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-<style>
-body { margin:0; overflow:hidden; }
-#fileInput {
-  position:fixed; top:10px; left:50%; transform:translateX(-50%);
-  z-index:10; background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
-}
-</style>
+  <meta charset="utf-8">
+  <title>AR Видео с кнопками и гейзингом</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <style>
+    body { margin:0; overflow:hidden; }
+    #fileInput {
+      position:fixed; top:10px; left:50%; transform:translateX(-50%);
+      z-index:10; background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
+    }
+  </style>
 </head>
 <body>
 <input type="file" id="fileInput" accept="video/*">
 
-<a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+<a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
   <a-entity id="camera" camera look-controls>
-    <a-entity cursor="fuse:true; fuseTimeout:3000" position="0 0 -1"
-              geometry="primitive:ring; radiusInner:0.005; radiusOuter:0.01"
+    <!-- Центральный курсор -->
+    <a-entity id="cursor" cursor="fuse:false" position="0 0 -1"
+              geometry="primitive:ring; radiusInner:0.01; radiusOuter:0.015"
               material="color:black; shader:flat"></a-entity>
   </a-entity>
 </a-scene>
 
 <script>
 const scene = document.querySelector('a-scene');
-const camera = document.getElementById('camera');
 const fileInput = document.getElementById('fileInput');
 
-let videoEl = null;
-let videoMesh = null;
+let videoEl, videoMesh, videoTexture;
 let videoWidth=1, videoHeight=0.6;
+let firstInteraction=true;
+let buttonGroup;
 
-// Загружаем видео заранее
+const buttonsData = [
+  {name:'Произвести', offsetX:-0.45, action:()=>videoEl.play()},
+  {name:'Пауза', offsetX:-0.15, action:()=>videoEl.pause()},
+  {name:'+5', offsetX:0.15, action:()=>videoEl.currentTime+=5},
+  {name:'-5', offsetX:0.45, action:()=>videoEl.currentTime-=5},
+];
+
 fileInput.addEventListener('change', e=>{
   const file = e.target.files[0];
   if(!file) return;
@@ -42,45 +49,135 @@ fileInput.addEventListener('change', e=>{
   videoEl = document.createElement('video');
   videoEl.src = url;
   videoEl.loop = true;
-  videoEl.playsInline = true;
   videoEl.muted = false;
+  videoEl.playsInline = true;
   videoEl.crossOrigin = 'anonymous';
-});
 
-// По первому клику создаём плоскость и запускаем видео
-scene.addEventListener('click', async ()=>{
-  if(!videoEl) return;
-
-  await videoEl.play().catch(()=>{ console.log('Нужно разрешить воспроизведение'); });
-
-  // создаём VideoTexture только после play()
-  if(!videoMesh){
+  videoEl.addEventListener('loadeddata', ()=>{
     videoWidth = videoEl.videoWidth / videoEl.videoHeight;
     videoHeight = 1;
 
-    const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
-    const videoTexture = new THREE.VideoTexture(videoEl);
-    const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
+    if(!videoMesh){
+      const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
+      videoTexture = new THREE.VideoTexture(videoEl);
+      const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
+      videoMesh = new THREE.Mesh(geometry, material);
+      videoMesh.visible=false;
+      scene.object3D.add(videoMesh);
 
-    videoMesh = new THREE.Mesh(geometry, material);
-
-    const vector = new THREE.Vector3(0,0,-1);
-    vector.unproject(camera.object3D.children[0]);
-    const dir = vector.sub(camera.object3D.position).normalize();
-    const distance = 2;
-    const pos = camera.object3D.position.clone().add(dir.multiplyScalar(distance));
-
-    videoMesh.position.copy(pos);
-    scene.object3D.add(videoMesh);
-  }
-
-  videoMesh.visible = true;
+      createButtons();
+      buttonGroup.visible=false;
+    }
+  });
 });
 
-// Видео всегда смотрит на камеру
+// ---------------- Создание кнопок ----------------
+function createButtons(){
+  buttonGroup = new THREE.Group();
+
+  buttonsData.forEach(b=>{
+    const btn = document.createElement('a-entity');
+    btn.setAttribute('geometry','primitive: plane; width:0.25; height:0.08');
+    btn.setAttribute('material','color:blue; opacity:0.6');
+
+    // Текст
+    const text = document.createElement('a-entity');
+    text.setAttribute('text',`value:${b.name}; align:center; color:white; width:2`);
+    text.object3D.position.set(0,0,0.01);
+    btn.appendChild(text);
+
+    // Прогресс-кружок
+    const progress = document.createElement('a-entity');
+    progress.setAttribute('geometry','primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:0');
+    progress.setAttribute('material','color:black; shader:flat; opacity:0.8');
+    progress.object3D.position.set(0,0,0.02);
+    btn.appendChild(progress);
+
+    progress.progress=0;
+
+    // Проверка наведения через центр экрана (raycaster)
+    let hovering=false;
+    btn.addEventListener('mouseenter', ()=>hovering=true);
+    btn.addEventListener('mouseleave', ()=>{
+      hovering=false;
+      progress.progress=0;
+      progress.setAttribute('geometry','primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:0');
+    });
+
+    scene.addEventListener('tick', ()=>{
+      if(hovering){
+        progress.progress += scene.clock ? scene.clock.getDelta() / 3 : 0.016/3;
+        progress.setAttribute('geometry',`primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:${progress.progress*360}`);
+        if(progress.progress>=1){
+          b.action();
+          progress.progress=0;
+          progress.setAttribute('geometry','primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:0');
+        }
+      }
+    });
+
+    btn.object3D.position.x=b.offsetX;
+    btn.object3D.position.y=-0.9;
+    btn.object3D.position.z=-1.5;
+    buttonGroup.add(btn.object3D);
+  });
+
+  scene.object3D.add(buttonGroup);
+}
+
+// ---------------- Появление видео и кнопок по тапу ----------------
+scene.addEventListener('click', e=>{
+  if(!videoMesh || !videoEl) return;
+
+  const touchX = e.clientX / window.innerWidth * 2 - 1;
+  const touchY = - (e.clientY / window.innerHeight) * 2 + 1;
+
+  const camera = scene.camera;
+  const vector = new THREE.Vector3(touchX, touchY, -1).unproject(camera);
+  const dir = vector.sub(camera.position).normalize();
+  const distance = 2;
+  const pos = camera.position.clone().add(dir.multiplyScalar(distance));
+
+  videoMesh.position.copy(pos);
+  videoMesh.visible=true;
+  videoMesh.rotation.set(0, Math.PI, 0);
+
+  buttonGroup.visible=true;
+  buttonGroup.position.set(0,-videoHeight/2-0.15,0);
+
+  if(firstInteraction){
+    videoEl.muted=false;
+    videoEl.play().catch(()=>{});
+    firstInteraction=false;
+  }
+});
+
+// ---------------- Масштабирование пальцами ----------------
+let startDistance=null, startScale=1;
+scene.addEventListener('touchstart', e=>{
+  if(e.touches.length==2 && videoMesh){
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    startDistance = Math.sqrt(dx*dx + dy*dy);
+    startScale = videoMesh.scale.x;
+  }
+});
+
+scene.addEventListener('touchmove', e=>{
+  if(e.touches.length==2 && videoMesh && startDistance){
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const newDistance = Math.sqrt(dx*dx + dy*dy);
+    const scaleFactor = newDistance / startDistance;
+    videoMesh.scale.set(startScale*scaleFactor,startScale*scaleFactor,1);
+    buttonGroup.scale.set(scaleFactor,scaleFactor,1);
+  }
+});
+
+// ---------------- Видео всегда смотрит на камеру ----------------
 scene.addEventListener('tick', ()=>{
   if(videoMesh && videoMesh.visible){
-    videoMesh.lookAt(camera.object3D.position);
+    videoMesh.lookAt(scene.camera.position);
   }
 });
 </script>
