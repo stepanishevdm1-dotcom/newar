@@ -170,6 +170,7 @@ sizeSlider.addEventListener('input', ()=>{
 // --------------------- Gaze 3 секунды ---------------------
 let activeBtn = null;
 let gazeStartTime = 0;
+const gazeDuration = 3000;
 
 function executeButton(btn){
   if(!videoEl) return;
@@ -186,25 +187,24 @@ scene.addEventListener('tick', ()=>{
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2(0,0); // центр экрана
   raycaster.setFromCamera(mouse, scene.camera);
+
   const intersects = raycaster.intersectObjects([playBtn,pauseBtn,plus5Btn,minus5Btn]);
 
-  if(intersects.length>0){
+  if(intersects.length > 0){
     const btn = intersects[0].object;
     if(activeBtn !== btn){
       activeBtn = btn;
       gazeStartTime = performance.now();
     } else {
-      // заполняем кружок пропорционально времени
-      const progress = (performance.now() - gazeStartTime)/3000;
+      const progress = (performance.now() - gazeStartTime)/gazeDuration;
       gazeFill.style.transform = `scaleY(${Math.min(progress,1)})`;
-      if(progress>=1){
+      if(progress >= 1){
         executeButton(btn);
         gazeFill.style.transform='scaleY(0)';
         activeBtn = null;
       }
     }
   } else {
-    // кружок ушёл с кнопки — сбрасываем
     activeBtn = null;
     gazeFill.style.transform='scaleY(0)';
   }
