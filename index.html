@@ -17,21 +17,22 @@
             margin: 0;
             overflow: hidden;
             font-family: Arial, sans-serif;
+            background: #000;
         }
         
         #videoTime {
             position: fixed;
             top: 10px;
             right: 10px;
-            color: white;
-            background: rgba(0, 0, 0, 0.7);
+            color: #00ff00;
+            background: rgba(20, 20, 20, 0.9);
             padding: 8px 12px;
             border-radius: 8px;
             font-family: monospace;
             font-size: 14px;
             z-index: 999;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            border: 1px solid #00ff00;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
         }
         
         #fileInput {
@@ -40,21 +41,23 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 999;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.3);
+            background: rgba(20, 20, 20, 0.9);
+            color: #00ff00;
+            border: 1px solid #00ff00;
             padding: 8px 16px;
             border-radius: 8px;
-            backdrop-filter: blur(4px);
+            font-size: 14px;
+            box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
         }
         
         #fileInput::-webkit-file-upload-button {
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: none;
+            background: rgba(0, 255, 0, 0.2);
+            color: #00ff00;
+            border: 1px solid #00ff00;
             padding: 4px 8px;
             border-radius: 4px;
             cursor: pointer;
+            margin-right: 10px;
         }
         
         .loading {
@@ -62,12 +65,27 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: white;
-            background: rgba(0, 0, 0, 0.8);
+            color: #00ff00;
+            background: rgba(20, 20, 20, 0.9);
             padding: 20px 30px;
             border-radius: 10px;
             z-index: 1000;
             display: none;
+            border: 1px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.4);
+        }
+        
+        .controls-info {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            color: #00ffff;
+            background: rgba(20, 20, 20, 0.8);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            z-index: 999;
+            border: 1px solid #00ffff;
         }
     </style>
 </head>
@@ -75,6 +93,7 @@
     <input id="fileInput" type="file" accept="video/*">
     <div id="videoTime">00:00 / 00:00</div>
     <div id="loading" class="loading">Загрузка видео...</div>
+    <div class="controls-info">Наведите курсор на кнопку на 1 сек</div>
     
     <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;" vr-mode-ui="enabled: false">
         <!-- Камера с курсором -->
@@ -83,14 +102,14 @@
                 fuse="true" 
                 fuse-timeout="1000" 
                 raycaster="objects: .btn"
-                geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.02"
-                material="color: #ffffff; shader: flat">
+                geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.025"
+                material="color: #ff9900; shader: flat">
             </a-cursor>
         </a-entity>
         
         <!-- Видеоплейер -->
-        <a-entity id="videoPlayer" position="0 0 -1.5" visible="false">
-            <!-- Видео -->
+        <a-entity id="videoPlayer" position="0 0 -2" visible="false">
+            <!-- Видео плоскость -->
             <a-video 
                 id="videoPlane"
                 width="1.6"
@@ -99,95 +118,139 @@
                 material="shader: flat; side: double">
             </a-video>
             
-            <!-- Кнопки управления -->
-            <a-entity id="buttons" position="0 -0.55 0">
+            <!-- Кнопки управления видео -->
+            <a-entity id="videoButtons" position="0 -0.55 0">
                 <!-- Play -->
                 <a-entity class="btn" position="-0.6 0 0">
                     <a-plane 
-                        color="#00ff00"
+                        color="#006600"
                         width="0.35"
                         height="0.15"
-                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200; startEvents: mouseenter"
-                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200; startEvents: mouseleave">
+                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200"
+                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200">
                     </a-plane>
                     <a-text 
                         value="▶"
                         align="center"
                         position="0 0 0.01"
-                        scale="0.8 0.8 1"
-                        color="#000000">
+                        scale="0.6 0.6 1"
+                        color="#00ff00">
                     </a-text>
                 </a-entity>
                 
                 <!-- Pause -->
                 <a-entity class="btn" position="-0.2 0 0">
                     <a-plane 
-                        color="#ffff00"
+                        color="#666600"
                         width="0.35"
                         height="0.15"
-                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200; startEvents: mouseenter"
-                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200; startEvents: mouseleave">
+                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200"
+                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200">
                     </a-plane>
                     <a-text 
                         value="⏸"
                         align="center"
                         position="0 0 0.01"
-                        scale="0.8 0.8 1"
-                        color="#000000">
+                        scale="0.6 0.6 1"
+                        color="#ffff00">
                     </a-text>
                 </a-entity>
                 
                 <!-- +5 секунд -->
                 <a-entity class="btn" position="0.2 0 0">
                     <a-plane 
-                        color="#00ffff"
+                        color="#006666"
                         width="0.35"
                         height="0.15"
-                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200; startEvents: mouseenter"
-                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200; startEvents: mouseleave">
+                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200"
+                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200">
                     </a-plane>
                     <a-text 
                         value="+5s"
                         align="center"
                         position="0 0 0.01"
-                        scale="0.6 0.6 1"
-                        color="#000000">
+                        scale="0.5 0.5 1"
+                        color="#00ffff">
                     </a-text>
                 </a-entity>
                 
                 <!-- -5 секунд -->
                 <a-entity class="btn" position="0.6 0 0">
                     <a-plane 
-                        color="#ff00ff"
+                        color="#660066"
                         width="0.35"
                         height="0.15"
-                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200; startEvents: mouseenter"
-                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200; startEvents: mouseleave">
+                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200"
+                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200">
                     </a-plane>
                     <a-text 
                         value="-5s"
                         align="center"
                         position="0 0 0.01"
-                        scale="0.6 0.6 1"
-                        color="#000000">
+                        scale="0.5 0.5 1"
+                        color="#ff00ff">
+                    </a-text>
+                </a-entity>
+            </a-entity>
+            
+            <!-- Кнопки изменения размера -->
+            <a-entity id="sizeButtons" position="0 -0.75 0">
+                <!-- Увеличить -->
+                <a-entity class="size-btn" position="-0.3 0 0">
+                    <a-plane 
+                        color="#333333"
+                        width="0.25"
+                        height="0.12"
+                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200"
+                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200">
+                    </a-plane>
+                    <a-text 
+                        value="+ Размер"
+                        align="center"
+                        position="0 0 0.01"
+                        scale="0.35 0.35 1"
+                        color="#ffffff">
+                    </a-text>
+                </a-entity>
+                
+                <!-- Уменьшить -->
+                <a-entity class="size-btn" position="0.3 0 0">
+                    <a-plane 
+                        color="#333333"
+                        width="0.25"
+                        height="0.12"
+                        animation__mouseenter="property: scale; to: 1.1 1.1 1; dur: 200"
+                        animation__mouseleave="property: scale; to: 1 1 1; dur: 200">
+                    </a-plane>
+                    <a-text 
+                        value="- Размер"
+                        align="center"
+                        position="0 0 0.01"
+                        scale="0.35 0.35 1"
+                        color="#ffffff">
                     </a-text>
                 </a-entity>
             </a-entity>
             
             <!-- Индикатор загрузки -->
             <a-entity id="loadingIndicator" position="0 0 0.01" visible="false">
-                <a-ring color="#ffffff" radius-inner="0.1" radius-outer="0.15">
+                <a-ring color="#00ff00" radius-inner="0.08" radius-outer="0.12">
                     <a-animation attribute="rotation" dur="1000" to="0 0 360" repeat="indefinite"></a-animation>
                 </a-ring>
+                <a-text value="Загрузка..." align="center" position="0 -0.15 0" scale="0.4 0.4 1" color="#00ff00"></a-text>
             </a-entity>
         </a-entity>
     </a-scene>
     
     <script>
         let videoEl = null;
+        let currentVideoScale = 1.0;
+        const MIN_SCALE = 0.5;
+        const MAX_SCALE = 2.0;
+        const SCALE_STEP = 0.2;
+        
         const videoPlayer = document.getElementById('videoPlayer');
         const videoPlane = document.getElementById('videoPlane');
-        const buttons = document.getElementById('buttons');
         const timeEl = document.getElementById('videoTime');
         const fileInput = document.getElementById('fileInput');
         const loading = document.getElementById('loading');
@@ -212,6 +275,7 @@
             try {
                 // Создать элемент видео
                 videoEl = document.createElement('video');
+                videoEl.id = 'ar-video-' + Date.now();
                 videoEl.src = URL.createObjectURL(file);
                 videoEl.loop = true;
                 videoEl.playsInline = true;
@@ -220,14 +284,21 @@
                 
                 // Дождаться загрузки метаданных
                 await new Promise((resolve, reject) => {
-                    videoEl.onloadedmetadata = resolve;
+                    videoEl.onloadedmetadata = () => {
+                        console.log('Video metadata loaded');
+                        resolve();
+                    };
                     videoEl.onerror = reject;
-                    setTimeout(() => reject(new Error('Timeout loading video')), 10000);
+                    setTimeout(() => reject(new Error('Timeout loading video')), 15000);
                 });
                 
                 // Установить видео в плоскость
-                videoPlane.setAttribute('src', `#${videoEl.id}`);
-                videoPlane.appendChild(videoEl);
+                videoPlane.setAttribute('src', '#' + videoEl.id);
+                document.body.appendChild(videoEl);
+                
+                // Сбросить масштаб
+                currentVideoScale = 1.0;
+                updateVideoScale();
                 
                 // Показать плеер
                 videoPlayer.setAttribute('visible', true);
@@ -236,7 +307,8 @@
                 try {
                     await videoEl.play();
                 } catch (err) {
-                    console.log('Автовоспроизведение не удалось:', err);
+                    console.log('Автовоспроизведение не удалось, ждем взаимодействия пользователя');
+                    // Можно показать кнопку play здесь
                 }
                 
             } catch (error) {
@@ -251,22 +323,31 @@
         
         // Обновление таймера
         setInterval(() => {
-            if (!videoEl) return;
+            if (!videoEl || videoEl.paused) return;
             
             const current = videoEl.currentTime;
             const duration = videoEl.duration || 0;
             
-            if (!isNaN(duration)) {
+            if (!isNaN(duration) && duration > 0) {
                 timeEl.textContent = `${formatTime(current)} / ${formatTime(duration)}`;
+            } else {
+                timeEl.textContent = `${formatTime(current)} / --:--`;
             }
-        }, 200);
+        }, 250);
+        
+        // Обновление масштаба видео
+        function updateVideoScale() {
+            videoPlane.setAttribute('width', 1.6 * currentVideoScale);
+            videoPlane.setAttribute('height', 0.9 * currentVideoScale);
+        }
         
         // Компоненты для кнопок
         AFRAME.registerComponent('play-btn', {
             init() {
                 this.el.addEventListener('fuse', () => {
+                    console.log('Play button clicked');
                     if (videoEl) {
-                        videoEl.play();
+                        videoEl.play().catch(e => console.log('Play error:', e));
                         // Анимация нажатия
                         this.el.setAttribute('animation__click', 'property: scale; to: 0.9 0.9 1; dur: 100; easing: easeOutCubic');
                         setTimeout(() => {
@@ -280,6 +361,7 @@
         AFRAME.registerComponent('pause-btn', {
             init() {
                 this.el.addEventListener('fuse', () => {
+                    console.log('Pause button clicked');
                     if (videoEl) {
                         videoEl.pause();
                         // Анимация нажатия
@@ -295,7 +377,8 @@
         AFRAME.registerComponent('plus-btn', {
             init() {
                 this.el.addEventListener('fuse', () => {
-                    if (videoEl) {
+                    console.log('+5 button clicked');
+                    if (videoEl && !isNaN(videoEl.duration)) {
                         videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime + 5);
                         // Анимация нажатия
                         this.el.setAttribute('animation__click', 'property: scale; to: 0.9 0.9 1; dur: 100; easing: easeOutCubic');
@@ -310,6 +393,7 @@
         AFRAME.registerComponent('minus-btn', {
             init() {
                 this.el.addEventListener('fuse', () => {
+                    console.log('-5 button clicked');
                     if (videoEl) {
                         videoEl.currentTime = Math.max(0, videoEl.currentTime - 5);
                         // Анимация нажатия
@@ -322,8 +406,40 @@
             }
         });
         
-        // Назначить компоненты кнопкам
-        document.querySelectorAll('.btn').forEach((btn, index) => {
+        AFRAME.registerComponent('increase-size-btn', {
+            init() {
+                this.el.addEventListener('fuse', () => {
+                    console.log('Increase size button clicked');
+                    currentVideoScale = Math.min(MAX_SCALE, currentVideoScale + SCALE_STEP);
+                    updateVideoScale();
+                    
+                    // Анимация нажатия
+                    this.el.setAttribute('animation__click', 'property: scale; to: 0.9 0.9 1; dur: 100; easing: easeOutCubic');
+                    setTimeout(() => {
+                        this.el.removeAttribute('animation__click');
+                    }, 100);
+                });
+            }
+        });
+        
+        AFRAME.registerComponent('decrease-size-btn', {
+            init() {
+                this.el.addEventListener('fuse', () => {
+                    console.log('Decrease size button clicked');
+                    currentVideoScale = Math.max(MIN_SCALE, currentVideoScale - SCALE_STEP);
+                    updateVideoScale();
+                    
+                    // Анимация нажатия
+                    this.el.setAttribute('animation__click', 'property: scale; to: 0.9 0.9 1; dur: 100; easing: easeOutCubic');
+                    setTimeout(() => {
+                        this.el.removeAttribute('animation__click');
+                    }, 100);
+                });
+            }
+        });
+        
+        // Назначить компоненты кнопкам управления видео
+        document.querySelectorAll('#videoButtons .btn').forEach((btn, index) => {
             switch(index) {
                 case 0:
                     btn.setAttribute('play-btn', '');
@@ -340,12 +456,32 @@
             }
         });
         
+        // Назначить компоненты кнопкам изменения размера
+        document.querySelectorAll('#sizeButtons .size-btn').forEach((btn, index) => {
+            if (index === 0) {
+                btn.setAttribute('increase-size-btn', '');
+            } else {
+                btn.setAttribute('decrease-size-btn', '');
+            }
+        });
+        
+        // Добавить обработчики событий для отладки
+        document.querySelectorAll('.btn, .size-btn').forEach(btn => {
+            btn.addEventListener('mouseenter', () => console.log('Mouse enter button'));
+            btn.addEventListener('mouseleave', () => console.log('Mouse leave button'));
+        });
+        
         // Освобождение ресурсов при закрытии
         window.addEventListener('beforeunload', () => {
             if (videoEl && videoEl.src) {
                 URL.revokeObjectURL(videoEl.src);
             }
         });
+        
+        // Авто-скрытие подсказки через 10 секунд
+        setTimeout(() => {
+            document.querySelector('.controls-info').style.opacity = '0.5';
+        }, 10000);
     </script>
 </body>
 </html>
