@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео ровное, без сжатия</title>
+  <title>AR Видео с оригинальными пропорциями</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -25,8 +25,8 @@ const scene = document.querySelector('a-scene');
 const fileInput = document.getElementById('fileInput');
 
 let videoEl, videoMesh, videoTexture;
+let videoWidth = 1, videoHeight = 0.6; // будут заменены на реальные после загрузки
 
-// Загружаем видео
 fileInput.addEventListener('change', e => {
   const file = e.target.files[0];
   if(!file) return;
@@ -41,19 +41,26 @@ fileInput.addEventListener('change', e => {
   videoEl.crossOrigin = 'anonymous';
 
   videoEl.addEventListener('loadeddata', () => {
+    // Сохраняем оригинальные пропорции
+    videoWidth = videoEl.videoWidth / videoEl.videoHeight;
+    videoHeight = 1;
+
     if(!videoMesh){
-      const geometry = new THREE.PlaneGeometry(1, 0.6);
+      const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
       videoTexture = new THREE.VideoTexture(videoEl);
       const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
       videoMesh = new THREE.Mesh(geometry, material);
       videoMesh.visible = false;
       scene.object3D.add(videoMesh);
+    } else {
+      videoMesh.geometry.dispose();
+      videoMesh.geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
     }
     videoEl.play().catch(()=>{});
   });
 });
 
-// Ставим видео по тапу
+// Установка позиции при тапе
 scene.addEventListener('click', event => {
   if(!videoMesh) return;
 
@@ -69,11 +76,11 @@ scene.addEventListener('click', event => {
   videoMesh.position.copy(pos);
   videoMesh.visible = true;
   videoMesh.rotation.set(-Math.PI/2, 0, 0); // ровное
-  videoMesh.scale.set(1, 0.6, 1); // фиксированная пропорция
+  videoMesh.scale.set(1,1,1); // масштаб 1:1, пропорции исходные
   videoEl.play().catch(()=>{});
 });
 
-// Масштабирование пальцами без искажения
+// Масштабирование пропорционально исходным сторонам
 let startDistance = null;
 let startScale = 1;
 
@@ -82,7 +89,7 @@ scene.addEventListener('touchstart', e => {
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     startDistance = Math.sqrt(dx*dx + dy*dy);
-    startScale = videoMesh.scale.x; // масштабируем одинаково
+    startScale = videoMesh.scale.x; // единый коэффициент масштаба
   }
 });
 
@@ -93,7 +100,7 @@ scene.addEventListener('touchmove', e => {
     const newDistance = Math.sqrt(dx*dx + dy*dy);
     const scaleFactor = newDistance / startDistance;
 
-    // Масштаб одинаково по X и Y, пропорции сохраняются
+    // Масштаб одинаково по X и Y, пропорции исходные
     videoMesh.scale.set(startScale * scaleFactor, startScale * scaleFactor, 1);
   }
 });
