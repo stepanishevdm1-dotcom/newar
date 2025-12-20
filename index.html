@@ -35,10 +35,10 @@ let firstInteraction=true;
 let buttonGroup;
 
 const buttonData = [
-  {name:'Воспроизвести', offsetX:-0.6, action:()=>videoEl.play()},
-  {name:'Пауза', offsetX:-0.2, action:()=>videoEl.pause()},
-  {name:'Назад 5с', offsetX:0.2, action:()=>videoEl.currentTime-=5},
-  {name:'Вперед 5с', offsetX:0.6, action:()=>videoEl.currentTime+=5},
+  {name:'Произвести', offsetX:-0.45, action:()=>videoEl.play()},
+  {name:'Пауза', offsetX:-0.15, action:()=>videoEl.pause()},
+  {name:'+5', offsetX:0.15, action:()=>videoEl.currentTime+=5},
+  {name:'-5', offsetX:0.45, action:()=>videoEl.currentTime-=5},
 ];
 
 // ----------------- Загрузка видео -----------------
@@ -82,6 +82,7 @@ function createButtons(){
     btn.setAttribute('geometry','primitive: plane; width:0.25; height:0.08');
     btn.setAttribute('material','color:blue; opacity:0.6');
 
+    // текст
     const text = document.createElement('a-entity');
     text.setAttribute('text',`value:${b.name}; align:center; color:white; width:2`);
     text.object3D.position.set(0,0,0.01);
@@ -136,7 +137,7 @@ scene.addEventListener('click', event=>{
   videoMesh.position.copy(pos);
   videoMesh.visible=true;
 
-  // перемещаем кнопки прямо под видео
+  // размещаем кнопки под видео
   buttonGroup.position.set(0,-videoHeight/2-0.15,0);
 
   if(firstInteraction){
@@ -145,7 +146,7 @@ scene.addEventListener('click', event=>{
   }
 });
 
-// ----------------- Масштабирование -----------------
+// ----------------- Масштабирование всего вместе -----------------
 let startDistance=null, startScale=1;
 scene.addEventListener('touchstart', e=>{
   if(e.touches.length==2 && videoMesh){
@@ -163,7 +164,7 @@ scene.addEventListener('touchmove', e=>{
     const scaleFactor=newDistance/startDistance;
     videoMesh.scale.set(startScale*scaleFactor,startScale*scaleFactor,1);
 
-    // масштабируем кнопки вместе с видео
+    // масштабируем всю группу кнопок вместе
     buttonGroup.scale.set(scaleFactor,scaleFactor,1);
   }
 });
