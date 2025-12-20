@@ -63,10 +63,10 @@ fileInput.addEventListener('change', e => {
       const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
       videoMesh = new THREE.Mesh(geometry, material);
       videoMesh.visible = false;
-      videoMesh.scale.x = -1; // зеркалирование
+      videoMesh.scale.x = -1; // исправляем зеркалирование
       scene.object3D.add(videoMesh);
 
-      // создаем кнопки после загрузки видео
+      // создаем кнопки
       createButtons();
     } else {
       videoMesh.geometry.dispose();
@@ -75,7 +75,7 @@ fileInput.addEventListener('change', e => {
   });
 });
 
-// ----------------- Кнопки -----------------
+// ----------------- Создание кнопок -----------------
 function createButtons(){
   buttons = [];
   buttonData.forEach(b=>{
@@ -90,34 +90,34 @@ function createButtons(){
     text.object3D.position.set(0,0,0.01);
     btn.appendChild(text);
 
-    // прогресс круг
+    // прогресс кружок
     const progress = document.createElement('a-entity');
-    progress.setAttribute('geometry','primitive:ring; radiusInner:0.02; radiusOuter:0.025');
+    progress.setAttribute('geometry','primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:0');
     progress.setAttribute('material','color:white; shader:flat; opacity:0.8');
     progress.object3D.position.set(0,0,0.02);
     btn.appendChild(progress);
+
     progress.progress = 0;
     progress.updateProgress = function(dt){
       this.progress += dt/3000;
-      this.setAttribute('geometry',`primitive:ring; radiusInner:0.02; radiusOuter:0.025; thetaLength:${Math.min(this.progress*360,360)}`);
-      if(this.progress>=1){ b.action(); this.progress=0; }
+      this.setAttribute('geometry',`primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:${Math.min(this.progress*360,360)}`);
+      if(this.progress>=1){ b.action(); this.progress=0; this.setAttribute('geometry',`primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:0`); }
     }
 
     buttons.push({btn, progress});
+
     scene.appendChild(btn);
 
     // наведение
     let hovering=false;
-    btn.addEventListener('mouseenter', ()=>{
-      hovering=true;
-    });
+    btn.addEventListener('mouseenter', ()=>{ hovering=true; });
     btn.addEventListener('mouseleave', ()=>{
-      hovering=false;
-      progress.progress=0;
-      progress.setAttribute('geometry',`primitive:ring; radiusInner:0.02; radiusOuter:0.025; thetaLength:0`);
+      hovering=false; 
+      progress.progress=0; 
+      progress.setAttribute('geometry',`primitive:ring; radiusInner:0.01; radiusOuter:0.015; thetaLength:0`);
     });
 
-    // обновление прогресса каждый кадр
+    // обновление прогресса
     scene.addEventListener('tick', ()=>{
       if(hovering) progress.updateProgress(16);
     });
@@ -137,7 +137,7 @@ scene.addEventListener('click', event=>{
   videoMesh.position.copy(pos);
   videoMesh.visible = true;
 
-  // перемещаем кнопки вместе с видео
+  // размещаем кнопки относительно видео
   buttons.forEach((b,i)=>{
     b.btn.object3D.position.x = buttonData[i].offsetX;
     b.btn.object3D.position.y = -0.9;
