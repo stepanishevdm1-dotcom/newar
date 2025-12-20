@@ -66,7 +66,8 @@ fileInput.addEventListener('change', e=>{
       videoMesh.visible=false;
       scene.object3D.add(videoMesh);
 
-      createButtons();
+      createButtons(); // кнопки создаются заранее, но скрыты
+      buttonGroup.visible=false;
     }else{
       videoMesh.geometry.dispose();
       videoMesh.geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
@@ -124,7 +125,7 @@ function createButtons(){
   scene.object3D.add(buttonGroup);
 }
 
-// ----------------- Установка видео -----------------
+// ----------------- Установка видео и показ кнопок по нажатию -----------------
 scene.addEventListener('click', event=>{
   if(!videoMesh || !videoEl) return;
 
@@ -137,7 +138,8 @@ scene.addEventListener('click', event=>{
   videoMesh.position.copy(pos);
   videoMesh.visible=true;
 
-  // размещаем кнопки под видео
+  // показываем кнопки и размещаем их под видео
+  buttonGroup.visible=true;
   buttonGroup.position.set(0,-videoHeight/2-0.15,0);
 
   if(firstInteraction){
