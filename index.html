@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>AR Видео с кнопками фокусировки</title>
+<title>AR Видео с кнопками и look-at камеру</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 <style>
@@ -17,8 +17,7 @@
 <input type="file" id="fileInput" accept="video/*">
 
 <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
-  <a-entity camera look-controls>
-    <!-- Курсор в центре для фокусировки -->
+  <a-entity id="camera" camera look-controls>
     <a-entity cursor="fuse: true; fuseTimeout: 3000" position="0 0 -1"
               geometry="primitive: ring; radiusInner: 0.02; radiusOuter: 0.03"
               material="color: yellow; shader: flat"></a-entity>
@@ -27,12 +26,14 @@
 
 <script>
 const scene = document.querySelector('a-scene');
+const camera = document.getElementById('camera');
 const fileInput = document.getElementById('fileInput');
 
 let videoEl, videoMesh, videoTexture;
 let videoWidth = 1, videoHeight = 0.6;
 let firstInteraction = true;
 
+// ----------------- Загружаем видео -----------------
 fileInput.addEventListener('change', e => {
   const file = e.target.files[0];
   if(!file) return;
@@ -57,10 +58,8 @@ fileInput.addEventListener('change', e => {
       const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
       videoMesh = new THREE.Mesh(geometry, material);
       videoMesh.visible = false;
+      videoMesh.scale.x = -1; // исправляем зеркалирование
       scene.object3D.add(videoMesh);
-
-      // исправляем зеркалирование
-      videoMesh.scale.x = -1;
     } else {
       videoMesh.geometry.dispose();
       videoMesh.geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
@@ -68,23 +67,20 @@ fileInput.addEventListener('change', e => {
   });
 });
 
-// Ставим видео вертикально лицом к камере
+// ----------------- Устанавливаем видео по тапу -----------------
 scene.addEventListener('click', event => {
   if(!videoMesh || !videoEl) return;
 
   const touchX = event.clientX / window.innerWidth * 2 - 1;
   const touchY = - (event.clientY / window.innerHeight) * 2 + 1;
 
-  const camera = scene.camera;
-  const vector = new THREE.Vector3(touchX, touchY, -1).unproject(camera);
-  const dir = vector.sub(camera.position).normalize();
+  const vector = new THREE.Vector3(touchX, touchY, -1).unproject(camera.object3D.children[0]);
+  const dir = vector.sub(camera.object3D.position).normalize();
   const distance = 2;
-  const pos = camera.position.clone().add(dir.multiplyScalar(distance));
+  const pos = camera.object3D.position.clone().add(dir.multiplyScalar(distance));
 
   videoMesh.position.copy(pos);
   videoMesh.visible = true;
-  videoMesh.rotation.set(0, Math.PI, 0); 
-  videoMesh.scale.set(-1,1,1); // отражение исправлено
 
   if(firstInteraction){
     videoEl.play().catch(()=>{});
@@ -92,9 +88,10 @@ scene.addEventListener('click', event => {
   }
 });
 
-// Масштабирование пальцами пропорционально
+// ----------------- Масштабирование пальцами -----------------
 let startDistance = null;
 let startScale = 1;
+
 scene.addEventListener('touchstart', e => {
   if(e.touches.length == 2 && videoMesh){
     const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -103,6 +100,7 @@ scene.addEventListener('touchstart', e => {
     startScale = Math.abs(videoMesh.scale.x);
   }
 });
+
 scene.addEventListener('touchmove', e => {
   if(e.touches.length == 2 && videoMesh && startDistance){
     const dx = e.touches[0].clientX - e.touches[1].clientX;
@@ -113,26 +111,33 @@ scene.addEventListener('touchmove', e => {
   }
 });
 
-// ----------------- Кнопки -----------------
+// ----------------- Видео всегда смотрит на камеру -----------------
+scene.addEventListener('render-target-loaded', ()=>{
+  scene.addEventListener('tick', ()=>{
+    if(videoMesh && videoMesh.visible){
+      videoMesh.lookAt(camera.object3D.position);
+    }
+  });
+});
+
+// ----------------- Кнопки AR -----------------
 const buttonData = [
-  {name:'play', x:-0.5, y:-1, action:()=>videoEl.play()},
-  {name:'pause', x:0, y:-1, action:()=>videoEl.pause()},
-  {name:'back', x:-1, y:-1, action:()=>videoEl.currentTime-=5},
-  {name:'forward', x:1, y:-1, action:()=>videoEl.currentTime+=5},
-  {name:'vol+', x:1.5, y:-1, action:()=>{ videoEl.volume = Math.min(videoEl.volume+0.1,1)}},
-  {name:'vol-', x:-1.5, y:-1, action:()=>{ videoEl.volume = Math.max(videoEl.volume-0.1,0)}}
+  {name:'play', x:-0.6, y:-0.9, action:()=>videoEl.play()},
+  {name:'pause', x:-0.2, y:-0.9, action:()=>videoEl.pause()},
+  {name:'back', x:0.2, y:-0.9, action:()=>videoEl.currentTime-=5},
+  {name:'forward', x:0.6, y:-0.9, action:()=>videoEl.currentTime+=5},
 ];
 
 buttonData.forEach(b=>{
   const btn = document.createElement('a-entity');
   btn.setAttribute('geometry','primitive: plane; width:0.3; height:0.1');
   btn.setAttribute('material','color:blue; opacity:0.6');
-  btn.object3D.position.set(b.x,b.y,-2);
+  btn.object3D.position.set(b.x,b.y,-1.5);
   btn.elName = b.name;
   btn.action = b.action;
   scene.appendChild(btn);
 
-  // добавим систему фокусировки
+  // Фокус 3 сек
   let focusTimer = null;
   btn.addEventListener('mouseenter', ()=>{ 
     focusTimer = setTimeout(()=>{ b.action(); },3000); 
