@@ -2,40 +2,34 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео в воздухе</title>
+  <title>AR Видео в воздухе с масштабированием</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aframe-extras@6.1.1/dist/aframe-extras.min.js"></script>
   <style>
     body { margin:0; overflow:hidden; }
-    #fileInput {
-      position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
-      z-index: 10; background: rgba(0,0,0,0.5); color: white;
-      padding: 5px 10px; border-radius: 5px;
-    }
-    #distanceRange {
-      position: fixed; top: 50px; left: 50%; transform: translateX(-50%);
-      z-index: 10; width: 200px;
-    }
+    #fileInput {position:fixed; top:10px; left:50%; transform:translateX(-50%);
+      z-index:10; background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;}
   </style>
 </head>
 <body>
-
 <input type="file" id="fileInput" accept="video/*">
-<label>
-  Расстояние: <input type="range" id="distanceRange" min="0.5" max="5" step="0.1" value="2">
-</label>
 
 <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
-  <a-entity camera look-controls></a-entity>
+
+  <a-entity id="cameraRig">
+    <a-entity camera look-controls></a-entity>
+  </a-entity>
+
 </a-scene>
 
 <script>
 const scene = document.querySelector('a-scene');
 const fileInput = document.getElementById('fileInput');
-const distanceRange = document.getElementById('distanceRange');
 
-let arVideo;
-let videoElement;
+let videoEl;
+let videoMesh;
+let videoTexture;
 
 fileInput.addEventListener('change', e => {
   const file = e.target.files[0];
@@ -43,39 +37,30 @@ fileInput.addEventListener('change', e => {
   const url = URL.createObjectURL(file);
 
   // создаём <video> элемент
-  videoElement = document.createElement('video');
-  videoElement.src = url;
-  videoElement.loop = true;
-  videoElement.muted = true; // важно для автоплей
-  videoElement.playsInline = true;
-  videoElement.crossOrigin = 'anonymous';
+  videoEl = document.createElement('video');
+  videoEl.src = url;
+  videoEl.loop = true;
+  videoEl.muted = true; // обязательно для автоплей
+  videoEl.playsInline = true;
+  videoEl.crossOrigin = 'anonymous';
 
-  videoElement.addEventListener('loadeddata', () => {
-    // создаём a-video только после загрузки видео
-    if(!arVideo){
-      arVideo = document.createElement('a-video');
-      arVideo.setAttribute('width', '1');
-      arVideo.setAttribute('height', '0.6');
-      arVideo.setAttribute('rotation', '-90 0 0');
-      arVideo.setAttribute('visible', 'false');
-
-      // привязываем текстуру видео
-      const material = new THREE.MeshBasicMaterial({ 
-        map: new THREE.VideoTexture(videoElement),
-        side: THREE.DoubleSide
-      });
-      arVideo.getObject3D('mesh').material = material;
-
-      scene.appendChild(arVideo);
+  videoEl.addEventListener('loadeddata', () => {
+    if(!videoMesh){
+      // создаём плоскость с текстурой видео
+      const geometry = new THREE.PlaneGeometry(1, 0.6);
+      videoTexture = new THREE.VideoTexture(videoEl);
+      const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
+      videoMesh = new THREE.Mesh(geometry, material);
+      videoMesh.visible = false;
+      scene.object3D.add(videoMesh);
     }
+    videoEl.play().catch(()=>{});
   });
-
-  videoElement.play().catch(()=>{}); // автоплей
 });
 
-// При тапе по экрану ставим видео в воздухе
-scene.addEventListener('click', function(event){
-  if(!arVideo || !videoElement) return;
+// Ставим видео по тапу на экран
+scene.addEventListener('click', event => {
+  if(!videoMesh) return;
 
   const touchX = event.clientX / window.innerWidth * 2 - 1;
   const touchY = - (event.clientY / window.innerHeight) * 2 + 1;
@@ -83,15 +68,36 @@ scene.addEventListener('click', function(event){
   const camera = scene.camera;
   const vector = new THREE.Vector3(touchX, touchY, -1).unproject(camera);
   const dir = vector.sub(camera.position).normalize();
-  const distance = parseFloat(distanceRange.value);
+  const distance = 2;
   const pos = camera.position.clone().add(dir.multiplyScalar(distance));
 
-  arVideo.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
-  arVideo.setAttribute('visible', 'true');
+  videoMesh.position.copy(pos);
+  videoMesh.visible = true;
+  videoEl.play().catch(()=>{});
+});
 
-  videoElement.play().catch(()=>{});
+// Масштабирование и вращение пальцами (pinch/rotate)
+let initialDistance = null;
+let initialScale = 1;
+
+scene.addEventListener('touchstart', e => {
+  if(e.touches.length == 2 && videoMesh){
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    initialDistance = Math.sqrt(dx*dx + dy*dy);
+    initialScale = videoMesh.scale.x;
+  }
+});
+
+scene.addEventListener('touchmove', e => {
+  if(e.touches.length == 2 && videoMesh && initialDistance){
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const newDistance = Math.sqrt(dx*dx + dy*dy);
+    const scaleFactor = newDistance / initialDistance;
+    videoMesh.scale.set(initialScale * scaleFactor, initialScale * scaleFactor, 1);
+  }
 });
 </script>
-
 </body>
 </html>
