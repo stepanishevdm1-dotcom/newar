@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео в воздухе с масштабированием и вращением</title>
+  <title>AR Видео с перспективой</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -51,7 +51,7 @@ fileInput.addEventListener('change', e => {
   });
 });
 
-// Ставим видео при тапе
+// Установка позиции при тапе
 scene.addEventListener('click', event => {
   if(!videoMesh) return;
 
@@ -61,7 +61,7 @@ scene.addEventListener('click', event => {
   const camera = scene.camera;
   const vector = new THREE.Vector3(touchX, touchY, -1).unproject(camera);
   const dir = vector.sub(camera.position).normalize();
-  const distance = 2; // можно менять дистанцию
+  const distance = 2;
   const pos = camera.position.clone().add(dir.multiplyScalar(distance));
 
   videoMesh.position.copy(pos);
@@ -69,34 +69,43 @@ scene.addEventListener('click', event => {
   videoEl.play().catch(()=>{});
 });
 
-// Масштабирование и вращение пальцами
-let initialDistance = null;
-let initialScale = 1;
-let initialAngle = null;
-let initialRotationY = 0;
+// Управление пальцами
+let startDistance = null;
+let startAngle = null;
+let startScaleX = 1;
+let startScaleY = 1;
+let startRotationY = 0;
 
 scene.addEventListener('touchstart', e => {
   if(e.touches.length == 2 && videoMesh){
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
-    initialDistance = Math.sqrt(dx*dx + dy*dy);
-    initialScale = videoMesh.scale.x;
+    startDistance = Math.sqrt(dx*dx + dy*dy);
+    startScaleX = videoMesh.scale.x;
+    startScaleY = videoMesh.scale.y;
 
-    initialAngle = Math.atan2(dy, dx);
-    initialRotationY = videoMesh.rotation.y;
+    startAngle = Math.atan2(dy, dx);
+    startRotationY = videoMesh.rotation.y;
   }
 });
 
 scene.addEventListener('touchmove', e => {
-  if(e.touches.length == 2 && videoMesh && initialDistance){
+  if(e.touches.length == 2 && videoMesh && startDistance){
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     const newDistance = Math.sqrt(dx*dx + dy*dy);
-    const scaleFactor = newDistance / initialDistance;
-    videoMesh.scale.set(initialScale * scaleFactor, initialScale * scaleFactor, 1);
+    const scaleFactor = newDistance / startDistance;
 
+    // Масштабируем пропорционально
+    let aspect = dx / dy; // изменение пропорции
+    aspect = Math.max(0.3, Math.min(aspect, 3)); // ограничение, чтобы не сжималось до квадрата
+
+    videoMesh.scale.x = startScaleX * scaleFactor * aspect;
+    videoMesh.scale.y = startScaleY * scaleFactor / aspect;
+
+    // Вращение вокруг Y
     const newAngle = Math.atan2(dy, dx);
-    videoMesh.rotation.y = initialRotationY + (newAngle - initialAngle);
+    videoMesh.rotation.y = startRotationY + (newAngle - startAngle);
   }
 });
 </script>
