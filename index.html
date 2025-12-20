@@ -35,27 +35,47 @@ const fileInput = document.getElementById('fileInput');
 const distanceRange = document.getElementById('distanceRange');
 
 let arVideo;
+let videoElement;
 
 fileInput.addEventListener('change', e => {
   const file = e.target.files[0];
   if(!file) return;
   const url = URL.createObjectURL(file);
 
-  if(!arVideo){
-    arVideo = document.createElement('a-video');
-    arVideo.setAttribute('src', url);
-    arVideo.setAttribute('width', '1');
-    arVideo.setAttribute('height', '0.6');
-    arVideo.setAttribute('visible', 'false');
-    scene.appendChild(arVideo);
-  } else {
-    arVideo.setAttribute('src', url);
-  }
+  // создаём <video> элемент
+  videoElement = document.createElement('video');
+  videoElement.src = url;
+  videoElement.loop = true;
+  videoElement.muted = true; // важно для автоплей
+  videoElement.playsInline = true;
+  videoElement.crossOrigin = 'anonymous';
+
+  videoElement.addEventListener('loadeddata', () => {
+    // создаём a-video только после загрузки видео
+    if(!arVideo){
+      arVideo = document.createElement('a-video');
+      arVideo.setAttribute('width', '1');
+      arVideo.setAttribute('height', '0.6');
+      arVideo.setAttribute('rotation', '-90 0 0');
+      arVideo.setAttribute('visible', 'false');
+
+      // привязываем текстуру видео
+      const material = new THREE.MeshBasicMaterial({ 
+        map: new THREE.VideoTexture(videoElement),
+        side: THREE.DoubleSide
+      });
+      arVideo.getObject3D('mesh').material = material;
+
+      scene.appendChild(arVideo);
+    }
+  });
+
+  videoElement.play().catch(()=>{}); // автоплей
 });
 
 // При тапе по экрану ставим видео в воздухе
 scene.addEventListener('click', function(event){
-  if(!arVideo) return;
+  if(!arVideo || !videoElement) return;
 
   const touchX = event.clientX / window.innerWidth * 2 - 1;
   const touchY = - (event.clientY / window.innerHeight) * 2 + 1;
@@ -69,8 +89,7 @@ scene.addEventListener('click', function(event){
   arVideo.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
   arVideo.setAttribute('visible', 'true');
 
-  // Автовоспроизведение видео
-  arVideo.components.material.material.map.image.play?.();
+  videoElement.play().catch(()=>{});
 });
 </script>
 
