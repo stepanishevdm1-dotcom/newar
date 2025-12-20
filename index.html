@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>AR Видео простое</title>
+<title>AR Видео рабочее</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 <style>
@@ -29,9 +29,11 @@ const scene = document.querySelector('a-scene');
 const camera = document.getElementById('camera');
 const fileInput = document.getElementById('fileInput');
 
-let videoEl, videoMesh, videoTexture;
+let videoEl = null;
+let videoMesh = null;
 let videoWidth=1, videoHeight=0.6;
 
+// Загружаем видео заранее
 fileInput.addEventListener('change', e=>{
   const file = e.target.files[0];
   if(!file) return;
@@ -43,39 +45,36 @@ fileInput.addEventListener('change', e=>{
   videoEl.playsInline = true;
   videoEl.muted = false;
   videoEl.crossOrigin = 'anonymous';
+});
 
-  videoEl.addEventListener('loadeddata', ()=>{
+// По первому клику создаём плоскость и запускаем видео
+scene.addEventListener('click', async ()=>{
+  if(!videoEl) return;
+
+  await videoEl.play().catch(()=>{ console.log('Нужно разрешить воспроизведение'); });
+
+  // создаём VideoTexture только после play()
+  if(!videoMesh){
     videoWidth = videoEl.videoWidth / videoEl.videoHeight;
     videoHeight = 1;
 
-    if(!videoMesh){
-      const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
-      videoTexture = new THREE.VideoTexture(videoEl);
-      const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
-      videoMesh = new THREE.Mesh(geometry, material);
-      videoMesh.visible=false;
-      scene.object3D.add(videoMesh);
-    } else {
-      videoMesh.geometry.dispose();
-      videoMesh.geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
-    }
-  });
-});
+    const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
+    const videoTexture = new THREE.VideoTexture(videoEl);
+    const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
 
-// Появление видео по первому клику
-scene.addEventListener('click', ()=>{
-  if(!videoMesh || !videoEl) return;
+    videoMesh = new THREE.Mesh(geometry, material);
 
-  const vector = new THREE.Vector3(0,0,-1);
-  vector.unproject(camera.object3D.children[0]);
-  const dir = vector.sub(camera.object3D.position).normalize();
-  const distance = 2;
-  const pos = camera.object3D.position.clone().add(dir.multiplyScalar(distance));
+    const vector = new THREE.Vector3(0,0,-1);
+    vector.unproject(camera.object3D.children[0]);
+    const dir = vector.sub(camera.object3D.position).normalize();
+    const distance = 2;
+    const pos = camera.object3D.position.clone().add(dir.multiplyScalar(distance));
 
-  videoMesh.position.copy(pos);
+    videoMesh.position.copy(pos);
+    scene.object3D.add(videoMesh);
+  }
+
   videoMesh.visible = true;
-
-  videoEl.play().catch(()=>{});
 });
 
 // Видео всегда смотрит на камеру
