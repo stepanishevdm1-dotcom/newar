@@ -4,210 +4,176 @@
 <meta charset="utf-8">
 <title>AR Видео с Gaze</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+<script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 <style>
 body { margin:0; overflow:hidden; }
-#gaze-circle { position: fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-  width: 25px; height: 25px; border: 2px solid white; border-radius: 50%;
-  z-index:100; pointer-events: none;}
-#gaze-fill { position: absolute; top:0; left:0; width:100%; height:100%;
-  background: rgba(255,255,255,0.5); border-radius:50%;
-  transform: scaleY(0); transform-origin: bottom; transition: transform 0.05s linear;}
-#videoTime { position: fixed; top:10px; right:10px; z-index:100;
-  color:white; background: rgba(0,0,0,0.5); padding:3px 6px; border-radius:5px;
-  font-family: monospace; font-size:14px;}
-#fileInput { position: fixed; top:10px; left:50%; transform:translateX(-50%); z-index:100;
-  background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;}
-#showBtnHTML { position: fixed; bottom:60px; left:50%; transform: translateX(-50%);
-  padding: 10px 20px; background: rgba(0,0,0,0.5); color:white; border-radius:5px;
-  cursor: pointer; z-index:100;}
-#sizeSliderContainer { position: fixed; bottom:20px; left:50%; transform: translateX(-50%);
-  background: rgba(0,0,0,0.5); padding:5px 10px; border-radius:5px; z-index:100;}
+#gaze-circle { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:25px; height:25px; border:2px solid white; border-radius:50%; z-index:100; pointer-events:none; }
+#gaze-fill { position:absolute; top:0; left:0; width:100%; height:100%;
+  background:rgba(255,255,255,0.6); border-radius:50%; transform:scaleY(0); transform-origin:bottom; }
+#videoTime { position:fixed; top:10px; right:10px; z-index:100;
+  color:white; background:rgba(0,0,0,0.5); padding:3px 6px; border-radius:5px;
+  font-family:monospace; font-size:14px;}
+#fileInput { position:fixed; top:10px; left:50%; transform:translateX(-50%); z-index:100;
+  background:rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;}
+#showBtnHTML { position:fixed; bottom:60px; left:50%; transform:translateX(-50%);
+  padding:10px 20px; background:rgba(0,0,0,0.5); color:white; border-radius:5px;
+  cursor:pointer; z-index:100; }
+#sizeSliderContainer { position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+  background:rgba(0,0,0,0.5); padding:5px 10px; border-radius:5px; z-index:100; }
 </style>
 </head>
 <body>
+
 <input type="file" id="fileInput" accept="video/*">
 <div id="showBtnHTML">📺 Show Video</div>
 <div id="sizeSliderContainer">
-<label style="color:white;">Video Size:</label>
-<input type="range" id="sizeSlider" min="0.2" max="5" step="0.05" value="1">
+  <label style="color:white;">Video Size:</label>
+  <input type="range" id="sizeSlider" min="0.2" max="5" step="0.05" value="1">
 </div>
 <div id="gaze-circle"><div id="gaze-fill"></div></div>
 <div id="videoTime">00:00 / 00:00</div>
 
-<a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
+<a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
   <a-entity camera look-controls></a-entity>
 </a-scene>
 
 <script>
 const scene = document.querySelector('a-scene');
 const fileInput = document.getElementById('fileInput');
-const showBtnHTML = document.getElementById('showBtnHTML');
+const showBtn = document.getElementById('showBtnHTML');
 const gazeFill = document.getElementById('gaze-fill');
 const sizeSlider = document.getElementById('sizeSlider');
 const videoTimeEl = document.getElementById('videoTime');
 
 let videoEl, videoMesh, videoTexture;
-let videoWidth = 1, videoHeight = 0.6;
 let firstInteraction = true;
 
-// --------------------- Кнопки ---------------------
+// ----------------- Кнопки -----------------
 let btnGroup = new THREE.Group();
 scene.object3D.add(btnGroup);
 
-function createButton(text, color){
+function createButton(text,color){
   const canvas = document.createElement('canvas');
-  canvas.width = 256; canvas.height = 128;
+  canvas.width=256; canvas.height=128;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = color;
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.font = '48px Arial';
-  ctx.fillStyle = 'black';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text, canvas.width/2, canvas.height/2);
+  ctx.fillStyle=color; ctx.fillRect(0,0,256,128);
+  ctx.font='48px Arial'; ctx.fillStyle='black'; ctx.textAlign='center';
+  ctx.textBaseline='middle'; ctx.fillText(text,128,64);
   const texture = new THREE.CanvasTexture(canvas);
-  const mat = new THREE.MeshBasicMaterial({ map: texture, side: THREE.DoubleSide });
+  const mat = new THREE.MeshBasicMaterial({ map:texture, side:THREE.DoubleSide });
   const geom = new THREE.PlaneGeometry(0.4,0.15);
   const mesh = new THREE.Mesh(geom, mat);
-  mesh.userData.label = text;
+  mesh.userData.label=text;
   return mesh;
 }
 
-const playBtn = createButton('Play','#00ff00');
-const pauseBtn = createButton('Pause','#ffff00');
-const plus5Btn = createButton('+5','#00ffff');
-const minus5Btn = createButton('-5','#ff00ff');
+const playBtn=createButton('Play','#00ff00'),
+      pauseBtn=createButton('Pause','#ffff00'),
+      plus5Btn=createButton('+5','#00ffff'),
+      minus5Btn=createButton('-5','#ff00ff');
 
-const spacing = 0.5;
-playBtn.position.set(-1.5*spacing, -0.8, 0);
-pauseBtn.position.set(-0.5*spacing, -0.8, 0);
-minus5Btn.position.set(0.5*spacing, -0.8, 0);
-plus5Btn.position.set(1.5*spacing, -0.8, 0);
-
+const spacing=0.5;
+playBtn.position.set(-1.5*spacing,-0.8,0);
+pauseBtn.position.set(-0.5*spacing,-0.8,0);
+minus5Btn.position.set(0.5*spacing,-0.8,0);
+plus5Btn.position.set(1.5*spacing,-0.8,0);
 btnGroup.add(playBtn,pauseBtn,minus5Btn,plus5Btn);
-btnGroup.visible = false;
+btnGroup.visible=false;
 
-// --------------------- Видео ---------------------
-fileInput.addEventListener('change', e=>{
-  const file = e.target.files[0];
+// ----------------- Видео -----------------
+fileInput.addEventListener('change',e=>{
+  const file=e.target.files[0];
   if(!file) return;
-  const url = URL.createObjectURL(file);
-
-  videoEl = document.createElement('video');
-  videoEl.src = url;
-  videoEl.loop = true;
-  videoEl.muted = false;
-  videoEl.playsInline = true;
-  videoEl.crossOrigin = 'anonymous';
-
-  videoEl.addEventListener('loadeddata', ()=>{
-    videoWidth = videoEl.videoWidth / videoEl.videoHeight;
-    videoHeight = 1;
-
+  const url=URL.createObjectURL(file);
+  videoEl=document.createElement('video');
+  videoEl.src=url; videoEl.loop=true; videoEl.muted=false; videoEl.playsInline=true;
+  videoEl.crossOrigin='anonymous';
+  videoEl.addEventListener('loadeddata',()=>{
+    const geometry=new THREE.PlaneGeometry(videoEl.videoWidth/videoEl.videoHeight,1);
+    videoTexture=new THREE.VideoTexture(videoEl);
+    const material=new THREE.MeshBasicMaterial({ map:videoTexture, side:THREE.DoubleSide });
     if(!videoMesh){
-      const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
-      videoTexture = new THREE.VideoTexture(videoEl);
-      const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
-      videoMesh = new THREE.Mesh(geometry, material);
-      videoMesh.visible = false;
+      videoMesh=new THREE.Mesh(geometry,material);
+      videoMesh.visible=false;
       scene.object3D.add(videoMesh);
     } else {
       videoMesh.geometry.dispose();
-      videoMesh.geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
+      videoMesh.geometry=geometry;
     }
   });
 });
 
-// --------------------- Показ видео ---------------------
-function showVideo(){
-  if(!videoMesh || !videoEl) return;
+// ----------------- Показ видео -----------------
+showBtn.addEventListener('click',()=>{
+  if(!videoMesh||!videoEl) return;
   const camera = scene.camera;
-  const distance = 2;
-  const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
-  const pos = camera.position.clone().add(dir.multiplyScalar(distance));
-
-  videoMesh.position.copy(pos);
-  videoMesh.visible = true;
-
-  btnGroup.position.copy(pos);
-  btnGroup.visible = true;
-
-  if(firstInteraction){
-    videoEl.muted=false;
-    videoEl.play().catch(()=>{});
-    firstInteraction=false;
-  }
-}
-
-// --------------------- Обновление позиции и времени ---------------------
-scene.addEventListener('render-target-loaded', ()=>{
-  scene.addEventListener('tick', ()=>{
-    if(videoMesh && videoMesh.visible){
-      videoMesh.lookAt(scene.camera.position);
-      btnGroup.lookAt(scene.camera.position);
-    }
-    if(videoEl){
-      function formatTime(t){ const m=Math.floor(t/60), s=Math.floor(t%60); return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;}
-      videoTimeEl.textContent = `${formatTime(videoEl.currentTime)} / ${formatTime(videoEl.duration||0)}`;
-    }
-  });
+  const pos = camera.position.clone().add(new THREE.Vector3(0,0,-2).applyQuaternion(camera.quaternion));
+  videoMesh.position.copy(pos); videoMesh.visible=true;
+  btnGroup.position.copy(pos); btnGroup.visible=true;
+  if(firstInteraction){ videoEl.play().catch(()=>{}); firstInteraction=false; }
 });
 
-// --------------------- Масштабирование ---------------------
-sizeSlider.addEventListener('input', ()=>{
-  if(videoMesh && btnGroup){
-    const scale = parseFloat(sizeSlider.value);
-    videoMesh.scale.set(scale,scale,1);
-    btnGroup.scale.set(scale,scale,1);
+// ----------------- Масштабирование -----------------
+sizeSlider.addEventListener('input',()=>{
+  if(videoMesh&&btnGroup){
+    const s=parseFloat(sizeSlider.value);
+    videoMesh.scale.set(s,s,1);
+    btnGroup.scale.set(s,s,1);
   }
 });
 
-// --------------------- Gaze ---------------------
-let activeBtn = null;
-let gazeStartTime = 0;
-const gazeDuration = 3000;
-
+// ----------------- Gaze 3 сек -----------------
+let activeBtn=null, gazeStart=0;
 function executeButton(btn){
   if(!videoEl) return;
   switch(btn.userData.label){
     case 'Play': videoEl.play(); break;
     case 'Pause': videoEl.pause(); break;
-    case '+5': videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime+5); break;
-    case '-5': videoEl.currentTime = Math.max(0, videoEl.currentTime-5); break;
+    case '+5': videoEl.currentTime=Math.min(videoEl.duration,videoEl.currentTime+5); break;
+    case '-5': videoEl.currentTime=Math.max(0,videoEl.currentTime-5); break;
   }
 }
 
-scene.addEventListener('tick', ()=>{
-  if(!btnGroup.visible || !videoEl) return;
-  const raycaster = new THREE.Raycaster();
-  const mouse = new THREE.Vector2(0,0); // центр экрана
-  raycaster.setFromCamera(mouse, scene.camera);
-
-  const intersects = raycaster.intersectObjects([playBtn,pauseBtn,plus5Btn,minus5Btn]);
-
-  if(intersects.length > 0){
-    const btn = intersects[0].object;
-    if(activeBtn !== btn){
-      activeBtn = btn;
-      gazeStartTime = performance.now();
-    } else {
-      const progress = (performance.now() - gazeStartTime)/gazeDuration;
-      gazeFill.style.transform = `scaleY(${Math.min(progress,1)})`;
-      if(progress >= 1){
-        executeButton(btn);
-        gazeFill.style.transform='scaleY(0)';
-        activeBtn = null;
-      }
+// ----------------- Tick для кнопок и видео -----------------
+scene.addEventListener('render-target-loaded',()=>{
+  scene.addEventListener('tick',()=>{
+    if(videoMesh && videoMesh.visible){
+      videoMesh.lookAt(scene.camera.position);
+      btnGroup.position.copy(videoMesh.position);
+      btnGroup.lookAt(scene.camera.position);
     }
-  } else {
-    activeBtn = null;
-    gazeFill.style.transform='scaleY(0)';
-  }
+
+    // Gaze raycasting
+    const ray=new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2(0,0), scene.camera);
+    const hit=ray.intersectObjects([playBtn,pauseBtn,plus5Btn,minus5Btn]);
+    if(hit.length){
+      const btn=hit[0].object;
+      if(activeBtn!==btn){ activeBtn=btn; gazeStart=performance.now(); }
+      else {
+        const progress=(performance.now()-gazeStart)/3000;
+        gazeFill.style.transform=`scaleY(${Math.min(progress,1)})`;
+        if(progress>=1){
+          executeButton(btn);
+          gazeFill.style.transform='scaleY(0)';
+          activeBtn=null;
+        }
+      }
+    } else {
+      activeBtn=null;
+      gazeFill.style.transform='scaleY(0)';
+    }
+  });
 });
 
-// --------------------- Show кнопка ---------------------
-showBtnHTML.addEventListener('click', showVideo);
+// ----------------- Обновление времени видео -----------------
+setInterval(()=>{
+  if(videoEl){
+    const f=t=>{ const m=Math.floor(t/60), s=Math.floor(t%60); return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;}
+    videoTimeEl.textContent=`${f(videoEl.currentTime)} / ${f(videoEl.duration||0)}`;
+  }
+},200);
 </script>
 </body>
 </html>
