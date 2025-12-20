@@ -54,7 +54,7 @@ const placeBtn = document.getElementById('placeBtn');
 const timeEl = document.getElementById('videoTime');
 
 let videoEl, videoMesh, videoTexture;
-let videoWidth = 1, videoHeight = 0.6;
+let videoWidth = 1, videoHeight = 1.5;
 let firstInteraction = true;
 
 // Загрузка видео
@@ -71,40 +71,42 @@ fileInput.addEventListener('change', e => {
   videoEl.crossOrigin = 'anonymous';
 
   videoEl.addEventListener('loadeddata', () => {
+    videoHeight = 1; 
     videoWidth = videoEl.videoWidth / videoEl.videoHeight;
-    videoHeight = 1;
     videoTexture = new THREE.VideoTexture(videoEl);
+    videoTexture.minFilter = THREE.LinearFilter;
+    videoTexture.magFilter = THREE.LinearFilter;
+    videoTexture.format = THREE.RGBFormat;
   });
 });
 
 // Таймер видео
 setInterval(() => {
-  if(!videoEl || !videoEl.duration) return;
+  if(!videoEl || videoEl.readyState < 2) return;
   const f = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
   timeEl.textContent = `${f(videoEl.currentTime)} / ${f(videoEl.duration)}`;
 }, 300);
 
-// Размещение видео по кнопке
+// Размещение видео
 placeBtn.addEventListener('click', () => {
-  if(!videoEl) return;
+  if(!videoEl || !videoTexture) return;
 
-  // Позиция перед камерой
   const camera = scene.camera;
   const distance = 2;
   const pos = camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(distance));
 
-  // Создаем Mesh, если еще нет
   if(!videoMesh){
-    const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
+    const geometry = new THREE.PlaneGeometry(videoHeight, videoWidth); // вертикальное видео
     const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
     videoMesh = new THREE.Mesh(geometry, material);
+    videoMesh.position.copy(pos);
+    videoMesh.lookAt(camera.position);
     scene.object3D.add(videoMesh);
+  } else {
+    videoMesh.position.copy(pos);
+    videoMesh.lookAt(camera.position);
+    videoMesh.visible = true;
   }
-
-  videoMesh.position.copy(pos);
-  videoMesh.rotation.copy(camera.rotation);
-  videoMesh.rotateX(Math.PI/2);
-  videoMesh.visible = true;
 
   if(firstInteraction){
     videoEl.muted = false;
@@ -112,7 +114,7 @@ placeBtn.addEventListener('click', () => {
     firstInteraction = false;
   }
 
-  createButtons(pos);
+  createButtons();
 });
 
 // Масштабирование пальцами
@@ -131,45 +133,43 @@ scene.addEventListener('touchmove', e => {
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     const scaleFactor = Math.sqrt(dx*dx+dy*dy)/startDistance;
-    videoMesh.scale.set(startScale*scaleFactor, startScale*scaleFactor,1);
+    videoMesh.scale.set(startScale*scaleFactor, startScale*scaleFactor, 1);
   }
 });
 
-// Создание кнопок под видео
-function createButtons(pos){
-  if(document.getElementById('playBtn')) return; // уже есть
+// Создание кнопок как дочерних объектов видео
+function createButtons(){
+  if(videoMesh.getObjectByName('playBtn')) return;
 
-  const btnY = pos.y - videoHeight/2 - 0.2;
+  const btnY = -videoWidth/2 - 0.2;
 
-  const playBtn = document.createElement('a-plane');
-  playBtn.setAttribute('id','playBtn');
-  playBtn.setAttribute('class','clickable');
-  playBtn.setAttribute('color','#00ff00');
-  playBtn.setAttribute('width','0.4');
-  playBtn.setAttribute('height','0.15');
-  playBtn.setAttribute('position', `${pos.x-0.25} ${btnY} ${pos.z}`);
-  playBtn.setAttribute('text','value:Play;align:center');
-  scene.appendChild(playBtn);
+  const playBtn = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.4,0.15),
+    new THREE.MeshBasicMaterial({color:0x00ff00})
+  );
+  playBtn.name = 'playBtn';
+  playBtn.position.set(-0.25, btnY, 0);
+  videoMesh.add(playBtn);
 
-  const pauseBtn = document.createElement('a-plane');
-  pauseBtn.setAttribute('id','pauseBtn');
-  pauseBtn.setAttribute('class','clickable');
-  pauseBtn.setAttribute('color','#ff0000');
-  pauseBtn.setAttribute('width','0.4');
-  pauseBtn.setAttribute('height','0.15');
-  pauseBtn.setAttribute('position', `${pos.x+0.25} ${btnY} ${pos.z}`);
-  pauseBtn.setAttribute('text','value:Pause;align:center');
-  scene.appendChild(pauseBtn);
+  const pauseBtn = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.4,0.15),
+    new THREE.MeshBasicMaterial({color:0xff0000})
+  );
+  pauseBtn.name = 'pauseBtn';
+  pauseBtn.position.set(0.25, btnY, 0);
+  videoMesh.add(pauseBtn);
 
   addFuse(playBtn, () => videoEl.play());
   addFuse(pauseBtn, () => videoEl.pause());
 }
 
-// Fuse 2 секунды
-function addFuse(el, callback){
+// Fuse 3 секунды
+function addFuse(mesh, callback){
   let timer = null;
-  el.addEventListener('mouseenter', () => { timer = setTimeout(callback,2000); });
-  el.addEventListener('mouseleave', () => { if(timer) clearTimeout(timer); });
+  mesh.cursorHover = false;
+
+  mesh.on('mouseenter', ()=>{ timer = setTimeout(callback, 3000); });
+  mesh.on('mouseleave', ()=>{ if(timer) clearTimeout(timer); });
 }
 </script>
 </body>
