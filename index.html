@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>AR Video FIXED</title>
+<title>AR VIDEO FIX</title>
 
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
@@ -10,131 +10,57 @@
 <style>
 body { margin:0; overflow:hidden; }
 
-#videoTime {
+#startBtn {
   position: fixed;
-  top: 10px;
-  right: 10px;
+  inset: 0;
+  background: black;
   color: white;
-  background: rgba(0,0,0,0.6);
-  padding: 4px 8px;
-  border-radius: 6px;
-  font-family: monospace;
-  z-index: 999;
-}
-
-#fileInput {
-  position: fixed;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 999;
+  font-size: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  cursor: pointer;
 }
 </style>
 </head>
 
 <body>
 
-<input id="fileInput" type="file" accept="video/*">
-<div id="videoTime">00:00 / 00:00</div>
+<div id="startBtn">НАЖМИ ЧТОБЫ ЗАПУСТИТЬ AR</div>
 
 <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false">
 
   <a-assets>
-    <video id="videoAsset" playsinline webkit-playsinline muted></video>
+    <video id="vid"
+      src="video.mp4"
+      muted
+      playsinline
+      webkit-playsinline
+      crossorigin="anonymous">
+    </video>
   </a-assets>
 
-  <!-- Камера + курсор -->
-  <a-entity camera look-controls>
-    <a-cursor
-      fuse="true"
-      fuse-timeout="3000"
-      geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.025"
-      material="color: white; shader: flat">
-    </a-cursor>
-  </a-entity>
+  <a-entity camera></a-entity>
 
-  <!-- Видео -->
   <a-video
-    id="videoPlane"
-    src="#videoAsset"
+    src="#vid"
     position="0 0 -2"
     width="1.2"
     height="0.7"
-    rotation="0 180 0"
-    visible="false">
+    rotation="0 180 0">
   </a-video>
-
-  <!-- Кнопки -->
-  <a-entity id="buttons" position="0 -0.4 -2" visible="false">
-
-    <a-plane color="#00ff00" position="-0.6 0 0"
-      width="0.35" height="0.15"
-      text="value: Play; align:center" play-btn></a-plane>
-
-    <a-plane color="#ffff00" position="-0.2 0 0"
-      width="0.35" height="0.15"
-      text="value: Pause; align:center" pause-btn></a-plane>
-
-    <a-plane color="#00ffff" position="0.2 0 0"
-      width="0.35" height="0.15"
-      text="value: +5; align:center" plus-btn></a-plane>
-
-    <a-plane color="#ff00ff" position="0.6 0 0"
-      width="0.35" height="0.15"
-      text="value: -5; align:center" minus-btn></a-plane>
-
-  </a-entity>
 
 </a-scene>
 
 <script>
-const videoEl = document.getElementById('videoAsset');
-const videoPlane = document.getElementById('videoPlane');
-const buttons = document.getElementById('buttons');
-const timeEl = document.getElementById('videoTime');
-const fileInput = document.getElementById('fileInput');
+const btn = document.getElementById('startBtn');
+const video = document.getElementById('vid');
 
-fileInput.onchange = e => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  videoEl.src = URL.createObjectURL(file);
-  videoEl.load();
-  videoEl.muted = true;
-
-  videoEl.onloadeddata = () => {
-    videoPlane.setAttribute('visible', true);
-    buttons.setAttribute('visible', true);
-    videoEl.play();
-  };
+btn.onclick = async () => {
+  btn.style.display = 'none';
+  await video.play();
 };
-
-// Таймер
-setInterval(() => {
-  if (!videoEl.duration) return;
-
-  const f = t =>
-    `${String(Math.floor(t/60)).padStart(2,'0')}:${String(Math.floor(t%60)).padStart(2,'0')}`;
-
-  timeEl.textContent = `${f(videoEl.currentTime)} / ${f(videoEl.duration)}`;
-}, 300);
-
-// Fuse-кнопки
-AFRAME.registerComponent('play-btn', {
-  init() { this.el.addEventListener('fuse', () => videoEl.play()); }
-});
-
-AFRAME.registerComponent('pause-btn', {
-  init() { this.el.addEventListener('fuse', () => videoEl.pause()); }
-});
-
-AFRAME.registerComponent('plus-btn', {
-  init() { this.el.addEventListener('fuse', () => videoEl.currentTime += 5); }
-});
-
-AFRAME.registerComponent('minus-btn', {
-  init() { this.el.addEventListener('fuse', () => videoEl.currentTime -= 5); }
-});
 </script>
 
 </body>
