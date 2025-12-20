@@ -6,48 +6,139 @@
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
     <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     <style>
-        body { margin:0; overflow:hidden; }
+        body { 
+            margin:0; 
+            overflow:hidden;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+        
         #fileInput {
-            position:fixed; top:10px; left:50%; 
-            transform:translateX(-50%); z-index:10;
-            background: rgba(0,0,0,0.5); color:white;
-            padding:5px 10px; border-radius:5px;
+            position:fixed; 
+            top:15px; 
+            left:50%; 
+            transform:translateX(-50%); 
+            z-index:10;
+            background: rgba(255,255,255,0.95);
+            color:#2c3e50;
+            padding:12px 25px;
+            border-radius:50px;
+            border:2px solid #3498db;
+            font-size:14px;
+            font-weight:600;
+            cursor:pointer;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+            transition: all 0.3s ease;
         }
+        
+        #fileInput:hover {
+            background: white;
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+            transform: translateX(-50%) scale(1.05);
+        }
+        
         #placeBtn {
-            position:fixed; bottom:10px; left:50%;
-            transform:translateX(-50%); z-index:10;
-            background: rgba(0,0,0,0.5); color:white;
-            padding:10px 20px; border-radius:5px;
-            font-size:16px; cursor:pointer;
+            position:fixed; 
+            bottom:20px; 
+            left:50%;
+            transform:translateX(-50%); 
+            z-index:10;
+            background: linear-gradient(135deg, #3498db 0%, #2ecc71 100%);
+            color:white;
+            padding:14px 40px;
+            border-radius:50px;
+            font-size:16px; 
+            font-weight:600;
+            cursor:pointer;
+            border:none;
+            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
+            transition: all 0.3s ease;
+            letter-spacing: 0.5px;
         }
+        
+        #placeBtn:hover {
+            transform: translateX(-50%) scale(1.08);
+            box-shadow: 0 8px 25px rgba(46, 204, 113, 0.6);
+        }
+        
         #videoTime {
-            position: fixed; top: 10px; right: 10px;
-            color: white; background: rgba(0,0,0,0.6);
-            padding: 5px 10px; border-radius: 5px;
-            font-family: monospace; z-index: 10;
+            position: fixed; 
+            top: 15px; 
+            right: 15px;
+            color: white; 
+            background: rgba(0,0,0,0.7);
+            padding: 8px 15px; 
+            border-radius: 25px;
+            font-family: 'Monaco', 'Courier New', monospace; 
+            z-index: 10;
+            font-size: 13px;
+            border: 1px solid rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        /* Скрытие VR кнопки */
+        .a-enter-vr {
+            display: none !important;
+        }
+        
+        /* Скрытие маркеров AR.js */
+        .a-enter-ar {
+            display: none !important;
+        }
+        
+        /* Индикатор загрузки */
+        .loading-spinner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #3498db;
+            animation: spin 1s ease-in-out infinite;
+            z-index: 1000;
+            display: none;
+        }
+        
+        @keyframes spin {
+            to { transform: translate(-50%, -50%) rotate(360deg); }
         }
     </style>
 </head>
 <body>
     <input type="file" id="fileInput" accept="video/*">
     <div id="videoTime">00:00 / 00:00</div>
-    <div id="placeBtn">Разместить видео</div>
+    <div id="placeBtn">🎬 Разместить видео</div>
+    <div class="loading-spinner" id="loadingSpinner"></div>
     
-    <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;' cursor="rayOrigin: mouse">
+    <a-scene 
+        embedded 
+        arjs='sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;' 
+        cursor="rayOrigin: mouse"
+        vr-mode-ui="enabled: false">
+        
         <a-entity camera look-controls>
-            <!-- Курсор в виде кольца с fuse-эффектом -->
+            <!-- Курсор в виде пульсирующего кольца -->
             <a-cursor id="main-cursor"
                      fuse="true"
                      fuse-timeout="2000"
-                     raycaster="objects: [cursor-listener]"
-                     geometry="primitive: ring; radiusInner: 0.008; radiusOuter: 0.016"
-                     material="color: #000000; shader: flat; opacity: 0.5"
+                     raycaster="objects: .clickable"
+                     geometry="primitive: ring; radiusInner: 0.006; radiusOuter: 0.012"
+                     material="color: #3498db; shader: flat; opacity: 0.8"
                      position="0 0 -1"
                      animation__click="property: scale; startEvents: click; easing: easeInCubic; dur: 150; from: 0.1 0.1 0.1; to: 1 1 1"
                      animation__fusing="property: scale; startEvents: fusing; easing: easeInCubic; dur: 2000; from: 1 1 1; to: 0.1 0.1 0.1"
-                     animation__mouseleave="property: scale; startEvents: mouseleave; easing: easeInCubic; dur: 500; to: 1 1 1">
+                     animation__mouseleave="property: scale; startEvents: mouseleave; easing: easeInCubic; dur: 500; to: 1 1 1"
+                     animation__pulse="property: scale; dir: alternate; dur: 1500; easing: easeInOutSine; loop: true; from: 1 1 1; to: 1.2 1.2 1.2">
             </a-cursor>
         </a-entity>
+        
+        <!-- Свет для лучшей видимости -->
+        <a-entity light="type: ambient; color: #666; intensity: 0.8"></a-entity>
+        <a-entity light="type: directional; color: #fff; intensity: 0.5" position="-1 2 1"></a-entity>
+        
     </a-scene>
     
     <script>
@@ -55,38 +146,47 @@
         const fileInput = document.getElementById('fileInput');
         const placeBtn = document.getElementById('placeBtn');
         const timeEl = document.getElementById('videoTime');
+        const loadingSpinner = document.getElementById('loadingSpinner');
         
         let videoEl, videoMesh, videoTexture;
-        let videoContainer; // Общий контейнер для видео и кнопок
+        let videoContainer;
         let currentScale = 1;
+        let isPlaced = false;
         let firstInteraction = true;
-        let playButton, pauseButton;
+        let playButton, pauseButton, volumeButton;
+        let videoWidth = 1.2;
+        let videoHeight = 0.8;
 
         // Загрузка видео
-        fileInput.addEventListener('change', e => {
+        fileInput.addEventListener('change', async e => {
             const file = e.target.files[0];
             if(!file) return;
             
-            if(videoEl && videoEl.src) {
-                URL.revokeObjectURL(videoEl.src);
-            }
+            loadingSpinner.style.display = 'block';
             
-            const url = URL.createObjectURL(file);
-            videoEl = document.createElement('video');
-            videoEl.src = url;
-            videoEl.loop = true;
-            videoEl.muted = true;
-            videoEl.playsInline = true;
-            videoEl.crossOrigin = 'anonymous';
-            
-            videoEl.addEventListener('loadeddata', () => {
-                const aspectRatio = videoEl.videoWidth / videoEl.videoHeight;
+            try {
+                if(videoEl && videoEl.src) {
+                    URL.revokeObjectURL(videoEl.src);
+                }
                 
+                const url = URL.createObjectURL(file);
+                videoEl = document.createElement('video');
+                videoEl.src = url;
+                videoEl.loop = true;
+                videoEl.muted = true;
+                videoEl.playsInline = true;
+                videoEl.crossOrigin = 'anonymous';
+                
+                await new Promise((resolve) => {
+                    videoEl.addEventListener('loadeddata', resolve, { once: true });
+                });
+                
+                const aspectRatio = videoEl.videoWidth / videoEl.videoHeight;
                 if (videoEl.videoHeight > videoEl.videoWidth) {
-                    videoWidth = 0.6;
+                    videoWidth = 0.8;
                     videoHeight = videoWidth / aspectRatio;
                 } else {
-                    videoHeight = 0.8;
+                    videoHeight = 1.0;
                     videoWidth = videoHeight * aspectRatio;
                 }
                 
@@ -95,60 +195,306 @@
                 videoTexture.minFilter = THREE.LinearFilter;
                 videoTexture.magFilter = THREE.LinearFilter;
                 videoTexture.format = THREE.RGBAFormat;
-            });
+                
+            } catch (error) {
+                console.error('Error loading video:', error);
+            } finally {
+                loadingSpinner.style.display = 'none';
+            }
         });
 
         // Таймер видео
-        setInterval(() => {
-            if(!videoEl || !videoEl.duration) return;
+        function updateVideoTime() {
+            if(!videoEl || !videoEl.duration || videoEl.paused) return;
+            
             const f = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
             timeEl.textContent = `${f(videoEl.currentTime)} / ${f(videoEl.duration)}`;
-        }, 300);
-
-        // Размещение видео по кнопке
-        placeBtn.addEventListener('click', () => {
-            if(!videoEl || !videoTexture) return;
             
-            if (videoContainer) {
-                scene.object3D.remove(videoContainer);
+            requestAnimationFrame(updateVideoTime);
+        }
+
+        // Размещение видео
+        placeBtn.addEventListener('click', () => {
+            if(!videoEl || !videoTexture) {
+                alert('Пожалуйста, сначала выберите видео файл');
+                return;
             }
             
             const camera = scene.camera;
-            const distance = 1.5;
+            const distance = isPlaced ? 1.2 : 1.5; // Ближе при повторном размещении
+            
+            // Если видео уже размещено, просто обновляем позицию
+            if (!videoContainer) {
+                videoContainer = new THREE.Group();
+                scene.object3D.add(videoContainer);
+                
+                const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
+                const material = new THREE.MeshBasicMaterial({
+                    map: videoTexture,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 1
+                });
+                
+                videoMesh = new THREE.Mesh(geometry, material);
+                videoContainer.add(videoMesh);
+                
+                createButtons();
+            }
+            
+            // Позиционируем видео перед камерой
             const pos = camera.position.clone().add(
                 camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(distance)
             );
             
-            videoContainer = new THREE.Group();
-            scene.object3D.add(videoContainer);
-            
-            const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
-            const material = new THREE.MeshBasicMaterial({
-                map: videoTexture,
-                side: THREE.DoubleSide,
-                transparent: false,
-                opacity: 1
-            });
-            
-            videoMesh = new THREE.Mesh(geometry, material);
-            videoContainer.add(videoMesh);
-            
             videoContainer.position.copy(pos);
             videoContainer.lookAt(camera.position);
             
-            currentScale = 1;
+            // Сохраняем текущий масштаб при перемещении
             videoContainer.scale.set(currentScale, currentScale, currentScale);
             
             if(firstInteraction){
                 videoEl.muted = false;
                 videoEl.play().catch(e => console.log('Play error:', e));
                 firstInteraction = false;
+                updateVideoTime();
             }
             
-            createButtons();
+            isPlaced = true;
+            placeBtn.textContent = '📌 Переместить видео';
         });
 
-        // Масштабирование всего контейнера
+        // Создание стилизованных кнопок под видео
+        function createButtons() {
+            // Удаляем старые кнопки
+            if (playButton) videoContainer.remove(playButton);
+            if (pauseButton) videoContainer.remove(pauseButton);
+            if (volumeButton) videoContainer.remove(volumeButton);
+            
+            // Позиция кнопок - ближе к видео
+            const buttonY = -videoHeight/2 - 0.15;
+            const buttonSpacing = videoWidth * 0.25;
+            
+            // Создаем кнопки с новым дизайном
+            playButton = createModernButton('play-btn', -buttonSpacing, buttonY, 0.001, '#2ecc71', '▶', 'play');
+            pauseButton = createModernButton('pause-btn', 0, buttonY, 0.001, '#e74c3c', '⏸', 'pause');
+            volumeButton = createModernButton('volume-btn', buttonSpacing, buttonY, 0.001, '#3498db', '🔊', 'toggleVolume');
+            
+            videoContainer.add(playButton);
+            videoContainer.add(pauseButton);
+            videoContainer.add(volumeButton);
+            
+            createAFrameButtons();
+        }
+
+        function createModernButton(id, x, y, z, color, icon, action) {
+            const buttonGroup = new THREE.Group();
+            buttonGroup.userData = { 
+                id: id, 
+                action: action,
+                originalColor: new THREE.Color(color),
+                isHovered: false
+            };
+            
+            // Основная круглая кнопка
+            const buttonGeometry = new THREE.CylinderGeometry(0.04, 0.04, 0.01, 32);
+            const buttonMaterial = new THREE.MeshPhongMaterial({ 
+                color: color,
+                transparent: true,
+                opacity: 0.9,
+                shininess: 30,
+                emissive: new THREE.Color(color).multiplyScalar(0.3)
+            });
+            
+            const buttonMesh = new THREE.Mesh(buttonGeometry, buttonMaterial);
+            buttonMesh.rotation.x = Math.PI / 2;
+            
+            // Иконка на кнопке
+            const iconCanvas = createButtonIcon(icon);
+            const iconTexture = new THREE.CanvasTexture(iconCanvas);
+            const iconMaterial = new THREE.MeshBasicMaterial({
+                map: iconTexture,
+                transparent: true,
+                side: THREE.DoubleSide,
+                alphaTest: 0.5
+            });
+            
+            const iconGeometry = new THREE.PlaneGeometry(0.05, 0.05);
+            const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
+            iconMesh.position.z = 0.006;
+            
+            // Свечение при наведении
+            const glowGeometry = new THREE.CylinderGeometry(0.045, 0.045, 0.011, 32);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.BackSide
+            });
+            const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
+            glowMesh.rotation.x = Math.PI / 2;
+            glowMesh.visible = false;
+            
+            buttonGroup.add(glowMesh);
+            buttonGroup.add(buttonMesh);
+            buttonGroup.add(iconMesh);
+            buttonGroup.position.set(x, y, z);
+            
+            // Анимация наведения
+            buttonGroup.userData.setHover = function(isHovering) {
+                this.userData.isHovered = isHovering;
+                glowMesh.visible = isHovering;
+                
+                if (isHovering) {
+                    buttonMesh.scale.set(1.1, 1.1, 1.1);
+                    buttonMaterial.emissive.setHex(0x333333);
+                } else {
+                    buttonMesh.scale.set(1, 1, 1);
+                    buttonMaterial.emissive.setHex(0x000000);
+                }
+            };
+            
+            return buttonGroup;
+        }
+
+        function createButtonIcon(icon) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 128;
+            canvas.height = 128;
+            
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Фон иконки
+            context.beginPath();
+            context.arc(64, 64, 50, 0, Math.PI * 2);
+            context.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            context.fill();
+            
+            // Иконка
+            context.font = 'bold 60px Arial';
+            context.fillStyle = '#FFFFFF';
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(icon, 64, 64);
+            
+            return canvas;
+        }
+
+        function createAFrameButtons() {
+            // Удаляем старые A-Frame кнопки
+            const oldButtons = scene.querySelectorAll('[cursor-listener]');
+            oldButtons.forEach(btn => btn.parentNode.removeChild(btn));
+            
+            const buttonY = -videoHeight/2 - 0.15;
+            const buttonSpacing = videoWidth * 0.25;
+            
+            // Play button
+            const playBtn = document.createElement('a-entity');
+            playBtn.classList.add('clickable');
+            playBtn.setAttribute('id', 'a-play-btn');
+            playBtn.setAttribute('geometry', { primitive: 'plane', width: 0.1, height: 0.1 });
+            playBtn.setAttribute('material', { opacity: 0.001, transparent: true });
+            playBtn.setAttribute('position', { x: -buttonSpacing, y: buttonY, z: 0.002 });
+            
+            playBtn.addEventListener('mouseenter', () => {
+                if(playButton) playButton.userData.setHover(true);
+            });
+            playBtn.addEventListener('mouseleave', () => {
+                if(playButton) playButton.userData.setHover(false);
+            });
+            playBtn.addEventListener('click', () => executeButtonAction('play'));
+            
+            // Pause button
+            const pauseBtn = document.createElement('a-entity');
+            pauseBtn.classList.add('clickable');
+            pauseBtn.setAttribute('id', 'a-pause-btn');
+            pauseBtn.setAttribute('geometry', { primitive: 'plane', width: 0.1, height: 0.1 });
+            pauseBtn.setAttribute('material', { opacity: 0.001, transparent: true });
+            pauseBtn.setAttribute('position', { x: 0, y: buttonY, z: 0.002 });
+            
+            pauseBtn.addEventListener('mouseenter', () => {
+                if(pauseButton) pauseButton.userData.setHover(true);
+            });
+            pauseBtn.addEventListener('mouseleave', () => {
+                if(pauseButton) pauseButton.userData.setHover(false);
+            });
+            pauseBtn.addEventListener('click', () => executeButtonAction('pause'));
+            
+            // Volume button
+            const volumeBtn = document.createElement('a-entity');
+            volumeBtn.classList.add('clickable');
+            volumeBtn.setAttribute('id', 'a-volume-btn');
+            volumeBtn.setAttribute('geometry', { primitive: 'plane', width: 0.1, height: 0.1 });
+            volumeBtn.setAttribute('material', { opacity: 0.001, transparent: true });
+            volumeBtn.setAttribute('position', { x: buttonSpacing, y: buttonY, z: 0.002 });
+            
+            volumeBtn.addEventListener('mouseenter', () => {
+                if(volumeButton) volumeButton.userData.setHover(true);
+            });
+            volumeBtn.addEventListener('mouseleave', () => {
+                if(volumeButton) volumeButton.userData.setHover(false);
+            });
+            volumeBtn.addEventListener('click', () => executeButtonAction('toggleVolume'));
+            
+            // Добавляем кнопки в сцену и привязываем к контейнеру
+            [playBtn, pauseBtn, volumeBtn].forEach(btn => {
+                scene.appendChild(btn);
+                if (videoContainer) {
+                    btn.object3D.parent = videoContainer;
+                }
+            });
+        }
+
+        function executeButtonAction(action) {
+            switch(action) {
+                case 'play':
+                    if(videoEl) {
+                        videoEl.play();
+                        // Визуальная обратная связь
+                        if(playButton) {
+                            playButton.children[1].material.emissive.setHex(0x666666);
+                            setTimeout(() => {
+                                playButton.children[1].material.emissive.setHex(0x000000);
+                            }, 300);
+                        }
+                    }
+                    break;
+                    
+                case 'pause':
+                    if(videoEl) {
+                        videoEl.pause();
+                        // Визуальная обратная связь
+                        if(pauseButton) {
+                            pauseButton.children[1].material.emissive.setHex(0x666666);
+                            setTimeout(() => {
+                                pauseButton.children[1].material.emissive.setHex(0x000000);
+                            }, 300);
+                        }
+                    }
+                    break;
+                    
+                case 'toggleVolume':
+                    if(videoEl) {
+                        videoEl.muted = !videoEl.muted;
+                        // Визуальная обратная связь
+                        if(volumeButton) {
+                            const iconMesh = volumeButton.children[2];
+                            const canvas = createButtonIcon(videoEl.muted ? '🔇' : '🔊');
+                            iconMesh.material.map = new THREE.CanvasTexture(canvas);
+                            iconMesh.material.needsUpdate = true;
+                            
+                            volumeButton.children[1].material.emissive.setHex(0x666666);
+                            setTimeout(() => {
+                                volumeButton.children[1].material.emissive.setHex(0x000000);
+                            }, 300);
+                        }
+                    }
+                    break;
+            }
+        }
+
+        // Масштабирование пальцами
         let startDistance = null;
         let startScale = 1;
         
@@ -163,13 +509,14 @@
         
         scene.addEventListener('touchmove', e => {
             if(e.touches.length == 2 && videoContainer && startDistance){
+                e.preventDefault();
                 const dx = e.touches[0].clientX - e.touches[1].clientX;
                 const dy = e.touches[0].clientY - e.touches[1].clientY;
                 const currentDistance = Math.sqrt(dx*dx + dy*dy);
                 const scaleFactor = currentDistance / startDistance;
 
                 const newScale = Math.max(0.1, Math.min(5, startScale * scaleFactor));
-                videoContainer.scale.set(newScale, newScale, newScale); // весь контейнер масштабируется
+                videoContainer.scale.set(newScale, newScale, newScale);
                 currentScale = newScale;
             }
         });
@@ -178,133 +525,61 @@
             startDistance = null;
         });
 
-        // Создание кнопок внутри контейнера
-        function createButtons() {
-            const buttonY = -videoHeight/2 - 0.1; // ближе к видео
-            const buttonSpacing = videoWidth * 0.15; // уменьшено расстояние между кнопками
-            
-            playButton = create3DButton('play-btn', -buttonSpacing, buttonY, 0.001, 0x4CAF50, 'Play', 'play');
-            pauseButton = create3DButton('pause-btn', buttonSpacing, buttonY, 0.001, 0xFF9800, 'Pause', 'pause');
-            
-            videoContainer.add(playButton);
-            videoContainer.add(pauseButton);
-            
-            createAFrameButtons();
-        }
-
-        function create3DButton(id, x, y, z, color, text, action) {
-            const buttonGroup = new THREE.Group();
-            buttonGroup.userData = { id: id, action: action };
-            
-            const buttonGeometry = new THREE.CylinderGeometry(0.06, 0.06, 0.02, 32);
-            const buttonMaterial = new THREE.MeshBasicMaterial({ 
-                color: color,
-                transparent: true,
-                opacity: 0.8
-            });
-            
-            const buttonMesh = new THREE.Mesh(buttonGeometry, buttonMaterial);
-            buttonMesh.rotation.x = Math.PI / 2;
-            
-            const textCanvas = createButtonText(text);
-            const textTexture = new THREE.CanvasTexture(textCanvas);
-            const textMaterial = new THREE.MeshBasicMaterial({
-                map: textTexture,
-                transparent: true,
-                side: THREE.DoubleSide
-            });
-            
-            const textGeometry = new THREE.PlaneGeometry(0.1, 0.05);
-            const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-            textMesh.position.z = 0.011;
-            
-            buttonGroup.add(buttonMesh);
-            buttonGroup.add(textMesh);
-            buttonGroup.position.set(x, y, z);
-            
-            return buttonGroup;
-        }
-
-        function createButtonText(text) {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = 256;
-            canvas.height = 128;
-            
-            context.clearRect(0, 0, canvas.width, canvas.height);
-            
-            context.font = 'bold 36px Arial';
-            context.fillStyle = '#FFFFFF';
-            context.textAlign = 'center';
-            context.textBaseline = 'middle';
-            context.fillText(text, canvas.width/2, canvas.height/2);
-            
-            context.strokeStyle = '#000000';
-            context.lineWidth = 4;
-            context.strokeText(text, canvas.width/2, canvas.height/2);
-            
-            return canvas;
-        }
-
-        function createAFrameButtons() {
-            const oldPlayBtn = document.getElementById('a-play-btn');
-            const oldPauseBtn = document.getElementById('a-pause-btn');
-            if (oldPlayBtn) scene.removeChild(oldPlayBtn);
-            if (oldPauseBtn) scene.removeChild(oldPauseBtn);
-            
-            const buttonY = -videoHeight/2 - 0.1;
-            const buttonSpacing = videoWidth * 0.15;
-            
-            const playBtn = document.createElement('a-entity');
-            playBtn.setAttribute('id', 'a-play-btn');
-            playBtn.setAttribute('cursor-listener', '');
-            playBtn.setAttribute('geometry', { primitive: 'plane', width: 0.15, height: 0.15 });
-            playBtn.setAttribute('material', { opacity: 0.01, transparent: true });
-            playBtn.setAttribute('position', { x: -buttonSpacing, y: buttonY, z: 0.002 });
-            playBtn.setAttribute('parent', videoContainer);
-            
-            playBtn.addEventListener('mouseenter', () => { if(playButton) playButton.children[0].material.opacity = 1; });
-            playBtn.addEventListener('mouseleave', () => { if(playButton) playButton.children[0].material.opacity = 0.8; });
-            playBtn.addEventListener('fusing', e => { if(e.detail.progress===1) executeButtonAction('play'); });
-            playBtn.addEventListener('click', () => executeButtonAction('play'));
-            
-            const pauseBtn = document.createElement('a-entity');
-            pauseBtn.setAttribute('id', 'a-pause-btn');
-            pauseBtn.setAttribute('cursor-listener', '');
-            pauseBtn.setAttribute('geometry', { primitive: 'plane', width: 0.15, height: 0.15 });
-            pauseBtn.setAttribute('material', { opacity: 0.01, transparent: true });
-            pauseBtn.setAttribute('position', { x: buttonSpacing, y: buttonY, z: 0.002 });
-            pauseBtn.setAttribute('parent', videoContainer);
-            
-            pauseBtn.addEventListener('mouseenter', () => { if(pauseButton) pauseButton.children[0].material.opacity = 1; });
-            pauseBtn.addEventListener('mouseleave', () => { if(pauseButton) pauseButton.children[0].material.opacity = 0.8; });
-            pauseBtn.addEventListener('fusing', e => { if(e.detail.progress===1) executeButtonAction('pause'); });
-            pauseBtn.addEventListener('click', () => executeButtonAction('pause'));
-            
-            scene.appendChild(playBtn);
-            scene.appendChild(pauseBtn);
-        }
-
-        function executeButtonAction(action) {
-            switch(action) {
-                case 'play':
-                    if(videoEl) videoEl.play();
-                    if(playButton){ const mat = playButton.children[0].material; mat.color.setHex(0x2E7D32); setTimeout(()=>{mat.color.setHex(0x4CAF50);},300); }
-                    break;
-                case 'pause':
-                    if(videoEl) videoEl.pause();
-                    if(pauseButton){ const mat = pauseButton.children[0].material; mat.color.setHex(0xEF6C00); setTimeout(()=>{mat.color.setHex(0xFF9800);},300); }
-                    break;
+        // Вращение видео
+        let isRotating = false;
+        let lastTouchX = 0;
+        
+        scene.addEventListener('touchstart', e => {
+            if(e.touches.length == 1 && videoContainer){
+                isRotating = true;
+                lastTouchX = e.touches[0].clientX;
             }
-        }
-
-        scene.addEventListener('object3dset', () => {
-            const cursor = document.getElementById('main-cursor');
-            if(cursor && cursor.components.raycaster) setTimeout(()=>{cursor.components.raycaster.refreshObjects();},100);
+        });
+        
+        scene.addEventListener('touchmove', e => {
+            if(isRotating && videoContainer && e.touches.length == 1){
+                e.preventDefault();
+                const deltaX = e.touches[0].clientX - lastTouchX;
+                videoContainer.rotation.y += deltaX * 0.01;
+                lastTouchX = e.touches[0].clientX;
+            }
+        });
+        
+        scene.addEventListener('touchend', () => {
+            isRotating = false;
         });
 
+        // Очистка ресурсов при закрытии
         window.addEventListener('beforeunload', () => {
-            if(videoEl && videoEl.src) URL.revokeObjectURL(videoEl.src);
+            if(videoEl && videoEl.src) {
+                URL.revokeObjectURL(videoEl.src);
+            }
+        });
+
+        // Управление с клавиатуры для тестирования
+        window.addEventListener('keydown', (e) => {
+            if(!videoContainer) return;
+            
+            switch(e.key) {
+                case ' ':
+                    if(videoEl) videoEl.paused ? videoEl.play() : videoEl.pause();
+                    break;
+                case '+':
+                case '=':
+                    currentScale = Math.min(5, currentScale * 1.1);
+                    videoContainer.scale.set(currentScale, currentScale, currentScale);
+                    break;
+                case '-':
+                    currentScale = Math.max(0.1, currentScale * 0.9);
+                    videoContainer.scale.set(currentScale, currentScale, currentScale);
+                    break;
+                case 'r':
+                    videoContainer.rotation.y += 0.1;
+                    break;
+                case 'm':
+                    if(videoEl) videoEl.muted = !videoEl.muted;
+                    break;
+            }
         });
     </script>
 </body>
