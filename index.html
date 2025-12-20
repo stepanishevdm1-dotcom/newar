@@ -1,43 +1,71 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<title>AR Видео с таймером</title>
-<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-<script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-<style>
-  body { margin:0; overflow:hidden; }
-  #fileInput {
-    position:fixed; top:10px; left:50%; transform:translateX(-50%);
-    z-index:10; background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
-  }
-</style>
+  <meta charset="utf-8">
+  <title>AR Видео с управлением глазами</title>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+  <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+  <style>
+    body { margin:0; overflow:hidden; }
+    #fileInput {
+      position:fixed; top:10px; left:50%; transform:translateX(-50%);
+      z-index:10; background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
+    }
+    .video-controls {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 15px; z-index: 10;
+    }
+    .control-btn {
+      width: 50px; height: 50px; border-radius: 50%; background: rgba(0,0,0,0.5);
+      display: flex; justify-content: center; align-items: center; color: white;
+      font-size: 20px; cursor: pointer; position: relative;
+    }
+    #gaze-circle {
+      position: fixed; top:50%; left:50%; transform: translate(-50%, -50%);
+      width: 30px; height: 30px; border: 2px solid white; border-radius: 50%;
+      z-index: 20; pointer-events: none;
+    }
+    #gaze-fill {
+      position: absolute; top:0; left:0; width:100%; height:100%;
+      background: rgba(255,255,255,0.5); border-radius: 50%;
+      transform: scaleY(0); transform-origin: bottom; transition: transform 0.1s linear;
+    }
+  </style>
 </head>
 <body>
 <input type="file" id="fileInput" accept="video/*">
+<div class="video-controls">
+  <div class="control-btn" id="playBtn">▶</div>
+  <div class="control-btn" id="pauseBtn">⏸</div>
+  <div class="control-btn" id="hideBtn">✖</div>
+</div>
+<div id="gaze-circle"><div id="gaze-fill"></div></div>
 
 <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
-  <a-entity id="camera" camera look-controls>
-    <a-entity id="cursor" cursor="fuse:false" position="0 0 -1"
-              geometry="primitive:ring; radiusInner:0.01; radiusOuter:0.015"
-              material="color:black; shader:flat"></a-entity>
-  </a-entity>
+  <a-entity camera look-controls></a-entity>
 </a-scene>
 
 <script>
 const scene = document.querySelector('a-scene');
 const fileInput = document.getElementById('fileInput');
 
-let videoEl, videoMesh;
+const playBtn = document.getElementById('playBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const hideBtn = document.getElementById('hideBtn');
+
+const gazeCircle = document.getElementById('gaze-circle');
+const gazeFill = document.getElementById('gaze-fill');
+
+let videoEl, videoMesh, videoTexture;
 let videoWidth = 1, videoHeight = 0.6;
 let firstInteraction = true;
-let timerText;
+let gazeTimer = null;
+let gazeDuration = 3000; // 3 секунды
 
-// ------------------- Загрузка видео -------------------
+// --------------------- Видео ---------------------
 fileInput.addEventListener('change', e => {
   const file = e.target.files[0];
   if(!file) return;
-
   const url = URL.createObjectURL(file);
 
   videoEl = document.createElement('video');
@@ -53,34 +81,25 @@ fileInput.addEventListener('change', e => {
 
     if(!videoMesh){
       const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
-      const texture = new THREE.VideoTexture(videoEl);
-      const material = new THREE.MeshBasicMaterial({map: texture, side: THREE.DoubleSide});
+      videoTexture = new THREE.VideoTexture(videoEl);
+      const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
       videoMesh = new THREE.Mesh(geometry, material);
       videoMesh.visible = false;
       scene.object3D.add(videoMesh);
-
-      // Таймер видео
-      timerText = document.createElement('a-text');
-      timerText.setAttribute('value','0:00 / 0:00');
-      timerText.setAttribute('color','white');
-      timerText.setAttribute('align','left');
-      timerText.setAttribute('width',1);
-      scene.appendChild(timerText);
+    } else {
+      videoMesh.geometry.dispose();
+      videoMesh.geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
     }
   });
 });
 
-// ------------------- Спавн видео по тапу -------------------
-scene.addEventListener('click', async event => {
+// --------------------- Размещение видео по тапу ---------------------
+scene.addEventListener('click', event => {
   if(!videoMesh || !videoEl) return;
-
-  if(firstInteraction){
-    try{ await videoEl.play(); } catch(e){}
-    firstInteraction = false;
-  }
 
   const touchX = event.clientX / window.innerWidth * 2 - 1;
   const touchY = - (event.clientY / window.innerHeight) * 2 + 1;
+
   const camera = scene.camera;
   const vector = new THREE.Vector3(touchX, touchY, -1).unproject(camera);
   const dir = vector.sub(camera.position).normalize();
@@ -89,23 +108,78 @@ scene.addEventListener('click', async event => {
 
   videoMesh.position.copy(pos);
   videoMesh.visible = true;
+  videoMesh.rotation.set(0, Math.PI, 0);
+
+  if(firstInteraction){
+    videoEl.muted = false;
+    videoEl.play().catch(()=>{});
+    firstInteraction = false;
+  }
 });
 
-// ------------------- Видео всегда смотрит на камеру и обновление таймера -------------------
-scene.addEventListener('tick', ()=>{
-  if(videoMesh && videoMesh.visible){
-    videoMesh.lookAt(scene.camera.position);
+// --------------------- Масштабирование ---------------------
+let startDistance = null;
+let startScale = 1;
 
-    if(videoEl && timerText){
-      const c = Math.floor(videoEl.currentTime);
-      const d = Math.floor(videoEl.duration || 0);
-      const format = t => `${Math.floor(t/60)}:${("0"+(t%60)).padStart(2,'0')}`;
-      timerText.setAttribute('value',`${format(c)} / ${format(d)}`);
-      timerText.object3D.position.set(videoMesh.position.x - videoWidth/2,
-                                      videoMesh.position.y + videoHeight/2 +0.05,
-                                      videoMesh.position.z);
-    }
+scene.addEventListener('touchstart', e => {
+  if(e.touches.length == 2 && videoMesh){
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    startDistance = Math.sqrt(dx*dx + dy*dy);
+    startScale = videoMesh.scale.x;
   }
+});
+
+scene.addEventListener('touchmove', e => {
+  if(e.touches.length == 2 && videoMesh && startDistance){
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const newDistance = Math.sqrt(dx*dx + dy*dy);
+    const scaleFactor = newDistance / startDistance;
+
+    let newScale = Math.min(Math.max(startScale * scaleFactor, 0.2), 5); // ограничение
+    videoMesh.scale.set(newScale, newScale, 1);
+  }
+});
+
+// --------------------- Кнопки ---------------------
+playBtn.addEventListener('click', () => { if(videoEl) videoEl.play(); });
+pauseBtn.addEventListener('click', () => { if(videoEl) videoEl.pause(); });
+hideBtn.addEventListener('click', () => { if(videoMesh) videoMesh.visible = false; });
+
+// --------------------- Billboard (лицом к камере) ---------------------
+scene.addEventListener('render-target-loaded', () => {
+  scene.addEventListener('tick', () => {
+    if(videoMesh && videoMesh.visible){
+      videoMesh.lookAt(scene.camera.position);
+    }
+  });
+});
+
+// --------------------- Gaze control ---------------------
+function startGaze(targetBtn){
+  let startTime = performance.now();
+  gazeTimer = requestAnimationFrame(function tick(time){
+    let progress = (time - startTime)/gazeDuration;
+    gazeFill.style.transform = `scaleY(${Math.min(progress,1)})`;
+    if(progress >= 1){
+      targetBtn.click();
+      gazeFill.style.transform = 'scaleY(0)';
+    } else {
+      gazeTimer = requestAnimationFrame(tick);
+    }
+  });
+}
+
+function stopGaze(){
+  if(gazeTimer) cancelAnimationFrame(gazeTimer);
+  gazeFill.style.transform = 'scaleY(0)';
+}
+
+// Наведение на кнопку
+document.querySelectorAll('.control-btn').forEach(btn => {
+  btn.addEventListener('mouseenter', ()=> startGaze(btn));
+  btn.addEventListener('mouseleave', stopGaze);
 });
 </script>
 </body>
