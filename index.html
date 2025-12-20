@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>AR Video WORKING</title>
+<title>AR Video FIXED</title>
 
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
@@ -59,23 +59,18 @@ body { margin:0; overflow:hidden; }
 
   <!-- КНОПКИ -->
   <a-entity id="buttons" position="0 -0.5 -2" visible="false">
-
     <a-plane class="btn" color="#00ff00" position="-0.6 0 0" width="0.35" height="0.15"
       text="value: Play; align:center; width:3"
       play-btn></a-plane>
-
     <a-plane class="btn" color="#ffff00" position="-0.2 0 0" width="0.35" height="0.15"
       text="value: Pause; align:center; width:3"
       pause-btn></a-plane>
-
     <a-plane class="btn" color="#00ffff" position="0.2 0 0" width="0.35" height="0.15"
       text="value: +5; align:center; width:3"
       plus-btn></a-plane>
-
     <a-plane class="btn" color="#ff00ff" position="0.6 0 0" width="0.35" height="0.15"
       text="value: -5; align:center; width:3"
       minus-btn></a-plane>
-
   </a-entity>
 
 </a-scene>
@@ -97,24 +92,24 @@ fileInput.onchange = e => {
   videoEl.loop = true;
   videoEl.playsInline = true;
   videoEl.crossOrigin = 'anonymous';
-  videoEl.muted = true; // Чтобы autoplay сработал без проблем в браузерах
-  videoEl.setAttribute('webkit-playsinline', ''); 
-
+  videoEl.muted = true; // autoplay на мобильных
+  videoEl.setAttribute('webkit-playsinline', '');
+  
   videoPlane.setAttribute('src', videoEl);
   videoPlane.setAttribute('visible', true);
   buttons.setAttribute('visible', true);
 
-  videoEl.play();
+  videoEl.play().catch(err => console.log("Autoplay failed:", err));
 };
 
-// Обновление таймера каждые 300 мс
+// Таймер
 setInterval(() => {
   if (!videoEl) return;
   const f = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
   timeEl.textContent = `${f(videoEl.currentTime)} / ${isNaN(videoEl.duration) ? '00:00' : f(videoEl.duration)}`;
 }, 300);
 
-// Кнопки через fuse (3 секунды удержания)
+// Fuse кнопки
 AFRAME.registerComponent('play-btn', {
   init() { this.el.addEventListener('fuse', () => videoEl && videoEl.play()); }
 });
