@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>AR Video Gaze Buttons</title>
+<title>AR Video WORKING</title>
 
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
@@ -27,19 +27,6 @@ body { margin:0; overflow:hidden; }
   transform: translateX(-50%);
   z-index: 999;
 }
-#gaze-circle {
-  position: fixed;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  width: 25px; height: 25px;
-  border: 2px solid white; border-radius: 50%;
-  z-index: 100; pointer-events: none;
-}
-#gaze-fill {
-  position: absolute; top:0; left:0; width:100%; height:100%;
-  background: rgba(255,255,255,0.6); border-radius: 50%;
-  transform: scaleY(0); transform-origin: bottom;
-}
 </style>
 </head>
 
@@ -47,41 +34,47 @@ body { margin:0; overflow:hidden; }
 
 <input id="fileInput" type="file" accept="video/*">
 <div id="videoTime">00:00 / 00:00</div>
-<div id="gaze-circle"><div id="gaze-fill"></div></div>
 
 <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false">
 
-  <!-- Камера с gaze -->
+  <!-- КАМЕРА + КУРСОР С FUSE -->
   <a-entity camera look-controls>
-    <a-cursor fuse="true" fuse-timeout="3000"
-      geometry="primitive:ring; radiusInner:0.015; radiusOuter:0.025"
-      material="color:white; shader:flat">
+    <a-cursor
+      fuse="true"
+      fuse-timeout="3000"
+      geometry="primitive: ring; radiusInner: 0.015; radiusOuter: 0.025"
+      material="color: white; shader: flat">
     </a-cursor>
   </a-entity>
 
-  <!-- Видео -->
+  <!-- ВИДЕО -->
   <a-video
     id="videoPlane"
     visible="false"
     position="0 0 -2"
     width="1.2"
-    height="0.7">
+    height="0.7"
+    scale="-1 1 1">
   </a-video>
 
-  <!-- Кнопки под видео -->
-  <a-entity id="buttons" position="0 -0.6 -2" visible="false">
+  <!-- КНОПКИ -->
+  <a-entity id="buttons" position="0 -0.4 -2" visible="false">
 
     <a-plane class="btn" color="#00ff00" position="-0.6 0 0" width="0.35" height="0.15"
-      text="value: Play; align:center" gaze-button="action:play"></a-plane>
+      text="value: Play; align:center"
+      play-btn></a-plane>
 
     <a-plane class="btn" color="#ffff00" position="-0.2 0 0" width="0.35" height="0.15"
-      text="value: Pause; align:center" gaze-button="action:pause"></a-plane>
+      text="value: Pause; align:center"
+      pause-btn></a-plane>
 
     <a-plane class="btn" color="#00ffff" position="0.2 0 0" width="0.35" height="0.15"
-      text="value: +5; align:center" gaze-button="action:plus"></a-plane>
+      text="value: +5; align:center"
+      plus-btn></a-plane>
 
     <a-plane class="btn" color="#ff00ff" position="0.6 0 0" width="0.35" height="0.15"
-      text="value: -5; align:center" gaze-button="action:minus"></a-plane>
+      text="value: -5; align:center"
+      minus-btn></a-plane>
 
   </a-entity>
 
@@ -92,7 +85,7 @@ let videoEl;
 const videoPlane = document.getElementById('videoPlane');
 const buttons = document.getElementById('buttons');
 const timeEl = document.getElementById('videoTime');
-const gazeFill = document.getElementById('gaze-fill');
+const fileInput = document.getElementById('fileInput');
 
 // Загрузка видео
 fileInput.onchange = e => {
@@ -112,56 +105,25 @@ fileInput.onchange = e => {
   videoEl.play();
 };
 
-// Обновление таймера видео
+// Обновление таймера каждые 300 мс
 setInterval(() => {
   if (!videoEl) return;
   const f = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
-  timeEl.textContent = `${f(videoEl.currentTime)} / ${f(videoEl.duration||0)}`;
+  timeEl.textContent = `${f(videoEl.currentTime)} / ${isNaN(videoEl.duration) ? '00:00' : f(videoEl.duration)}`;
 }, 300);
 
-// Масштабирование видео и кнопок
-const sizeSlider = document.createElement('input');
-sizeSlider.type = 'range';
-sizeSlider.min = 0.2; sizeSlider.max = 5; sizeSlider.step = 0.05; sizeSlider.value = 1;
-sizeSlider.style.position = 'fixed'; sizeSlider.style.bottom = '20px'; sizeSlider.style.left = '50%';
-sizeSlider.style.transform = 'translateX(-50%)'; sizeSlider.style.zIndex = 1000;
-document.body.appendChild(sizeSlider);
-
-sizeSlider.addEventListener('input', ()=>{
-  const scale = parseFloat(sizeSlider.value);
-  videoPlane.setAttribute('scale', `${scale} ${scale} ${scale}`);
-  buttons.setAttribute('scale', `${scale} ${scale} ${scale}`);
+// Кнопки через fuse (3 секунды удержания)
+AFRAME.registerComponent('play-btn', {
+  init() { this.el.addEventListener('fuse', () => videoEl && videoEl.play()); }
 });
-
-// --------------------- COMPONENT ---------------------
-AFRAME.registerComponent('gaze-button', {
-  schema: { action: {type:'string'} },
-  init: function () {
-    this.gazeStart = null;
-    this.fused = false;
-    this.el.addEventListener('mouseenter', () => { this.gazeStart = performance.now(); });
-    this.el.addEventListener('mouseleave', () => { this.gazeStart = null; gazeFill.style.transform='scaleY(0)'; });
-  },
-  tick: function () {
-    if (this.gazeStart) {
-      const progress = (performance.now() - this.gazeStart)/3000;
-      gazeFill.style.transform = `scaleY(${Math.min(progress,1)})`;
-      if(progress >= 1 && !this.fused){
-        this.fused = true;
-        gazeFill.style.transform='scaleY(0)';
-        // Выполняем действие
-        if(!videoEl) return;
-        switch(this.data.action){
-          case 'play': videoEl.play(); break;
-          case 'pause': videoEl.pause(); break;
-          case 'plus': videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime+5); break;
-          case 'minus': videoEl.currentTime = Math.max(0, videoEl.currentTime-5); break;
-        }
-      }
-    } else {
-      this.fused = false;
-    }
-  }
+AFRAME.registerComponent('pause-btn', {
+  init() { this.el.addEventListener('fuse', () => videoEl && videoEl.pause()); }
+});
+AFRAME.registerComponent('plus-btn', {
+  init() { this.el.addEventListener('fuse', () => videoEl && (videoEl.currentTime += 5)); }
+});
+AFRAME.registerComponent('minus-btn', {
+  init() { this.el.addEventListener('fuse', () => videoEl && (videoEl.currentTime -= 5)); }
 });
 </script>
 
