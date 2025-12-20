@@ -33,12 +33,19 @@
     <div id="videoTime">00:00 / 00:00</div>
     <div id="placeBtn">Разместить видео</div>
     
-    <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
+    <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;' cursor="rayOrigin: mouse">
         <a-entity camera look-controls>
-            <a-cursor fuse="true" fuse-timeout="2000" 
-                     raycaster="objects: .clickable"
-                     geometry="primitive:ring; radiusInner:0.01; radiusOuter:0.02"
-                     material="color:white; shader:flat">
+            <!-- Курсор в виде кольца с fuse-эффектом -->
+            <a-cursor id="main-cursor"
+                     fuse="true"
+                     fuse-timeout="2000"
+                     raycaster="objects: [cursor-listener]"
+                     geometry="primitive: ring; radiusInner: 0.008; radiusOuter: 0.016"
+                     material="color: #18A0FB; shader: flat"
+                     position="0 0 -1"
+                     animation__click="property: scale; startEvents: click; easing: easeInCubic; dur: 150; from: 0.1 0.1 0.1; to: 1 1 1"
+                     animation__fusing="property: scale; startEvents: fusing; easing: easeInCubic; dur: 2000; from: 1 1 1; to: 0.1 0.1 0.1"
+                     animation__mouseleave="property: scale; startEvents: mouseleave; easing: easeInCubic; dur: 500; to: 1 1 1">
             </a-cursor>
         </a-entity>
     </a-scene>
@@ -50,13 +57,10 @@
         const timeEl = document.getElementById('videoTime');
         
         let videoEl, videoMesh, videoTexture;
-        let videoContainer; // Контейнер для видео и кнопок
+        let videoContainer;
         let currentScale = 1;
         let firstInteraction = true;
-        let buttonsGroup; // Группа для кнопок
-        let fuseTimers = {}; // Таймеры для fuse эффекта
-        let fuseProgress = {}; // Прогресс заполнения
-        let fuseIndicators = {}; // Индикаторы прогресса
+        let buttonsGroup;
 
         // Загрузка видео
         fileInput.addEventListener('change', e => {
@@ -77,18 +81,17 @@
             videoEl.crossOrigin = 'anonymous';
             
             videoEl.addEventListener('loadeddata', () => {
-                // Правильный расчет пропорций с учетом ориентации
                 const aspectRatio = videoEl.videoWidth / videoEl.videoHeight;
                 
-                // Если видео вертикальное (высота > ширины)
+                // Определяем ориентацию видео
                 if (videoEl.videoHeight > videoEl.videoWidth) {
-                    // Для вертикального видео
-                    videoWidth = 0.6; // Фиксированная ширина
-                    videoHeight = videoWidth / aspectRatio; // Высота рассчитывается
+                    // Вертикальное видео
+                    videoWidth = 0.6;
+                    videoHeight = videoWidth / aspectRatio;
                 } else {
-                    // Для горизонтального видео
-                    videoHeight = 1; // Фиксированная высота
-                    videoWidth = videoHeight * aspectRatio; // Ширина рассчитывается
+                    // Горизонтальное видео
+                    videoHeight = 0.8;
+                    videoWidth = videoHeight * aspectRatio;
                 }
                 
                 if (videoTexture) videoTexture.dispose();
@@ -112,7 +115,7 @@
             
             // Позиция перед камерой
             const camera = scene.camera;
-            const distance = 2;
+            const distance = 1.5;
             const pos = camera.position.clone().add(
                 camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(distance)
             );
@@ -131,7 +134,8 @@
             const material = new THREE.MeshBasicMaterial({
                 map: videoTexture,
                 side: THREE.DoubleSide,
-                transparent: true
+                transparent: true,
+                opacity: 0.9
             });
             
             videoMesh = new THREE.Mesh(geometry, material);
@@ -139,8 +143,6 @@
             
             // Позиционируем контейнер
             videoContainer.position.copy(pos);
-            
-            // Поворачиваем контейнер к камере
             videoContainer.lookAt(camera.position);
             
             currentScale = 1;
@@ -175,7 +177,6 @@
                 const currentDistance = Math.sqrt(dx*dx + dy*dy);
                 const scaleFactor = currentDistance / startDistance;
                 
-                // Ограничиваем масштабирование
                 const newScale = Math.max(0.1, Math.min(5, startScale * scaleFactor));
                 videoContainer.scale.set(newScale, newScale, newScale);
                 currentScale = newScale;
@@ -186,180 +187,173 @@
             startDistance = null;
         });
 
-        // Создание кнопок под видео с fuse эффектом
-        function createButtons(){
-            // Удаляем старые кнопки, если есть
-            if(buttonsGroup) {
+        // Создание кнопок под видео
+        function createButtons() {
+            if (buttonsGroup) {
                 videoContainer.remove(buttonsGroup);
             }
             
-            // Создаем группу для кнопок
             buttonsGroup = new THREE.Group();
             videoContainer.add(buttonsGroup);
             
-            // Позиция кнопок под видео (в локальных координатах контейнера)
-            const buttonY = -videoHeight/2 - 0.2;
+            // Позиция кнопок под видео
+            const buttonY = -videoHeight/2 - 0.15;
             const buttonSpacing = 0.25;
             
-            // Создаем кнопки
-            createButton('play', -buttonSpacing, buttonY, 0x00ff00, 'Play');
-            createButton('pause', buttonSpacing, buttonY, 0xff0000, 'Pause');
-            
-            // Создаем кнопку закрытия видео
-            createButton('close', 0, -videoHeight/2 - 0.1, 0x888888, 'Close');
+            // Создаем кнопки как A-Frame элементы для работы с fuse
+            createAFrameButton('play-btn', -buttonSpacing, buttonY, 0.001, '#4CAF50', '▶', 'play');
+            createAFrameButton('pause-btn', 0, buttonY, 0.001, '#FF9800', '⏸', 'pause');
+            createAFrameButton('close-btn', buttonSpacing, buttonY, 0.001, '#F44336', '✕', 'close');
         }
         
-        // Создание одной кнопки с fuse индикатором
-        function createButton(id, x, y, color, text) {
-            // Основная кнопка
-            const buttonGeometry = new THREE.CircleGeometry(0.1, 32);
-            const buttonMaterial = new THREE.MeshBasicMaterial({ 
-                color: color,
-                transparent: true,
-                opacity: 0.7
+        // Создание кнопки как A-Frame элемента
+        function createAFrameButton(id, x, y, z, color, text, action) {
+            // Создаем элемент a-entity
+            const btn = document.createElement('a-entity');
+            btn.setAttribute('id', id);
+            btn.setAttribute('cursor-listener', '');
+            btn.setAttribute('class', 'clickable');
+            
+            // Позиция в локальных координатах контейнера
+            const worldPos = new THREE.Vector3(x, y, z);
+            worldPos.applyMatrix4(videoContainer.matrixWorld);
+            
+            btn.setAttribute('position', {
+                x: worldPos.x,
+                y: worldPos.y,
+                z: worldPos.z
             });
             
-            const button = new THREE.Mesh(buttonGeometry, buttonMaterial);
-            button.position.set(x, y, 0.001);
-            button.userData = { 
-                type: 'button', 
-                action: id,
-                hovering: false
+            // Родительский контейнер для трансформаций
+            btn.setAttribute('parent', videoContainer);
+            
+            // Геометрия кнопки
+            btn.setAttribute('geometry', {
+                primitive: 'cylinder',
+                radius: 0.06,
+                height: 0.01
+            });
+            
+            btn.setAttribute('material', {
+                color: color,
+                opacity: 0.8,
+                transparent: true
+            });
+            
+            // Текст на кнопке
+            btn.setAttribute('text', {
+                value: text,
+                align: 'center',
+                color: 'white',
+                width: 0.3
+            });
+            
+            // Добавляем обработчики событий
+            btn.addEventListener('mouseenter', function() {
+                // Подсветка кнопки при наведении
+                this.setAttribute('material', 'opacity', 1);
+                this.setAttribute('animation', {
+                    property: 'scale',
+                    to: '1.1 1.1 1.1',
+                    dur: 200,
+                    easing: 'easeOutQuad'
+                });
+            });
+            
+            btn.addEventListener('mouseleave', function() {
+                // Возвращаем кнопку в исходное состояние
+                this.setAttribute('material', 'opacity', 0.8);
+                this.setAttribute('animation', {
+                    property: 'scale',
+                    to: '1 1 1',
+                    dur: 200,
+                    easing: 'easeOutQuad'
+                });
+            });
+            
+            // Обработчик fuse-события (когда курсор заполнился)
+            btn.addEventListener('fusing', function(e) {
+                const progress = e.detail.progress;
+                // Можно добавить визуальную обратную связь при заполнении
+                if (progress === 1) {
+                    // Выполняем действие, когда fuse завершен
+                    executeButtonAction(action);
+                    
+                    // Анимация нажатия
+                    this.setAttribute('animation', {
+                        property: 'scale',
+                        from: '1 1 1',
+                        to: '0.9 0.9 0.9',
+                        dur: 100,
+                        easing: 'easeOutQuad'
+                    });
+                    
+                    setTimeout(() => {
+                        this.setAttribute('animation', {
+                            property: 'scale',
+                            from: '0.9 0.9 0.9',
+                            to: '1 1 1',
+                            dur: 100,
+                            easing: 'easeOutQuad'
+                        });
+                    }, 100);
+                }
+            });
+            
+            // Также обрабатываем клик для десктопных устройств
+            btn.addEventListener('click', function() {
+                executeButtonAction(action);
+            });
+            
+            // Добавляем в сцену
+            scene.appendChild(btn);
+            
+            // Сохраняем ссылку на кнопку в группу
+            btn.userData = {
+                localPosition: new THREE.Vector3(x, y, z),
+                action: action
             };
             
-            // Индикатор прогресса (кольцо)
-            const indicatorGeometry = new THREE.RingGeometry(0.09, 0.1, 32);
-            const indicatorMaterial = new THREE.MeshBasicMaterial({
-                color: 0xffffff,
-                transparent: true,
-                opacity: 0.8,
-                side: THREE.DoubleSide
-            });
+            if (!buttonsGroup.userData.buttons) {
+                buttonsGroup.userData.buttons = [];
+            }
+            buttonsGroup.userData.buttons.push(btn);
             
-            const indicator = new THREE.Mesh(indicatorGeometry, indicatorMaterial);
-            indicator.position.set(0, 0, 0.002);
-            indicator.rotation.z = Math.PI / 2; // Начинаем с верхней точки
-            indicator.visible = false;
-            
-            // Добавляем индикатор к кнопке
-            button.add(indicator);
-            
-            // Сохраняем ссылки
-            fuseIndicators[id] = indicator;
-            fuseProgress[id] = 0;
-            
-            // Текст кнопки
-            addTextToButton(button, text, 0, 0, 0.003);
-            
-            buttonsGroup.add(button);
-            
-            // Настраиваем события
-            setupButtonEvents(button, id);
-        }
-        
-        // Настройка событий для кнопки
-        function setupButtonEvents(button, id) {
-            // Событие при наведении курсора
-            button.addEventListener('mouseenter', () => {
-                if (!videoEl) return;
-                
-                button.userData.hovering = true;
-                fuseIndicators[id].visible = true;
-                fuseProgress[id] = 0;
-                
-                // Запускаем таймер заполнения
-                clearTimeout(fuseTimers[id]);
-                
-                const startTime = Date.now();
-                const duration = 2000; // 2 секунды
-                const updateInterval = 50; // Обновляем каждые 50мс
-                
-                function updateProgress() {
-                    if (!button.userData.hovering) return;
-                    
-                    const elapsed = Date.now() - startTime;
-                    fuseProgress[id] = Math.min(elapsed / duration, 1);
-                    
-                    // Обновляем индикатор
-                    if (fuseIndicators[id]) {
-                        // Создаем геометрию кольца с учетом прогресса
-                        const startAngle = -Math.PI / 2;
-                        const endAngle = startAngle + (2 * Math.PI * fuseProgress[id]);
-                        
-                        const arcGeometry = new THREE.RingGeometry(
-                            0.09, 0.1, 32,
-                            1, // thetaSegments
-                            startAngle, endAngle - startAngle
-                        );
-                        
-                        // Обновляем геометрию
-                        fuseIndicators[id].geometry.dispose();
-                        fuseIndicators[id].geometry = arcGeometry;
-                    }
-                    
-                    // Если заполнение завершено
-                    if (fuseProgress[id] >= 1) {
-                        executeButtonAction(id);
-                        // Сбрасываем индикатор
-                        setTimeout(() => {
-                            if (fuseIndicators[id]) {
-                                fuseIndicators[id].visible = false;
-                            }
-                        }, 300);
-                    } else {
-                        // Продолжаем обновление
-                        fuseTimers[id] = setTimeout(updateProgress, updateInterval);
-                    }
-                }
-                
-                fuseTimers[id] = setTimeout(updateProgress, updateInterval);
-            });
-            
-            // Событие при уходе курсора
-            button.addEventListener('mouseleave', () => {
-                button.userData.hovering = false;
-                
-                // Останавливаем таймер
-                clearTimeout(fuseTimers[id]);
-                
-                // Скрываем индикатор
-                if (fuseIndicators[id]) {
-                    fuseIndicators[id].visible = false;
-                    
-                    // Восстанавливаем полное кольцо
-                    const fullGeometry = new THREE.RingGeometry(0.09, 0.1, 32);
-                    fuseIndicators[id].geometry.dispose();
-                    fuseIndicators[id].geometry = fullGeometry;
-                    fuseIndicators[id].rotation.z = Math.PI / 2;
-                }
-                
-                fuseProgress[id] = 0;
-            });
-            
-            // Обработка клика (на всякий случай)
-            button.addEventListener('click', () => {
-                executeButtonAction(id);
-            });
+            return btn;
         }
         
         // Выполнение действия кнопки
-        function executeButtonAction(id) {
-            switch(id) {
+        function executeButtonAction(action) {
+            console.log('Button action:', action);
+            
+            switch(action) {
                 case 'play':
                     if (videoEl) {
                         videoEl.play();
                         console.log('Play video');
                     }
                     break;
+                    
                 case 'pause':
                     if (videoEl) {
                         videoEl.pause();
                         console.log('Pause video');
                     }
                     break;
+                    
                 case 'close':
-                    // Удаляем видео
+                    // Удаляем видео и все кнопки
                     if (videoContainer) {
+                        // Удаляем A-Frame кнопки из сцены
+                        if (buttonsGroup && buttonsGroup.userData.buttons) {
+                            buttonsGroup.userData.buttons.forEach(btn => {
+                                if (btn.parentNode) {
+                                    scene.removeChild(btn);
+                                }
+                            });
+                        }
+                        
+                        // Удаляем контейнер
                         scene.object3D.remove(videoContainer);
                         videoContainer = null;
                         buttonsGroup = null;
@@ -373,73 +367,50 @@
             }
         }
         
-        // Добавление текста на кнопки
-        function addTextToButton(button, text, x, y, z) {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = 128;
-            canvas.height = 128;
+        // Функция для обновления позиций кнопок при масштабировании/перемещении видео
+        function updateButtonsPosition() {
+            if (!buttonsGroup || !buttonsGroup.userData.buttons) return;
             
-            // Прозрачный фон
-            context.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Текст
-            context.font = 'bold 24px Arial';
-            context.fillStyle = '#ffffff';
-            context.textAlign = 'center';
-            context.textBaseline = 'middle';
-            context.fillText(text, canvas.width/2, canvas.height/2);
-            
-            // Добавляем тень для лучшей читаемости
-            context.strokeStyle = '#000000';
-            context.lineWidth = 3;
-            context.strokeText(text, canvas.width/2, canvas.height/2);
-            
-            const texture = new THREE.CanvasTexture(canvas);
-            const textMaterial = new THREE.MeshBasicMaterial({
-                map: texture,
-                transparent: true,
-                side: THREE.DoubleSide
-            });
-            
-            const textGeometry = new THREE.PlaneGeometry(0.15, 0.15);
-            const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-            textMesh.position.set(x, y, z);
-            
-            button.add(textMesh);
-        }
-        
-        // Обновление raycaster для обнаружения кнопок
-        function refreshRaycaster() {
-            const cursor = document.querySelector('a-cursor');
-            if (cursor && cursor.components.raycaster) {
-                // Обновляем список объектов для raycaster
-                const raycaster = cursor.components.raycaster;
-                raycaster.objects = '.clickable, [raycastable]';
-                
-                // Добавляем атрибут raycastable к нашим кнопкам
-                if (buttonsGroup) {
-                    buttonsGroup.traverse((child) => {
-                        if (child.userData && child.userData.type === 'button') {
-                            child.setAttribute('raycastable', '');
-                        }
+            buttonsGroup.userData.buttons.forEach(btn => {
+                if (btn.userData && btn.userData.localPosition) {
+                    const worldPos = btn.userData.localPosition.clone();
+                    worldPos.applyMatrix4(videoContainer.matrixWorld);
+                    
+                    btn.setAttribute('position', {
+                        x: worldPos.x,
+                        y: worldPos.y,
+                        z: worldPos.z
                     });
                 }
-                
-                raycaster.refreshObjects();
-            }
+            });
         }
+        
+        // Обновляем позиции кнопок при анимациях
+        function animationLoop() {
+            if (videoContainer && buttonsGroup && buttonsGroup.userData.buttons) {
+                updateButtonsPosition();
+            }
+            requestAnimationFrame(animationLoop);
+        }
+        
+        // Запускаем цикл анимации
+        animationLoop();
         
         // Освобождаем ресурсы при закрытии
         window.addEventListener('beforeunload', () => {
             if (videoEl && videoEl.src) {
                 URL.revokeObjectURL(videoEl.src);
             }
-            
-            // Очищаем все таймеры
-            Object.values(fuseTimers).forEach(timer => {
-                clearTimeout(timer);
-            });
+        });
+        
+        // Обновляем raycaster при добавлении новых объектов
+        scene.addEventListener('object3dset', function() {
+            const cursor = document.getElementById('main-cursor');
+            if (cursor && cursor.components.raycaster) {
+                setTimeout(() => {
+                    cursor.components.raycaster.refreshObjects();
+                }, 100);
+            }
         });
     </script>
 </body>
