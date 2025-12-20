@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>AR Видео с fuse-анимацией</title>
+<title>AR Видео с кнопкой разместить</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
 <style>
@@ -36,17 +36,15 @@
 <div id="placeBtn">Разместить видео</div>
 
 <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;'>
-
-  <!-- Камера с fuse-курсором -->
   <a-entity camera look-controls>
-    <a-entity id="cursor" cursor="fuse: true; fuseTimeout: 2000"
+    <a-cursor 
+      fuse="true" 
+      fuse-timeout="2000" 
+      raycaster="objects: .clickable"
       geometry="primitive:ring; radiusInner:0.01; radiusOuter:0.02"
-      material="color:white; shader:flat"
-      position="0 0 -0.5">
-      <a-ring id="fuseRing" radius-inner="0.01" radius-outer="0.02" color="white" rotation="-90 0 0"></a-ring>
-    </a-entity>
+      material="color:white; shader:flat">
+    </a-cursor>
   </a-entity>
-
 </a-scene>
 
 <script>
@@ -55,19 +53,14 @@ const fileInput = document.getElementById('fileInput');
 const placeBtn = document.getElementById('placeBtn');
 const timeEl = document.getElementById('videoTime');
 
-let videoEl; 
+let videoEl, videoMesh, videoTexture;
 let videoWidth = 1, videoHeight = 0.6;
 let firstInteraction = true;
-
-// Группа для видео + кнопок
-let groupEntity = null;
-let aVideoEl = null;
 
 // Загрузка видео
 fileInput.addEventListener('change', e => {
   const file = e.target.files[0];
   if(!file) return;
-
   const url = URL.createObjectURL(file);
 
   videoEl = document.createElement('video');
@@ -77,9 +70,10 @@ fileInput.addEventListener('change', e => {
   videoEl.playsInline = true;
   videoEl.crossOrigin = 'anonymous';
 
-  videoEl.addEventListener('loadeddata', ()=>{
+  videoEl.addEventListener('loadeddata', () => {
     videoWidth = videoEl.videoWidth / videoEl.videoHeight;
     videoHeight = 1;
+    videoTexture = new THREE.VideoTexture(videoEl);
   });
 });
 
@@ -90,111 +84,92 @@ setInterval(() => {
   timeEl.textContent = `${f(videoEl.currentTime)} / ${f(videoEl.duration)}`;
 }, 300);
 
-// Размещение видео
+// Размещение видео по кнопке
 placeBtn.addEventListener('click', () => {
   if(!videoEl) return;
 
+  // Позиция перед камерой
   const camera = scene.camera;
   const distance = 2;
   const pos = camera.position.clone().add(camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(distance));
-  pos.y = 0; // на полу
 
-  if(!groupEntity){
-    groupEntity = document.createElement('a-entity');
-    scene.appendChild(groupEntity);
-
-    // Видео
-    aVideoEl = document.createElement('a-video');
-    aVideoEl.setAttribute('src', videoEl);
-    aVideoEl.setAttribute('width', videoWidth);
-    aVideoEl.setAttribute('height', videoHeight);
-    aVideoEl.setAttribute('rotation', '-90 0 0'); // горизонтально
-    groupEntity.appendChild(aVideoEl);
-
-    // Кнопки
-    const playBtn = document.createElement('a-plane');
-    playBtn.setAttribute('id','playBtn');
-    playBtn.setAttribute('class','clickable');
-    playBtn.setAttribute('color','#00ff00');
-    playBtn.setAttribute('width','0.4');
-    playBtn.setAttribute('height','0.15');
-    playBtn.setAttribute('position', `-0.25 ${-videoHeight/2-0.2} 0`);
-    playBtn.setAttribute('text','value:Play;align:center');
-    groupEntity.appendChild(playBtn);
-
-    const pauseBtn = document.createElement('a-plane');
-    pauseBtn.setAttribute('id','pauseBtn');
-    pauseBtn.setAttribute('class','clickable');
-    pauseBtn.setAttribute('color','#ff0000');
-    pauseBtn.setAttribute('width','0.4');
-    pauseBtn.setAttribute('height','0.15');
-    pauseBtn.setAttribute('position', `0.25 ${-videoHeight/2-0.2} 0`);
-    pauseBtn.setAttribute('text','value:Pause;align:center');
-    groupEntity.appendChild(pauseBtn);
-
-    addFuse(playBtn, ()=>videoEl.play());
-    addFuse(pauseBtn, ()=>videoEl.pause());
+  // Создаем Mesh, если еще нет
+  if(!videoMesh){
+    const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
+    const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
+    videoMesh = new THREE.Mesh(geometry, material);
+    scene.object3D.add(videoMesh);
   }
 
-  groupEntity.setAttribute('position', `${pos.x} ${pos.y} ${pos.z}`);
+  videoMesh.position.copy(pos);
+  videoMesh.rotation.copy(camera.rotation);
+  videoMesh.rotateX(Math.PI/2);
+  videoMesh.visible = true;
 
   if(firstInteraction){
     videoEl.muted = false;
     videoEl.play().catch(()=>{});
     firstInteraction = false;
   }
+
+  createButtons(pos);
 });
 
 // Масштабирование пальцами
 let startDistance = null;
 let startScale = 1;
-scene.addEventListener('touchstart', e=>{
-  if(e.touches.length==2 && groupEntity){
+scene.addEventListener('touchstart', e => {
+  if(e.touches.length==2 && videoMesh){
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
-    startDistance = Math.sqrt(dx*dx+dy*dy);
-    const scale = groupEntity.getAttribute('scale');
-    startScale = scale.x;
+    startDistance = Math.sqrt(dx*dx + dy*dy);
+    startScale = videoMesh.scale.x;
   }
 });
-scene.addEventListener('touchmove', e=>{
-  if(e.touches.length==2 && groupEntity && startDistance){
+scene.addEventListener('touchmove', e => {
+  if(e.touches.length==2 && videoMesh && startDistance){
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     const scaleFactor = Math.sqrt(dx*dx+dy*dy)/startDistance;
-    groupEntity.setAttribute('scale', `${startScale*scaleFactor} ${startScale*scaleFactor} ${startScale*scaleFactor}`);
+    videoMesh.scale.set(startScale*scaleFactor, startScale*scaleFactor,1);
   }
 });
 
-// Fuse с анимацией заполнения
+// Создание кнопок под видео
+function createButtons(pos){
+  if(document.getElementById('playBtn')) return; // уже есть
+
+  const btnY = pos.y - videoHeight/2 - 0.2;
+
+  const playBtn = document.createElement('a-plane');
+  playBtn.setAttribute('id','playBtn');
+  playBtn.setAttribute('class','clickable');
+  playBtn.setAttribute('color','#00ff00');
+  playBtn.setAttribute('width','0.4');
+  playBtn.setAttribute('height','0.15');
+  playBtn.setAttribute('position', `${pos.x-0.25} ${btnY} ${pos.z}`);
+  playBtn.setAttribute('text','value:Play;align:center');
+  scene.appendChild(playBtn);
+
+  const pauseBtn = document.createElement('a-plane');
+  pauseBtn.setAttribute('id','pauseBtn');
+  pauseBtn.setAttribute('class','clickable');
+  pauseBtn.setAttribute('color','#ff0000');
+  pauseBtn.setAttribute('width','0.4');
+  pauseBtn.setAttribute('height','0.15');
+  pauseBtn.setAttribute('position', `${pos.x+0.25} ${btnY} ${pos.z}`);
+  pauseBtn.setAttribute('text','value:Pause;align:center');
+  scene.appendChild(pauseBtn);
+
+  addFuse(playBtn, () => videoEl.play());
+  addFuse(pauseBtn, () => videoEl.pause());
+}
+
+// Fuse 2 секунды
 function addFuse(el, callback){
   let timer = null;
-  const ring = document.getElementById('fuseRing');
-  let start = null;
-
-  el.addEventListener('mouseenter', ()=>{
-    start = performance.now();
-    timer = requestAnimationFrame(fill);
-  });
-
-  el.addEventListener('mouseleave', ()=>{
-    if(timer) cancelAnimationFrame(timer);
-    ring.setAttribute('scale','1 1 1');
-    ring.setAttribute('material','color:white');
-  });
-
-  function fill(now){
-    const elapsed = now - start;
-    const progress = Math.min(elapsed/2000,1);
-    ring.setAttribute('scale', `1 ${progress} 1`);
-    ring.setAttribute('material','color:#00ffff');
-    if(progress<1) timer = requestAnimationFrame(fill);
-    else {
-      callback();
-      ring.setAttribute('scale','1 1 1');
-      ring.setAttribute('material','color:white');
-    }
-  }
+  el.addEventListener('mouseenter', () => { timer = setTimeout(callback,2000); });
+  el.addEventListener('mouseleave', () => { if(timer) clearTimeout(timer); });
 }
 </script>
 </body>
