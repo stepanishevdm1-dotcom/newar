@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео с Gaze и прогрессом</title>
+  <title>AR Видео с Gaze 3с</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -159,7 +159,6 @@ scene.addEventListener('render-target-loaded', ()=>{
       videoMesh.lookAt(scene.camera.position);
       btnGroup.lookAt(scene.camera.position);
     }
-    // обновление времени видео
     if(videoEl){
       function formatTime(t){ const m=Math.floor(t/60), s=Math.floor(t%60); return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;}
       videoTimeEl.textContent = `${formatTime(videoEl.currentTime)} / ${formatTime(videoEl.duration||0)}`;
@@ -179,50 +178,59 @@ sizeSlider.addEventListener('input', ()=>{
 // --------------------- Gaze-контроль ---------------------
 let gazeTimer = null;
 let gazeDuration = 3000; // 3 секунды
-function startGaze(targetFunc){
+let activeBtn = null;
+
+function startGazeButton(btn){
   let startTime = performance.now();
-  gazeTimer = requestAnimationFrame(function tick(time){
+  activeBtn = btn;
+  function tick(time){
+    if(activeBtn !== btn) { gazeFill.style.transform='scaleY(0)'; return; }
     const progress = (time-startTime)/gazeDuration;
     gazeFill.style.transform = `scaleY(${Math.min(progress,1)})`;
     if(progress>=1){
-      targetFunc();
-      gazeFill.style.transform = 'scaleY(0)';
+      executeButton(btn);
+      gazeFill.style.transform='scaleY(0)';
+      activeBtn = null;
     } else {
-      gazeTimer = requestAnimationFrame(tick);
+      requestAnimationFrame(tick);
     }
-  });
+  }
+  requestAnimationFrame(tick);
 }
-function stopGaze(){
-  if(gazeTimer) cancelAnimationFrame(gazeTimer);
+
+function stopGazeButton(){
   gazeFill.style.transform='scaleY(0)';
+  activeBtn = null;
+}
+
+function executeButton(btn){
+  if(!videoEl) return;
+  switch(btn.userData.label){
+    case 'Play': videoEl.play(); break;
+    case 'Pause': videoEl.pause(); break;
+    case '+5': videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime+5); break;
+    case '-5': videoEl.currentTime = Math.max(0, videoEl.currentTime-5); break;
+  }
 }
 
 // --------------------- Show кнопка ---------------------
 showBtnHTML.addEventListener('mouseenter', ()=>startGaze(showVideo));
-showBtnHTML.addEventListener('mouseleave', stopGaze);
+showBtnHTML.addEventListener('mouseleave', stopGazeButton);
 showBtnHTML.addEventListener('click', showVideo);
 
-// --------------------- Gaze на 3D кнопки ---------------------
-function checkGazeOnButtons(){
+// --------------------- Проверка наведения на кнопки ---------------------
+scene.addEventListener('tick', ()=>{
   if(!btnGroup.visible) return;
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2(0,0); // центр экрана
   raycaster.setFromCamera(mouse, scene.camera);
   const intersects = raycaster.intersectObjects([playBtn,pauseBtn,plus5Btn,minus5Btn]);
   if(intersects.length>0){
-    const btn = intersects[0].object;
-    startGaze(()=>{
-      switch(btn.userData.label){
-        case 'Play': videoEl.play(); break;
-        case 'Pause': videoEl.pause(); break;
-        case '+5': videoEl.currentTime = Math.min(videoEl.duration, videoEl.currentTime+5); break;
-        case '-5': videoEl.currentTime = Math.max(0, videoEl.currentTime-5); break;
-      }
-    });
-  } else stopGaze();
-}
-
-scene.addEventListener('tick', checkGazeOnButtons);
+    if(activeBtn !== intersects[0].object){
+      startGazeButton(intersects[0].object);
+    }
+  } else stopGazeButton();
+});
 </script>
 </body>
 </html>
