@@ -35,13 +35,13 @@
     
     <a-scene embedded arjs='sourceType: webcam; debugUIEnabled: false;' cursor="rayOrigin: mouse">
         <a-entity camera look-controls>
-            <!-- Черный полупрозрачный курсор в центре экрана -->
+            <!-- Курсор в виде кольца с fuse-эффектом -->
             <a-cursor id="main-cursor"
                      fuse="true"
                      fuse-timeout="2000"
-                     raycaster="far: 5; objects: .clickable"
-                     geometry="primitive: ring; radiusInner: 0.012; radiusOuter: 0.024"
-                     material="color: #000000; opacity: 0.7; shader: flat; transparent: true"
+                     raycaster="objects: [cursor-listener]"
+                     geometry="primitive: ring; radiusInner: 0.008; radiusOuter: 0.016"
+                     material="color: #000000; shader: flat; opacity: 0.5"
                      position="0 0 -1"
                      animation__click="property: scale; startEvents: click; easing: easeInCubic; dur: 150; from: 0.1 0.1 0.1; to: 1 1 1"
                      animation__fusing="property: scale; startEvents: fusing; easing: easeInCubic; dur: 2000; from: 1 1 1; to: 0.1 0.1 0.1"
@@ -57,18 +57,17 @@
         const timeEl = document.getElementById('videoTime');
         
         let videoEl, videoMesh, videoTexture;
-        let videoContainer;
+        let videoContainer; // Общий контейнер для видео и кнопок
         let currentScale = 1;
         let firstInteraction = true;
         let playButton, pauseButton;
-        let playAFButton, pauseAFButton; // A-Frame кнопки для взаимодействия
 
         // Загрузка видео
         fileInput.addEventListener('change', e => {
             const file = e.target.files[0];
             if(!file) return;
             
-            if (videoEl && videoEl.src) {
+            if(videoEl && videoEl.src) {
                 URL.revokeObjectURL(videoEl.src);
             }
             
@@ -114,22 +113,15 @@
                 scene.object3D.remove(videoContainer);
             }
             
-            // Удаляем старые A-Frame кнопки
-            if (playAFButton && playAFButton.parentNode) scene.removeChild(playAFButton);
-            if (pauseAFButton && pauseAFButton.parentNode) scene.removeChild(pauseAFButton);
-            
-            // Позиция перед камерой
             const camera = scene.camera;
             const distance = 1.5;
             const pos = camera.position.clone().add(
                 camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(distance)
             );
             
-            // Создаем общий контейнер
             videoContainer = new THREE.Group();
             scene.object3D.add(videoContainer);
             
-            // Создаем Mesh для видео
             const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
             const material = new THREE.MeshBasicMaterial({
                 map: videoTexture,
@@ -141,7 +133,6 @@
             videoMesh = new THREE.Mesh(geometry, material);
             videoContainer.add(videoMesh);
             
-            // Позиционируем контейнер
             videoContainer.position.copy(pos);
             videoContainer.lookAt(camera.position);
             
@@ -155,12 +146,9 @@
             }
             
             createButtons();
-            
-            // Обновляем raycaster после создания кнопок
-            setTimeout(refreshRaycaster, 100);
         });
 
-        // Масштабирование пальцами
+        // Масштабирование всего контейнера
         let startDistance = null;
         let startScale = 1;
         
@@ -179,9 +167,9 @@
                 const dy = e.touches[0].clientY - e.touches[1].clientY;
                 const currentDistance = Math.sqrt(dx*dx + dy*dy);
                 const scaleFactor = currentDistance / startDistance;
-                
+
                 const newScale = Math.max(0.1, Math.min(5, startScale * scaleFactor));
-                videoContainer.scale.set(newScale, newScale, newScale);
+                videoContainer.scale.set(newScale, newScale, newScale); // весь контейнер масштабируется
                 currentScale = newScale;
             }
         });
@@ -190,30 +178,25 @@
             startDistance = null;
         });
 
-        // Создание кнопок
+        // Создание кнопок внутри контейнера
         function createButtons() {
-            // Более близкое расположение кнопок (меньшее расстояние между ними)
-            const buttonY = -videoHeight/2 - 0.12;
-            const buttonSpacing = videoWidth * 0.15; // Уменьшили расстояние между кнопками
+            const buttonY = -videoHeight/2 - 0.1; // ближе к видео
+            const buttonSpacing = videoWidth * 0.15; // уменьшено расстояние между кнопками
             
-            // Создаем 3D кнопки
-            playButton = create3DButton('play-3d', -buttonSpacing, buttonY, 0.001, 0x4CAF50, 'PLAY', 'play');
-            pauseButton = create3DButton('pause-3d', buttonSpacing, buttonY, 0.001, 0xFF9800, 'PAUSE', 'pause');
+            playButton = create3DButton('play-btn', -buttonSpacing, buttonY, 0.001, 0x4CAF50, 'Play', 'play');
+            pauseButton = create3DButton('pause-btn', buttonSpacing, buttonY, 0.001, 0xFF9800, 'Pause', 'pause');
             
             videoContainer.add(playButton);
             videoContainer.add(pauseButton);
             
-            // Создаем A-Frame кнопки для взаимодействия
-            createAFrameButtons(buttonSpacing, buttonY);
+            createAFrameButtons();
         }
-        
-        // Создание 3D кнопки
+
         function create3DButton(id, x, y, z, color, text, action) {
             const buttonGroup = new THREE.Group();
             buttonGroup.userData = { id: id, action: action };
             
-            // Кнопка (плоский цилиндр)
-            const buttonGeometry = new THREE.CylinderGeometry(0.05, 0.05, 0.015, 32);
+            const buttonGeometry = new THREE.CylinderGeometry(0.06, 0.06, 0.02, 32);
             const buttonMaterial = new THREE.MeshBasicMaterial({ 
                 color: color,
                 transparent: true,
@@ -223,7 +206,6 @@
             const buttonMesh = new THREE.Mesh(buttonGeometry, buttonMaterial);
             buttonMesh.rotation.x = Math.PI / 2;
             
-            // Текст на кнопке
             const textCanvas = createButtonText(text);
             const textTexture = new THREE.CanvasTexture(textCanvas);
             const textMaterial = new THREE.MeshBasicMaterial({
@@ -232,9 +214,9 @@
                 side: THREE.DoubleSide
             });
             
-            const textGeometry = new THREE.PlaneGeometry(0.08, 0.035);
+            const textGeometry = new THREE.PlaneGeometry(0.1, 0.05);
             const textMesh = new THREE.Mesh(textGeometry, textMaterial);
-            textMesh.position.z = 0.016;
+            textMesh.position.z = 0.011;
             
             buttonGroup.add(buttonMesh);
             buttonGroup.add(textMesh);
@@ -242,8 +224,7 @@
             
             return buttonGroup;
         }
-        
-        // Создание текста для кнопки
+
         function createButtonText(text) {
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
@@ -251,7 +232,8 @@
             canvas.height = 128;
             
             context.clearRect(0, 0, canvas.width, canvas.height);
-            context.font = 'bold 28px Arial';
+            
+            context.font = 'bold 36px Arial';
             context.fillStyle = '#FFFFFF';
             context.textAlign = 'center';
             context.textBaseline = 'middle';
@@ -263,193 +245,66 @@
             
             return canvas;
         }
-        
-        // Создание A-Frame кнопок для взаимодействия с курсором
-        function createAFrameButtons(buttonSpacing, buttonY) {
-            // Удаляем старые кнопки
-            if (playAFButton && playAFButton.parentNode) scene.removeChild(playAFButton);
-            if (pauseAFButton && pauseAFButton.parentNode) scene.removeChild(pauseAFButton);
+
+        function createAFrameButtons() {
+            const oldPlayBtn = document.getElementById('a-play-btn');
+            const oldPauseBtn = document.getElementById('a-pause-btn');
+            if (oldPlayBtn) scene.removeChild(oldPlayBtn);
+            if (oldPauseBtn) scene.removeChild(oldPauseBtn);
             
-            // Создаем Play кнопку для взаимодействия
-            playAFButton = document.createElement('a-entity');
-            playAFButton.setAttribute('id', 'play-af');
-            playAFButton.setAttribute('class', 'clickable');
-            playAFButton.setAttribute('geometry', {
-                primitive: 'plane',
-                width: 0.12,
-                height: 0.12
-            });
-            playAFButton.setAttribute('material', {
-                opacity: 0.001,
-                transparent: true
-            });
-            playAFButton.setAttribute('position', {
-                x: -buttonSpacing,
-                y: buttonY,
-                z: 0.002
-            });
-            playAFButton.setAttribute('parent', videoContainer);
+            const buttonY = -videoHeight/2 - 0.1;
+            const buttonSpacing = videoWidth * 0.15;
             
-            // Обработчики для Play кнопки
-            playAFButton.addEventListener('mouseenter', function() {
-                if (playButton) {
-                    playButton.children[0].material.opacity = 1;
-                }
-            });
+            const playBtn = document.createElement('a-entity');
+            playBtn.setAttribute('id', 'a-play-btn');
+            playBtn.setAttribute('cursor-listener', '');
+            playBtn.setAttribute('geometry', { primitive: 'plane', width: 0.15, height: 0.15 });
+            playBtn.setAttribute('material', { opacity: 0.01, transparent: true });
+            playBtn.setAttribute('position', { x: -buttonSpacing, y: buttonY, z: 0.002 });
+            playBtn.setAttribute('parent', videoContainer);
             
-            playAFButton.addEventListener('mouseleave', function() {
-                if (playButton) {
-                    playButton.children[0].material.opacity = 0.8;
-                }
-            });
+            playBtn.addEventListener('mouseenter', () => { if(playButton) playButton.children[0].material.opacity = 1; });
+            playBtn.addEventListener('mouseleave', () => { if(playButton) playButton.children[0].material.opacity = 0.8; });
+            playBtn.addEventListener('fusing', e => { if(e.detail.progress===1) executeButtonAction('play'); });
+            playBtn.addEventListener('click', () => executeButtonAction('play'));
             
-            playAFButton.addEventListener('fusing', function(e) {
-                const progress = e.detail.progress;
-                console.log('Play button fusing:', progress);
-                
-                // Визуальная обратная связь при заполнении
-                if (playButton) {
-                    const intensity = 0.8 + (progress * 0.2);
-                    playButton.children[0].material.opacity = intensity;
-                }
-                
-                if (progress === 1) {
-                    executeButtonAction('play');
-                }
-            });
+            const pauseBtn = document.createElement('a-entity');
+            pauseBtn.setAttribute('id', 'a-pause-btn');
+            pauseBtn.setAttribute('cursor-listener', '');
+            pauseBtn.setAttribute('geometry', { primitive: 'plane', width: 0.15, height: 0.15 });
+            pauseBtn.setAttribute('material', { opacity: 0.01, transparent: true });
+            pauseBtn.setAttribute('position', { x: buttonSpacing, y: buttonY, z: 0.002 });
+            pauseBtn.setAttribute('parent', videoContainer);
             
-            playAFButton.addEventListener('click', function() {
-                executeButtonAction('play');
-            });
+            pauseBtn.addEventListener('mouseenter', () => { if(pauseButton) pauseButton.children[0].material.opacity = 1; });
+            pauseBtn.addEventListener('mouseleave', () => { if(pauseButton) pauseButton.children[0].material.opacity = 0.8; });
+            pauseBtn.addEventListener('fusing', e => { if(e.detail.progress===1) executeButtonAction('pause'); });
+            pauseBtn.addEventListener('click', () => executeButtonAction('pause'));
             
-            // Создаем Pause кнопку для взаимодействия
-            pauseAFButton = document.createElement('a-entity');
-            pauseAFButton.setAttribute('id', 'pause-af');
-            pauseAFButton.setAttribute('class', 'clickable');
-            pauseAFButton.setAttribute('geometry', {
-                primitive: 'plane',
-                width: 0.12,
-                height: 0.12
-            });
-            pauseAFButton.setAttribute('material', {
-                opacity: 0.001,
-                transparent: true
-            });
-            pauseAFButton.setAttribute('position', {
-                x: buttonSpacing,
-                y: buttonY,
-                z: 0.002
-            });
-            pauseAFButton.setAttribute('parent', videoContainer);
-            
-            // Обработчики для Pause кнопки
-            pauseAFButton.addEventListener('mouseenter', function() {
-                if (pauseButton) {
-                    pauseButton.children[0].material.opacity = 1;
-                }
-            });
-            
-            pauseAFButton.addEventListener('mouseleave', function() {
-                if (pauseButton) {
-                    pauseButton.children[0].material.opacity = 0.8;
-                }
-            });
-            
-            pauseAFButton.addEventListener('fusing', function(e) {
-                const progress = e.detail.progress;
-                console.log('Pause button fusing:', progress);
-                
-                // Визуальная обратная связь при заполнении
-                if (pauseButton) {
-                    const intensity = 0.8 + (progress * 0.2);
-                    pauseButton.children[0].material.opacity = intensity;
-                }
-                
-                if (progress === 1) {
-                    executeButtonAction('pause');
-                }
-            });
-            
-            pauseAFButton.addEventListener('click', function() {
-                executeButtonAction('pause');
-            });
-            
-            // Добавляем кнопки в сцену
-            scene.appendChild(playAFButton);
-            scene.appendChild(pauseAFButton);
+            scene.appendChild(playBtn);
+            scene.appendChild(pauseBtn);
         }
-        
-        // Выполнение действия кнопки
+
         function executeButtonAction(action) {
-            console.log('Button activated:', action);
-            
             switch(action) {
                 case 'play':
-                    if (videoEl) {
-                        videoEl.play();
-                        // Визуальная обратная связь
-                        if (playButton) {
-                            playButton.children[0].material.color.setHex(0x2E7D32);
-                            setTimeout(() => {
-                                if (playButton) {
-                                    playButton.children[0].material.color.setHex(0x4CAF50);
-                                    playButton.children[0].material.opacity = 0.8;
-                                }
-                            }, 300);
-                        }
-                    }
+                    if(videoEl) videoEl.play();
+                    if(playButton){ const mat = playButton.children[0].material; mat.color.setHex(0x2E7D32); setTimeout(()=>{mat.color.setHex(0x4CAF50);},300); }
                     break;
-                    
                 case 'pause':
-                    if (videoEl) {
-                        videoEl.pause();
-                        // Визуальная обратная связь
-                        if (pauseButton) {
-                            pauseButton.children[0].material.color.setHex(0xEF6C00);
-                            setTimeout(() => {
-                                if (pauseButton) {
-                                    pauseButton.children[0].material.color.setHex(0xFF9800);
-                                    pauseButton.children[0].material.opacity = 0.8;
-                                }
-                            }, 300);
-                        }
-                    }
+                    if(videoEl) videoEl.pause();
+                    if(pauseButton){ const mat = pauseButton.children[0].material; mat.color.setHex(0xEF6C00); setTimeout(()=>{mat.color.setHex(0xFF9800);},300); }
                     break;
             }
         }
-        
-        // Обновление raycaster для обнаружения кнопок
-        function refreshRaycaster() {
+
+        scene.addEventListener('object3dset', () => {
             const cursor = document.getElementById('main-cursor');
-            if (cursor && cursor.components.raycaster) {
-                // Настраиваем raycaster
-                const raycaster = cursor.components.raycaster;
-                raycaster.far = 5;
-                raycaster.objects = '.clickable';
-                
-                // Обновляем список объектов
-                setTimeout(() => {
-                    raycaster.refreshObjects();
-                    console.log('Raycaster refreshed');
-                }, 50);
-            }
-        }
-        
-        // Настраиваем начальный raycaster
-        scene.addEventListener('loaded', function() {
-            setTimeout(refreshRaycaster, 500);
+            if(cursor && cursor.components.raycaster) setTimeout(()=>{cursor.components.raycaster.refreshObjects();},100);
         });
-        
-        // Обновляем raycaster при изменении сцены
-        scene.addEventListener('object3dset', function() {
-            setTimeout(refreshRaycaster, 100);
-        });
-        
-        // Освобождаем ресурсы
+
         window.addEventListener('beforeunload', () => {
-            if (videoEl && videoEl.src) {
-                URL.revokeObjectURL(videoEl.src);
-            }
+            if(videoEl && videoEl.src) URL.revokeObjectURL(videoEl.src);
         });
     </script>
 </body>
