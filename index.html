@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>AR Видео с Gaze 3с</title>
+  <title>AR Видео с Gaze и прогрессом</title>
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
   <style>
@@ -22,7 +22,7 @@
     }
     #gaze-circle {
       position: fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-      width: 30px; height: 30px; border: 2px solid white; border-radius: 50%;
+      width: 25px; height: 25px; border: 2px solid white; border-radius: 50%;
       z-index:100; pointer-events: none;
     }
     #gaze-fill {
@@ -71,7 +71,7 @@ function createButton(text, color){
   const canvas = document.createElement('canvas');
   canvas.width = 256; canvas.height = 128;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = `#${color.toString(16).padStart(6,'0')}`;
+  ctx.fillStyle = color;
   ctx.fillRect(0,0,canvas.width,canvas.height);
   ctx.font = '48px Arial';
   ctx.fillStyle = 'black';
@@ -86,10 +86,10 @@ function createButton(text, color){
   return mesh;
 }
 
-const playBtn = createButton('Play',0x00ff00);
-const pauseBtn = createButton('Pause',0xffff00);
-const plus5Btn = createButton('+5',0x00ffff);
-const minus5Btn = createButton('-5',0xff00ff);
+const playBtn = createButton('Play','#00ff00');
+const pauseBtn = createButton('Pause','#ffff00');
+const plus5Btn = createButton('+5','#00ffff');
+const minus5Btn = createButton('-5','#ff00ff');
 
 const spacing = 0.5;
 playBtn.position.set(-1.5*spacing, -0.8, 0);
@@ -152,7 +152,7 @@ function showVideo(){
   }
 }
 
-// --------------------- Billboard ---------------------
+// --------------------- Billboard и обновление времени ---------------------
 scene.addEventListener('render-target-loaded', ()=>{
   scene.addEventListener('tick', ()=>{
     if(videoMesh && videoMesh.visible){
@@ -166,7 +166,7 @@ scene.addEventListener('render-target-loaded', ()=>{
   });
 });
 
-// --------------------- Масштабирование через ползунок ---------------------
+// --------------------- Масштабирование ---------------------
 sizeSlider.addEventListener('input', ()=>{
   if(videoMesh && btnGroup){
     const scale = parseFloat(sizeSlider.value);
@@ -175,33 +175,9 @@ sizeSlider.addEventListener('input', ()=>{
   }
 });
 
-// --------------------- Gaze-контроль ---------------------
-let gazeTimer = null;
-let gazeDuration = 3000; // 3 секунды
+// --------------------- Gaze 3 секунды ---------------------
 let activeBtn = null;
-
-function startGazeButton(btn){
-  let startTime = performance.now();
-  activeBtn = btn;
-  function tick(time){
-    if(activeBtn !== btn) { gazeFill.style.transform='scaleY(0)'; return; }
-    const progress = (time-startTime)/gazeDuration;
-    gazeFill.style.transform = `scaleY(${Math.min(progress,1)})`;
-    if(progress>=1){
-      executeButton(btn);
-      gazeFill.style.transform='scaleY(0)';
-      activeBtn = null;
-    } else {
-      requestAnimationFrame(tick);
-    }
-  }
-  requestAnimationFrame(tick);
-}
-
-function stopGazeButton(){
-  gazeFill.style.transform='scaleY(0)';
-  activeBtn = null;
-}
+let gazeStartTime = 0;
 
 function executeButton(btn){
   if(!videoEl) return;
@@ -213,24 +189,37 @@ function executeButton(btn){
   }
 }
 
-// --------------------- Show кнопка ---------------------
-showBtnHTML.addEventListener('mouseenter', ()=>startGaze(showVideo));
-showBtnHTML.addEventListener('mouseleave', stopGazeButton);
-showBtnHTML.addEventListener('click', showVideo);
-
-// --------------------- Проверка наведения на кнопки ---------------------
 scene.addEventListener('tick', ()=>{
-  if(!btnGroup.visible) return;
+  if(!btnGroup.visible || !videoEl) return;
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2(0,0); // центр экрана
   raycaster.setFromCamera(mouse, scene.camera);
   const intersects = raycaster.intersectObjects([playBtn,pauseBtn,plus5Btn,minus5Btn]);
+
   if(intersects.length>0){
-    if(activeBtn !== intersects[0].object){
-      startGazeButton(intersects[0].object);
+    const btn = intersects[0].object;
+    if(activeBtn !== btn){
+      activeBtn = btn;
+      gazeStartTime = performance.now();
+    } else {
+      const progress = (performance.now() - gazeStartTime)/3000;
+      gazeFill.style.transform = `scaleY(${Math.min(progress,1)})`;
+      if(progress>=1){
+        executeButton(btn);
+        gazeFill.style.transform = 'scaleY(0)';
+        activeBtn = null;
+      }
     }
-  } else stopGazeButton();
+  } else {
+    activeBtn = null;
+    gazeFill.style.transform='scaleY(0)';
+  }
 });
+
+// --------------------- Show кнопка ---------------------
+showBtnHTML.addEventListener('mouseenter', ()=>{ gazeStartTime = performance.now(); });
+showBtnHTML.addEventListener('mouseleave', ()=>{ gazeFill.style.transform='scaleY(0)'; });
+showBtnHTML.addEventListener('click', showVideo);
 </script>
 </body>
 </html>
