@@ -3,8 +3,10 @@
 <head>
 <meta charset="utf-8">
 <title>AR Video WORKING</title>
+
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+
 <style>
 body { margin:0; overflow:hidden; }
 #videoTime {
@@ -61,20 +63,16 @@ video { display:none; }
   <!-- Кнопки -->
   <a-entity id="buttons" position="0 -1.2 -2" visible="false">
     <a-plane class="clickable" color="#00ff00" position="-0.9 0 0" width="0.5" height="0.25"
-      text="value: Play; align:center; width:0.45; color:#000"
-      play-btn></a-plane>
+      text="value: Play; align:center; width:0.45; color:#000" play-btn></a-plane>
 
     <a-plane class="clickable" color="#ffff00" position="-0.3 0 0" width="0.5" height="0.25"
-      text="value: Pause; align:center; width:0.45; color:#000"
-      pause-btn></a-plane>
+      text="value: Pause; align:center; width:0.45; color:#000" pause-btn></a-plane>
 
     <a-plane class="clickable" color="#00ffff" position="0.3 0 0" width="0.5" height="0.25"
-      text="value: +5; align:center; width:0.45; color:#000"
-      plus-btn></a-plane>
+      text="value: +5; align:center; width:0.45; color:#000" plus-btn></a-plane>
 
     <a-plane class="clickable" color="#ff00ff" position="0.9 0 0" width="0.5" height="0.25"
-      text="value: -5; align:center; width:0.45; color:#000"
-      minus-btn></a-plane>
+      text="value: -5; align:center; width:0.45; color:#000" minus-btn></a-plane>
   </a-entity>
 
 </a-scene>
@@ -99,26 +97,18 @@ fileInput.onchange = e => {
   buttons.setAttribute('visible', true);
 };
 
-// Таймер видео
+// Таймер
 setInterval(() => {
   if (!videoEl) return;
-  const formatTime = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
-  timeEl.textContent = `${formatTime(videoEl.currentTime)} / ${isNaN(videoEl.duration) ? '00:00' : formatTime(videoEl.duration)}`;
+  const f = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
+  timeEl.textContent = `${f(videoEl.currentTime)} / ${isNaN(videoEl.duration) ? '00:00' : f(videoEl.duration)}`;
 }, 300);
 
 // Fuse-кнопки
-AFRAME.registerComponent('play-btn', {
-  init() { this.el.addEventListener('fuse', () => videoEl.play()); }
-});
-AFRAME.registerComponent('pause-btn', {
-  init() { this.el.addEventListener('fuse', () => videoEl.pause()); }
-});
-AFRAME.registerComponent('plus-btn', {
-  init() { this.el.addEventListener('fuse', () => videoEl.currentTime += 5); }
-});
-AFRAME.registerComponent('minus-btn', {
-  init() { this.el.addEventListener('fuse', () => videoEl.currentTime -= 5); }
-});
+AFRAME.registerComponent('play-btn', { init() { this.el.addEventListener('fuse', () => videoEl.play()); } });
+AFRAME.registerComponent('pause-btn', { init() { this.el.addEventListener('fuse', () => videoEl.pause()); } });
+AFRAME.registerComponent('plus-btn', { init() { this.el.addEventListener('fuse', () => videoEl.currentTime += 5); } });
+AFRAME.registerComponent('minus-btn', { init() { this.el.addEventListener('fuse', () => videoEl.currentTime -= 5); } });
 </script>
 
 </body>
