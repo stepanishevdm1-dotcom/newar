@@ -5,11 +5,21 @@
 <title>Fake AR Video</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-  body, html { margin: 0; padding: 0; overflow: hidden; background: black; }
-  video#cam { position: absolute; top:0; left:0; width:100%; height:100%; object-fit: cover; }
-  video#videoLayer { position: absolute; top: 50%; left:50%; width: 200px; transform: translate(-50%, -50%); touch-action: none; }
-  #ui { position: fixed; bottom: 10px; left:50%; transform: translateX(-50%); z-index: 10; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 10px; color: white; }
-  input { font-size: 16px; }
+  body, html { margin:0; padding:0; overflow:hidden; background:black; }
+  video#cam { position:absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; }
+  video#videoLayer {
+    position:absolute;
+    top:50%; left:50%;
+    width:200px; height:auto;
+    transform: translate(-50%,-50%) scale(1);
+    touch-action: none;
+    display:block;
+    z-index:10;
+  }
+  #ui { position:fixed; bottom:10px; left:50%; transform:translateX(-50%);
+       z-index:20; background: rgba(0,0,0,0.6); padding:10px; border-radius:10px;
+       color:white; }
+  input { font-size:16px; }
 </style>
 </head>
 <body>
@@ -19,15 +29,15 @@
 </div>
 
 <video id="cam" autoplay muted playsinline></video>
-<video id="videoLayer" loop playsinline webkit-playsinline></video>
+<video id="videoLayer" loop muted playsinline webkit-playsinline></video>
 
 <script>
 const cam = document.getElementById('cam');
 const videoLayer = document.getElementById('videoLayer');
 const input = document.getElementById('videoInput');
 
-// Запуск камеры
-navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+// Камера
+navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}, audio:false})
 .then(stream => { cam.srcObject = stream; })
 .catch(e => alert('Не удалось включить камеру: ' + e));
 
@@ -37,39 +47,40 @@ input.addEventListener('change', e => {
   if (!file) return;
   const url = URL.createObjectURL(file);
   videoLayer.src = url;
-  videoLayer.play();
+  videoLayer.muted = false; // звук включаем
+  videoLayer.play().catch(err => console.log('Ошибка воспроизведения:', err));
 });
 
-// Перетаскивание пальцем
-let posX = 0, posY = 0, startX = 0, startY = 0;
-let scale = 1;
+// Перетаскивание и масштаб
+let posX=0, posY=0, startX=0, startY=0, scale=1;
+let startDistance=null;
 
-videoLayer.addEventListener('touchstart', e => {
-  if (e.touches.length === 1) {
+videoLayer.addEventListener('touchstart', e=>{
+  if(e.touches.length===1){
     startX = e.touches[0].clientX - posX;
     startY = e.touches[0].clientY - posY;
-  }
-}, { passive: false });
-
-videoLayer.addEventListener('touchmove', e => {
-  e.preventDefault();
-  if (e.touches.length === 1) {
-    posX = e.touches[0].clientX - startX;
-    posY = e.touches[0].clientY - startY;
-    videoLayer.style.transform = `translate(calc(-50% + ${posX}px), calc(-50% + ${posY}px)) scale(${scale})`;
-  } else if (e.touches.length === 2) {
-    // pinch масштаб
+  } else if(e.touches.length===2){
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
-    const distance = Math.hypot(dx, dy);
-    if (!videoLayer.startDistance) videoLayer.startDistance = distance;
-    scale = (distance / videoLayer.startDistance);
-    videoLayer.style.transform = `translate(calc(-50% + ${posX}px), calc(-50% + ${posY}px)) scale(${scale})`;
+    startDistance = Math.hypot(dx,dy)/scale;
   }
-}, { passive: false });
+}, {passive:false});
 
-videoLayer.addEventListener('touchend', e => {
-  if (e.touches.length < 2) videoLayer.startDistance = null;
+videoLayer.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  if(e.touches.length===1){
+    posX = e.touches[0].clientX - startX;
+    posY = e.touches[0].clientY - startY;
+  } else if(e.touches.length===2 && startDistance){
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    scale = Math.hypot(dx,dy)/startDistance;
+  }
+  videoLayer.style.transform = `translate(calc(-50% + ${posX}px), calc(-50% + ${posY}px)) scale(${scale})`;
+}, {passive:false});
+
+videoLayer.addEventListener('touchend', e=>{
+  if(e.touches.length < 2) startDistance=null;
 });
 </script>
 
