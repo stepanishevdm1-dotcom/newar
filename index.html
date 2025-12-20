@@ -1,32 +1,27 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AR Video</title>
+<meta charset="utf-8">
+<title>WebXR AR Video</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/ar.js@3.4.5/aframe/build/aframe-ar.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/aframe-gesture-detector@4.0.5/dist/aframe-gesture-detector.min.js"></script>
 
 <style>
-body {
-  margin: 0;
-  overflow: hidden;
-  font-family: sans-serif;
-}
+body { margin: 0; overflow: hidden; background: black; }
 #ui {
   position: fixed;
   bottom: 10px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 10;
-  background: rgba(0,0,0,0.6);
+  background: rgba(0,0,0,.6);
   padding: 10px;
   border-radius: 10px;
 }
 button, input {
   font-size: 16px;
+  color: white;
 }
 </style>
 </head>
@@ -34,52 +29,76 @@ button, input {
 <body>
 
 <div id="ui">
-  <input type="file" accept="video/*" id="videoInput">
+  <input type="file" id="videoInput" accept="video/*"><br><br>
+  <button id="startAR">START AR</button>
 </div>
 
 <a-scene
-  embedded
-  arjs="sourceType: webcam; debugUIEnabled: false;"
+  renderer="colorManagement: true"
   vr-mode-ui="enabled: false"
-  gesture-detector
-  renderer="logarithmicDepthBuffer: true;"
->
+  embedded>
 
-<a-assets>
-  <video id="video" loop crossorigin="anonymous" playsinline webkit-playsinline></video>
-</a-assets>
+  <a-assets>
+    <video id="video" loop playsinline webkit-playsinline crossorigin="anonymous"></video>
+  </a-assets>
 
-<a-entity camera></a-entity>
+  <a-camera position="0 1.6 0"></a-camera>
 
-<a-entity
-  id="videoPlane"
-  visible="false"
-  geometry="primitive: plane; height: 1; width: 1.6"
-  material="shader: flat; src: #video"
-  position="0 0 -2"
-  rotation="0 0 0"
-  gesture-handler
-></a-entity>
+  <a-entity
+    id="screen"
+    geometry="primitive: plane; width: 1.6; height: 0.9"
+    material="shader: flat; src: #video"
+    position="0 1.5 -2"
+    visible="false">
+  </a-entity>
 
 </a-scene>
 
 <script>
 const input = document.getElementById("videoInput");
 const video = document.getElementById("video");
-const plane = document.getElementById("videoPlane");
+const screen = document.getElementById("screen");
+const startBtn = document.getElementById("startAR");
+const scene = document.querySelector("a-scene");
 
-input.addEventListener("change", () => {
+let videoReady = false;
+
+input.onchange = () => {
   const file = input.files[0];
   if (!file) return;
 
-  const url = URL.createObjectURL(file);
-  video.src = url;
+  video.src = URL.createObjectURL(file);
   video.muted = false;
   video.play();
+  videoReady = true;
+};
 
-  plane.setAttribute("visible", true);
-});
+startBtn.onclick = async () => {
+  if (!videoReady) {
+    alert("Сначала выбери видео");
+    return;
+  }
+
+  if (!navigator.xr) {
+    alert("WebXR не поддерживается");
+    return;
+  }
+
+  try {
+    await scene.renderer.xr.setSession(
+      await navigator.xr.requestSession("immersive-ar", {
+        requiredFeatures: ["local-floor"]
+      })
+    );
+
+    screen.setAttribute("visible", true);
+  } catch (e) {
+    alert("Ошибка запуска AR");
+    console.error(e);
+  }
+};
 </script>
 
 </body>
 </html>
+
