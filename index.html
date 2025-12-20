@@ -156,6 +156,8 @@
         let playButton, pauseButton, volumeButton;
         let videoWidth = 1.2;
         let videoHeight = 0.8;
+        let isTimeUpdating = false;
+        let updateTimeInterval = null;
 
         // Загрузка видео
         fileInput.addEventListener('change', async e => {
@@ -167,6 +169,7 @@
             try {
                 if(videoEl && videoEl.src) {
                     URL.revokeObjectURL(videoEl.src);
+                    stopTimeUpdate();
                 }
                 
                 const url = URL.createObjectURL(file);
@@ -203,14 +206,25 @@
             }
         });
 
-        // Таймер видео
-        function updateVideoTime() {
-            if(!videoEl || !videoEl.duration || videoEl.paused) return;
+        // Обновление времени видео (исправленный)
+        function startTimeUpdate() {
+            if (updateTimeInterval) {
+                clearInterval(updateTimeInterval);
+            }
             
-            const f = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
-            timeEl.textContent = `${f(videoEl.currentTime)} / ${f(videoEl.duration)}`;
-            
-            requestAnimationFrame(updateVideoTime);
+            updateTimeInterval = setInterval(() => {
+                if(videoEl && videoEl.duration) {
+                    const f = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
+                    timeEl.textContent = `${f(videoEl.currentTime)} / ${f(videoEl.duration)}`;
+                }
+            }, 300);
+        }
+
+        function stopTimeUpdate() {
+            if (updateTimeInterval) {
+                clearInterval(updateTimeInterval);
+                updateTimeInterval = null;
+            }
         }
 
         // Размещение видео
@@ -221,7 +235,7 @@
             }
             
             const camera = scene.camera;
-            const distance = isPlaced ? 1.2 : 1.5; // Ближе при повторном размещении
+            const distance = isPlaced ? 1.2 : 1.5;
             
             // Если видео уже размещено, просто обновляем позицию
             if (!videoContainer) {
@@ -248,7 +262,9 @@
             );
             
             videoContainer.position.copy(pos);
-            videoContainer.lookAt(camera.position);
+            
+            // Фиксируем вращение, чтобы видео всегда смотрело на камеру
+            videoContainer.rotation.set(0, 0, 0);
             
             // Сохраняем текущий масштаб при перемещении
             videoContainer.scale.set(currentScale, currentScale, currentScale);
@@ -257,28 +273,28 @@
                 videoEl.muted = false;
                 videoEl.play().catch(e => console.log('Play error:', e));
                 firstInteraction = false;
-                updateVideoTime();
+                startTimeUpdate();
             }
             
             isPlaced = true;
             placeBtn.textContent = '📌 Переместить видео';
         });
 
-        // Создание стилизованных кнопок под видео
+        // Создание стилизованных кнопок под видео (увеличенных)
         function createButtons() {
             // Удаляем старые кнопки
             if (playButton) videoContainer.remove(playButton);
             if (pauseButton) videoContainer.remove(pauseButton);
             if (volumeButton) videoContainer.remove(volumeButton);
             
-            // Позиция кнопок - ближе к видео
-            const buttonY = -videoHeight/2 - 0.15;
-            const buttonSpacing = videoWidth * 0.25;
+            // Позиция кнопок - ближе к видео и увеличенные
+            const buttonY = -videoHeight/2 - 0.2; // Чуть ниже
+            const buttonSpacing = videoWidth * 0.3; // Больше расстояние для больших кнопок
             
-            // Создаем кнопки с новым дизайном
-            playButton = createModernButton('play-btn', -buttonSpacing, buttonY, 0.001, '#2ecc71', '▶', 'play');
-            pauseButton = createModernButton('pause-btn', 0, buttonY, 0.001, '#e74c3c', '⏸', 'pause');
-            volumeButton = createModernButton('volume-btn', buttonSpacing, buttonY, 0.001, '#3498db', '🔊', 'toggleVolume');
+            // Создаем УВЕЛИЧЕННЫЕ кнопки с новым дизайном
+            playButton = createModernButton('play-btn', -buttonSpacing, buttonY, 0.001, '#2ecc71', '▶', 'play', 0.07);
+            pauseButton = createModernButton('pause-btn', 0, buttonY, 0.001, '#e74c3c', '⏸', 'pause', 0.07);
+            volumeButton = createModernButton('volume-btn', buttonSpacing, buttonY, 0.001, '#3498db', '🔊', 'toggleVolume', 0.07);
             
             videoContainer.add(playButton);
             videoContainer.add(pauseButton);
@@ -287,7 +303,7 @@
             createAFrameButtons();
         }
 
-        function createModernButton(id, x, y, z, color, icon, action) {
+        function createModernButton(id, x, y, z, color, icon, action, size = 0.06) {
             const buttonGroup = new THREE.Group();
             buttonGroup.userData = { 
                 id: id, 
@@ -296,8 +312,8 @@
                 isHovered: false
             };
             
-            // Основная круглая кнопка
-            const buttonGeometry = new THREE.CylinderGeometry(0.04, 0.04, 0.01, 32);
+            // Основная круглая кнопка (УВЕЛИЧЕНА)
+            const buttonGeometry = new THREE.CylinderGeometry(size, size, 0.015, 32);
             const buttonMaterial = new THREE.MeshPhongMaterial({ 
                 color: color,
                 transparent: true,
@@ -309,8 +325,8 @@
             const buttonMesh = new THREE.Mesh(buttonGeometry, buttonMaterial);
             buttonMesh.rotation.x = Math.PI / 2;
             
-            // Иконка на кнопке
-            const iconCanvas = createButtonIcon(icon);
+            // Иконка на кнопке (УВЕЛИЧЕНА)
+            const iconCanvas = createButtonIcon(icon, size * 100);
             const iconTexture = new THREE.CanvasTexture(iconCanvas);
             const iconMaterial = new THREE.MeshBasicMaterial({
                 map: iconTexture,
@@ -319,12 +335,12 @@
                 alphaTest: 0.5
             });
             
-            const iconGeometry = new THREE.PlaneGeometry(0.05, 0.05);
+            const iconGeometry = new THREE.PlaneGeometry(size * 1.5, size * 1.5);
             const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-            iconMesh.position.z = 0.006;
+            iconMesh.position.z = 0.008; // Чуть выше
             
-            // Свечение при наведении
-            const glowGeometry = new THREE.CylinderGeometry(0.045, 0.045, 0.011, 32);
+            // Свечение при наведении (УВЕЛИЧЕНО)
+            const glowGeometry = new THREE.CylinderGeometry(size * 1.1, size * 1.1, 0.016, 32);
             const glowMaterial = new THREE.MeshBasicMaterial({
                 color: color,
                 transparent: true,
@@ -346,8 +362,8 @@
                 glowMesh.visible = isHovering;
                 
                 if (isHovering) {
-                    buttonMesh.scale.set(1.1, 1.1, 1.1);
-                    buttonMaterial.emissive.setHex(0x333333);
+                    buttonMesh.scale.set(1.15, 1.15, 1.15);
+                    buttonMaterial.emissive.setHex(0x444444);
                 } else {
                     buttonMesh.scale.set(1, 1, 1);
                     buttonMaterial.emissive.setHex(0x000000);
@@ -357,26 +373,31 @@
             return buttonGroup;
         }
 
-        function createButtonIcon(icon) {
+        function createButtonIcon(icon, size = 70) {
             const canvas = document.createElement('canvas');
             const context = canvas.getContext('2d');
-            canvas.width = 128;
-            canvas.height = 128;
+            canvas.width = 256;
+            canvas.height = 256;
             
             context.clearRect(0, 0, canvas.width, canvas.height);
             
             // Фон иконки
             context.beginPath();
-            context.arc(64, 64, 50, 0, Math.PI * 2);
+            context.arc(128, 128, 100, 0, Math.PI * 2);
             context.fillStyle = 'rgba(255, 255, 255, 0.2)';
             context.fill();
             
-            // Иконка
-            context.font = 'bold 60px Arial';
+            // Иконка (увеличенная)
+            context.font = `bold ${size}px Arial`;
             context.fillStyle = '#FFFFFF';
             context.textAlign = 'center';
             context.textBaseline = 'middle';
-            context.fillText(icon, 64, 64);
+            context.fillText(icon, 128, 128);
+            
+            // Контур иконки для лучшей видимости
+            context.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+            context.lineWidth = 4;
+            context.strokeText(icon, 128, 128);
             
             return canvas;
         }
@@ -384,16 +405,18 @@
         function createAFrameButtons() {
             // Удаляем старые A-Frame кнопки
             const oldButtons = scene.querySelectorAll('[cursor-listener]');
-            oldButtons.forEach(btn => btn.parentNode.removeChild(btn));
+            oldButtons.forEach(btn => {
+                if (btn.parentNode) btn.parentNode.removeChild(btn);
+            });
             
-            const buttonY = -videoHeight/2 - 0.15;
-            const buttonSpacing = videoWidth * 0.25;
+            const buttonY = -videoHeight/2 - 0.2;
+            const buttonSpacing = videoWidth * 0.3;
             
-            // Play button
+            // Play button (УВЕЛИЧЕНА)
             const playBtn = document.createElement('a-entity');
             playBtn.classList.add('clickable');
             playBtn.setAttribute('id', 'a-play-btn');
-            playBtn.setAttribute('geometry', { primitive: 'plane', width: 0.1, height: 0.1 });
+            playBtn.setAttribute('geometry', { primitive: 'plane', width: 0.14, height: 0.14 }); // Увеличен размер
             playBtn.setAttribute('material', { opacity: 0.001, transparent: true });
             playBtn.setAttribute('position', { x: -buttonSpacing, y: buttonY, z: 0.002 });
             
@@ -404,12 +427,15 @@
                 if(playButton) playButton.userData.setHover(false);
             });
             playBtn.addEventListener('click', () => executeButtonAction('play'));
+            playBtn.addEventListener('fusing', (e) => {
+                if(e.detail.progress === 1) executeButtonAction('play');
+            });
             
-            // Pause button
+            // Pause button (УВЕЛИЧЕНА)
             const pauseBtn = document.createElement('a-entity');
             pauseBtn.classList.add('clickable');
             pauseBtn.setAttribute('id', 'a-pause-btn');
-            pauseBtn.setAttribute('geometry', { primitive: 'plane', width: 0.1, height: 0.1 });
+            pauseBtn.setAttribute('geometry', { primitive: 'plane', width: 0.14, height: 0.14 }); // Увеличен размер
             pauseBtn.setAttribute('material', { opacity: 0.001, transparent: true });
             pauseBtn.setAttribute('position', { x: 0, y: buttonY, z: 0.002 });
             
@@ -420,12 +446,15 @@
                 if(pauseButton) pauseButton.userData.setHover(false);
             });
             pauseBtn.addEventListener('click', () => executeButtonAction('pause'));
+            pauseBtn.addEventListener('fusing', (e) => {
+                if(e.detail.progress === 1) executeButtonAction('pause');
+            });
             
-            // Volume button
+            // Volume button (УВЕЛИЧЕНА)
             const volumeBtn = document.createElement('a-entity');
             volumeBtn.classList.add('clickable');
             volumeBtn.setAttribute('id', 'a-volume-btn');
-            volumeBtn.setAttribute('geometry', { primitive: 'plane', width: 0.1, height: 0.1 });
+            volumeBtn.setAttribute('geometry', { primitive: 'plane', width: 0.14, height: 0.14 }); // Увеличен размер
             volumeBtn.setAttribute('material', { opacity: 0.001, transparent: true });
             volumeBtn.setAttribute('position', { x: buttonSpacing, y: buttonY, z: 0.002 });
             
@@ -436,21 +465,31 @@
                 if(volumeButton) volumeButton.userData.setHover(false);
             });
             volumeBtn.addEventListener('click', () => executeButtonAction('toggleVolume'));
-            
-            // Добавляем кнопки в сцену и привязываем к контейнеру
-            [playBtn, pauseBtn, volumeBtn].forEach(btn => {
-                scene.appendChild(btn);
-                if (videoContainer) {
-                    btn.object3D.parent = videoContainer;
-                }
+            volumeBtn.addEventListener('fusing', (e) => {
+                if(e.detail.progress === 1) executeButtonAction('toggleVolume');
             });
+            
+            // Добавляем кнопки в сцену
+            scene.appendChild(playBtn);
+            scene.appendChild(pauseBtn);
+            scene.appendChild(volumeBtn);
+            
+            // Привязываем к контейнеру видео
+            if (videoContainer) {
+                playBtn.object3D.parent = videoContainer;
+                pauseBtn.object3D.parent = videoContainer;
+                volumeBtn.object3D.parent = videoContainer;
+            }
         }
 
         function executeButtonAction(action) {
             switch(action) {
                 case 'play':
                     if(videoEl) {
-                        videoEl.play();
+                        videoEl.play().then(() => {
+                            startTimeUpdate(); // Запускаем таймер при начале воспроизведения
+                        }).catch(e => console.log('Play error:', e));
+                        
                         // Визуальная обратная связь
                         if(playButton) {
                             playButton.children[1].material.emissive.setHex(0x666666);
@@ -464,6 +503,8 @@
                 case 'pause':
                     if(videoEl) {
                         videoEl.pause();
+                        // НЕ останавливаем таймер - он будет продолжать обновлять время
+                        
                         // Визуальная обратная связь
                         if(pauseButton) {
                             pauseButton.children[1].material.emissive.setHex(0x666666);
@@ -480,7 +521,7 @@
                         // Визуальная обратная связь
                         if(volumeButton) {
                             const iconMesh = volumeButton.children[2];
-                            const canvas = createButtonIcon(videoEl.muted ? '🔇' : '🔊');
+                            const canvas = createButtonIcon(videoEl.muted ? '🔇' : '🔊', 70);
                             iconMesh.material.map = new THREE.CanvasTexture(canvas);
                             iconMesh.material.needsUpdate = true;
                             
@@ -492,6 +533,27 @@
                     }
                     break;
             }
+        }
+
+        // Обновление позиции кнопок при изменении размера видео
+        function updateButtonPositions() {
+            if (!videoContainer) return;
+            
+            const buttonY = -videoHeight/2 - 0.2;
+            const buttonSpacing = videoWidth * 0.3;
+            
+            if (playButton) playButton.position.set(-buttonSpacing, buttonY, 0.001);
+            if (pauseButton) pauseButton.position.set(0, buttonY, 0.001);
+            if (volumeButton) volumeButton.position.set(buttonSpacing, buttonY, 0.001);
+            
+            // Обновляем A-Frame кнопки
+            const playBtn = document.getElementById('a-play-btn');
+            const pauseBtn = document.getElementById('a-pause-btn');
+            const volumeBtn = document.getElementById('a-volume-btn');
+            
+            if (playBtn) playBtn.setAttribute('position', { x: -buttonSpacing, y: buttonY, z: 0.002 });
+            if (pauseBtn) pauseBtn.setAttribute('position', { x: 0, y: buttonY, z: 0.002 });
+            if (volumeBtn) volumeBtn.setAttribute('position', { x: buttonSpacing, y: buttonY, z: 0.002 });
         }
 
         // Масштабирование пальцами
@@ -518,6 +580,9 @@
                 const newScale = Math.max(0.1, Math.min(5, startScale * scaleFactor));
                 videoContainer.scale.set(newScale, newScale, newScale);
                 currentScale = newScale;
+                
+                // Обновляем позиции кнопок при масштабировании
+                updateButtonPositions();
             }
         });
         
@@ -549,29 +614,31 @@
             isRotating = false;
         });
 
-        // Очистка ресурсов при закрытии
-        window.addEventListener('beforeunload', () => {
-            if(videoEl && videoEl.src) {
-                URL.revokeObjectURL(videoEl.src);
-            }
-        });
-
         // Управление с клавиатуры для тестирования
         window.addEventListener('keydown', (e) => {
             if(!videoContainer) return;
             
             switch(e.key) {
                 case ' ':
-                    if(videoEl) videoEl.paused ? videoEl.play() : videoEl.pause();
+                    if(videoEl) {
+                        if (videoEl.paused) {
+                            videoEl.play();
+                            startTimeUpdate();
+                        } else {
+                            videoEl.pause();
+                        }
+                    }
                     break;
                 case '+':
                 case '=':
                     currentScale = Math.min(5, currentScale * 1.1);
                     videoContainer.scale.set(currentScale, currentScale, currentScale);
+                    updateButtonPositions();
                     break;
                 case '-':
                     currentScale = Math.max(0.1, currentScale * 0.9);
                     videoContainer.scale.set(currentScale, currentScale, currentScale);
+                    updateButtonPositions();
                     break;
                 case 'r':
                     videoContainer.rotation.y += 0.1;
@@ -579,6 +646,28 @@
                 case 'm':
                     if(videoEl) videoEl.muted = !videoEl.muted;
                     break;
+                case 'f':
+                    // Сброс положения видео
+                    videoContainer.rotation.set(0, 0, 0);
+                    break;
+            }
+        });
+
+        // Очистка ресурсов при закрытии
+        window.addEventListener('beforeunload', () => {
+            if(videoEl && videoEl.src) {
+                URL.revokeObjectURL(videoEl.src);
+            }
+            stopTimeUpdate();
+        });
+
+        // Автоматическое обновление объектов рейкастера
+        scene.addEventListener('renderstart', () => {
+            const cursor = document.getElementById('main-cursor');
+            if (cursor && cursor.components.raycaster) {
+                setTimeout(() => {
+                    cursor.components.raycaster.refreshObjects();
+                }, 100);
             }
         });
     </script>
