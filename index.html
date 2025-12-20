@@ -1,1267 +1,144 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta http-equiv="Permissions-Policy" content="camera=(), microphone=()">
-    <title>🎥 AR Видео в Комнате</title>
-    <style>
-        /* ===== СБРОС И БАЗОВЫЕ СТИЛИ ===== */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-            color: white;
-            height: 100vh;
-            overflow: hidden;
-            position: relative;
-        }
-        
-        /* ===== ЭКРАНЫ ===== */
-        .screen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            padding: 20px;
-            display: none;
-            flex-direction: column;
-            transition: opacity 0.3s;
-            overflow-y: auto;
-        }
-        
-        .screen.active {
-            display: flex;
-        }
-        
-        /* ===== ЭКРАН ЗАГРУЗКИ ===== */
-        #loadingScreen {
-            background: #0a0a1a;
-            justify-content: center;
-            align-items: center;
-            text-align: center;
-            z-index: 1000;
-        }
-        
-        .loader {
-            text-align: center;
-        }
-        
-        .spinner {
-            width: 70px;
-            height: 70px;
-            border: 5px solid rgba(255, 255, 255, 0.1);
-            border-top-color: #00dbde;
-            border-radius: 50%;
-            animation: spin 1.5s linear infinite;
-            margin: 0 auto 25px;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        .progress-bar {
-            width: 200px;
-            height: 6px;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 3px;
-            margin: 20px auto;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #00dbde, #fc00ff);
-            width: 0%;
-            transition: width 0.3s;
-        }
-        
-        /* ===== ГЛАВНЫЙ ЭКРАН ===== */
-        .menu-content {
-            max-width: 500px;
-            margin: 0 auto;
-            width: 100%;
-            padding: 20px;
-            text-align: center;
-        }
-        
-        h1 {
-            font-size: 32px;
-            margin-bottom: 15px;
-            background: linear-gradient(90deg, #00dbde, #fc00ff);
-            -webkit-background-clip: text;
-            background-clip: text;
-            color: transparent;
-            font-weight: 800;
-        }
-        
-        .subtitle {
-            color: #a0a0d0;
-            margin-bottom: 40px;
-            line-height: 1.5;
-            font-size: 16px;
-            opacity: 0.9;
-        }
-        
-        /* ===== КНОПКИ ===== */
-        .btn {
-            display: block;
-            width: 100%;
-            padding: 22px;
-            margin: 15px 0;
-            border: none;
-            border-radius: 18px;
-            font-size: 19px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .btn:active {
-            transform: scale(0.97);
-        }
-        
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-        }
-        
-        .btn-secondary {
-            background: rgba(255, 255, 255, 0.08);
-            color: white;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(20px);
-        }
-        
-        .btn-danger {
-            background: linear-gradient(135deg, #ff416c, #ff4b2b);
-            color: white;
-            box-shadow: 0 10px 30px rgba(255, 65, 108, 0.4);
-        }
-        
-        .btn-info {
-            background: linear-gradient(135deg, #00dbde, #0093e9);
-            color: white;
-        }
-        
-        .icon {
-            display: inline-block;
-            margin-right: 12px;
-            font-size: 22px;
-            vertical-align: middle;
-        }
-        
-        /* ===== ЗОНА ЗАГРУЗКИ ===== */
-        .upload-area {
-            border: 3px dashed #00dbde;
-            border-radius: 25px;
-            padding: 50px 20px;
-            text-align: center;
-            margin: 30px 0;
-            background: rgba(0, 219, 222, 0.05);
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-        
-        .upload-area.dragover {
-            background: rgba(0, 219, 222, 0.15);
-            border-color: #fc00ff;
-            transform: scale(1.02);
-        }
-        
-        .upload-icon {
-            font-size: 60px;
-            margin-bottom: 20px;
-            display: block;
-            color: #00dbde;
-        }
-        
-        .file-input {
-            display: none;
-        }
-        
-        .video-preview {
-            margin-top: 30px;
-            display: none;
-        }
-        
-        .video-preview.active {
-            display: block;
-            animation: fadeIn 0.5s;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        video {
-            width: 100%;
-            border-radius: 15px;
-            margin: 20px 0;
-            background: #000;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
-        }
-        
-        /* ===== ИНФОРМАЦИОННЫЕ БЛОКИ ===== */
-        .info-card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 20px;
-            padding: 25px;
-            margin: 15px 0;
-            border-left: 5px solid #00dbde;
-            backdrop-filter: blur(10px);
-        }
-        
-        .info-card h3 {
-            color: #00dbde;
-            margin-bottom: 12px;
-            font-size: 20px;
-        }
-        
-        .info-card p {
-            color: #b0b0e0;
-            line-height: 1.6;
-            font-size: 15px;
-        }
-        
-        /* ===== AR ЭКРАН ===== */
-        #arScreen {
-            padding: 0;
-            background: #000;
-        }
-        
-        #arCanvas {
-            width: 100%;
-            height: 100%;
-            display: block;
-        }
-        
-        .ar-controls {
-            position: absolute;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            gap: 15px;
-            background: rgba(0, 0, 0, 0.85);
-            padding: 20px 25px;
-            border-radius: 35px;
-            backdrop-filter: blur(25px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-            z-index: 100;
-        }
-        
-        .control-btn {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            border: none;
-            background: rgba(255, 255, 255, 0.12);
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        }
-        
-        .control-btn:active {
-            background: rgba(255, 255, 255, 0.25);
-            transform: scale(0.92);
-        }
-        
-        /* ===== КНОПКИ НАЗАД ===== */
-        .back-btn {
-            position: absolute;
-            top: 25px;
-            left: 25px;
-            padding: 14px 25px;
-            background: rgba(0, 0, 0, 0.7);
-            color: white;
-            border: none;
-            border-radius: 30px;
-            font-size: 17px;
-            cursor: pointer;
-            z-index: 10;
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-        }
-        
-        .back-btn:active {
-            transform: scale(0.95);
-        }
-        
-        /* ===== СООБЩЕНИЯ ===== */
-        #message {
-            position: fixed;
-            top: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.9);
-            color: white;
-            padding: 18px 30px;
-            border-radius: 15px;
-            z-index: 2000;
-            display: none;
-            text-align: center;
-            max-width: 90%;
-            backdrop-filter: blur(30px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-            font-weight: 500;
-        }
-        
-        #message.active {
-            display: block;
-            animation: slideIn 0.3s, fadeOut 3s 2.7s;
-        }
-        
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-50%) translateY(-30px); }
-            to { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
-        
-        @keyframes fadeOut {
-            to { opacity: 0; }
-        }
-        
-        /* ===== СТАТУС БАР ===== */
-        .status-bar {
-            position: absolute;
-            top: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.8);
-            padding: 12px 25px;
-            border-radius: 25px;
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(0, 219, 222, 0.3);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 15px;
-        }
-        
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #00ff00;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        
-        /* ===== МОБИЛЬНАЯ АДАПТАЦИЯ ===== */
-        @media (max-width: 768px) {
-            .screen {
-                padding: 15px;
-            }
-            
-            h1 {
-                font-size: 28px;
-            }
-            
-            .btn {
-                padding: 20px;
-                font-size: 18px;
-                margin: 12px 0;
-            }
-            
-            .ar-controls {
-                bottom: 20px;
-                padding: 15px 20px;
-                gap: 12px;
-            }
-            
-            .control-btn {
-                width: 55px;
-                height: 55px;
-                font-size: 22px;
-            }
-            
-            .back-btn {
-                top: 20px;
-                left: 20px;
-                padding: 12px 20px;
-                font-size: 16px;
-            }
-            
-            .status-bar {
-                top: 20px;
-                padding: 10px 20px;
-                font-size: 14px;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            h1 {
-                font-size: 24px;
-            }
-            
-            .btn {
-                padding: 18px;
-                font-size: 16px;
-            }
-            
-            .upload-area {
-                padding: 40px 15px;
-            }
-            
-            .upload-icon {
-                font-size: 50px;
-            }
-            
-            .ar-controls {
-                width: 95%;
-                justify-content: space-around;
-                border-radius: 25px;
-            }
-        }
-        
-        /* ===== ДОПОЛНИТЕЛЬНЫЕ ЭФФЕКТЫ ===== */
-        .glow {
-            text-shadow: 0 0 20px rgba(0, 219, 222, 0.5);
-        }
-        
-        .ripple {
-            position: absolute;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.3);
-            transform: scale(0);
-            animation: ripple 0.6s linear;
-        }
-        
-        @keyframes ripple {
-            to {
-                transform: scale(4);
-                opacity: 0;
-            }
-        }
-        
-        /* ===== ПОЛОСКА ПРОГРЕССА ГРОМКОСТИ ===== */
-        .volume-slider {
-            position: absolute;
-            right: 30px;
-            bottom: 40px;
-            width: 150px;
-            transform: rotate(-90deg);
-            background: rgba(0, 0, 0, 0.7);
-            padding: 15px;
-            border-radius: 20px;
-            backdrop-filter: blur(20px);
-            display: none;
-        }
-        
-        .volume-slider.active {
-            display: block;
-        }
-        
-        input[type="range"] {
-            width: 100%;
-            height: 8px;
-            -webkit-appearance: none;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-            outline: none;
-        }
-        
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: #00dbde;
-            cursor: pointer;
-            box-shadow: 0 0 15px rgba(0, 219, 222, 0.8);
-        }
-    </style>
+<meta charset="UTF-8">
+<title>WebXR AR Video</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  body, html { margin:0; padding:0; overflow:hidden; }
+  #fileInput {
+    position: fixed; top: 10px; left: 50%; transform: translateX(-50%);
+    z-index: 10; background: rgba(0,0,0,0.5); color: white;
+    padding: 5px 10px; border-radius: 5px;
+  }
+  #startBtn {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    z-index: 10; padding: 10px 20px; font-size:16px;
+  }
+</style>
 </head>
 <body>
-    <!-- ===== ЭКРАН ЗАГРУЗКИ ===== -->
-    <div id="loadingScreen" class="screen active">
-        <div class="loader">
-            <div class="spinner"></div>
-            <h1 class="glow">AR Видео Комната</h1>
-            <p class="subtitle">Инициализация приложения...</p>
-            <div class="progress-bar">
-                <div class="progress-fill" id="loadingProgress"></div>
-            </div>
-            <p style="margin-top: 20px; color: #888; font-size: 14px;">
-                Для работы AR требуется HTTPS и разрешение камеры
-            </p>
-        </div>
-    </div>
-    
-    <!-- ===== ГЛАВНОЕ МЕНЮ ===== -->
-    <div id="mainScreen" class="screen">
-        <div class="menu-content">
-            <h1><span class="icon">🎥</span> AR Видео в Комнате</h1>
-            <p class="subtitle">Загружайте видео с телефона и размещайте его в дополненной реальности в вашей комнате. Изменяйте положение, размер и смотрите со звуком!</p>
-            
-            <button id="startAR" class="btn btn-primary">
-                <span class="icon">🚀</span> Запустить AR режим
-            </button>
-            
-            <button id="uploadVideo" class="btn btn-secondary">
-                <span class="icon">📁</span> Загрузить видео с телефона
-            </button>
-            
-            <button id="showInstructions" class="btn btn-secondary">
-                <span class="icon">❓</span> Как это работает
-            </button>
-            
-            <div class="info-card" style="margin-top: 30px;">
-                <h3><span class="icon">📱</span> Текущее видео:</h3>
-                <p id="currentVideoName">Видео не выбрано</p>
-                <p id="videoInfo" style="color: #888; font-size: 14px; margin-top: 10px;">
-                    Загрузите видео чтобы начать работу с AR
-                </p>
-            </div>
-            
-            <div class="info-card" style="background: rgba(255, 107, 107, 0.1); border-left-color: #ff6b6b;">
-                <h3><span class="icon">⚠️</span> Важно знать:</h3>
-                <p>• Используйте Chrome или Edge на Android<br>
-                   • Требуется HTTPS соединение<br>
-                   • Разрешите доступ к камере<br>
-                   • Для работы нужна плоская поверхность</p>
-            </div>
-        </div>
-    </div>
-    
-    <!-- ===== ЭКРАН ЗАГРУЗКИ ВИДЕО ===== -->
-    <div id="uploadScreen" class="screen">
-        <button class="back-btn" id="backFromUpload">
-            <span class="icon">←</span> Назад
-        </button>
-        
-        <div class="menu-content">
-            <h1><span class="icon">📁</span> Загрузка видео</h1>
-            <p class="subtitle">Выберите видео файл с вашего телефона для размещения в AR</p>
-            
-            <div class="upload-area" id="dropArea">
-                <div class="upload-icon">📹</div>
-                <h3 style="color: #00dbde; margin-bottom: 10px;">Нажмите для выбора видео</h3>
-                <p style="color: #a0a0d0; margin: 15px 0;">Или перетащите файл в эту область</p>
-                <p style="font-size: 14px; color: #7a7ac8; background: rgba(0,0,0,0.3); padding: 8px 15px; border-radius: 20px; display: inline-block;">
-                    MP4 • MOV • WebM • До 100MB
-                </p>
-            </div>
-            
-            <input type="file" id="videoInput" class="file-input" accept="video/*" capture="environment">
-            
-            <div class="video-preview" id="videoPreview">
-                <h3 style="color: #00dbde; margin-bottom: 15px;"><span class="icon">👁️</span> Предпросмотр видео:</h3>
-                <video id="previewVideo" controls playsinline></video>
-                <button id="useThisVideo" class="btn btn-primary">
-                    <span class="icon">✅</span> Использовать это видео в AR
-                </button>
-            </div>
-            
-            <div class="info-card" style="margin-top: 25px;">
-                <h3><span class="icon">💡</span> Советы:</h3>
-                <p>• Используйте горизонтальное видео для лучшего результата<br>
-                   • Оптимальная длительность: 10-60 секунд<br>
-                   • Размер файла должен быть менее 100MB<br>
-                   • Для AR лучше подходят видео с чёткими объектами</p>
-            </div>
-        </div>
-    </div>
-    
-    <!-- ===== ЭКРАН ИНСТРУКЦИЙ ===== -->
-    <div id="instructionsScreen" class="screen">
-        <button class="back-btn" id="backFromInstructions">
-            <span class="icon">←</span> Назад
-        </button>
-        
-        <div class="menu-content" style="text-align: left;">
-            <h1><span class="icon">📖</span> Подробная инструкция</h1>
-            
-            <div class="info-card">
-                <h3><span class="icon">1️⃣</span> Шаг 1: Подготовка</h3>
-                <p>• Откройте приложение на телефоне в браузере Chrome/Edge<br>
-                   • Убедитесь, что у вас есть HTTPS соединение<br>
-                   • Подготовьте видео на телефоне или снимите новое</p>
-            </div>
-            
-            <div class="info-card">
-                <h3><span class="icon">2️⃣</span> Шаг 2: Загрузка видео</h3>
-                <p>• Нажмите "Загрузить видео с телефона"<br>
-                   • Выберите видео из галереи или снимите новое<br>
-                   • Просмотрите видео в предпросмотре<br>
-                   • Нажмите "Использовать это видео"</p>
-            </div>
-            
-            <div class="info-card">
-                <h3><span class="icon">3️⃣</span> Шаг 3: Запуск AR</h3>
-                <p>• Нажмите "Запустить AR режим"<br>
-                   • Разрешите доступ к камере когда браузер запросит<br>
-                   • Наведите камеру на плоскую поверхность (пол, стол)<br>
-                   • Дождитесь появления сетки</p>
-            </div>
-            
-            <div class="info-card">
-                <h3><span class="icon">4️⃣</span> Шаг 4: Размещение видео</h3>
-                <p>• Коснитесь экрана в нужном месте для размещения видео<br>
-                   • Используйте жесты для управления:<br>
-                   &nbsp;&nbsp;• Один палец – перемещение<br>
-                   &nbsp;&nbsp;• Два пальца – масштабирование<br>
-                   &nbsp;&nbsp;• Поворот двумя пальцами – вращение<br>
-                   &nbsp;&nbsp;• Двойное касание – воспроизведение/пауза</p>
-            </div>
-            
-            <div class="info-card">
-                <h3><span class="icon">5️⃣</span> Шаг 5: Управление</h3>
-                <p>• Используйте панель управления для:<br>
-                   &nbsp;&nbsp;• Воспроизведения/паузы видео<br>
-                   &nbsp;&nbsp;• Регулировки громкости<br>
-                   &nbsp;&nbsp;• Удаления видео из сцены<br>
-                   &nbsp;&nbsp;• Сброса позиции</p>
-            </div>
-            
-            <div class="info-card" style="background: rgba(0, 219, 222, 0.15); border-left-color: #fc00ff;">
-                <h3><span class="icon">🎯</span> Полезные советы:</h3>
-                <p>• Используйте хорошее освещение для лучшего отслеживания AR<br>
-                   • Размещайте видео на текстурированных поверхностях<br>
-                   • Для сложных сцен используйте несколько видео объектов<br>
-                   • Регулярно сохраняйте сцены через меню экспорта</p>
-            </div>
-        </div>
-    </div>
-    
-    <!-- ===== AR ЭКРАН ===== -->
-    <div id="arScreen" class="screen">
-        <canvas id="arCanvas"></canvas>
-        
-        <div class="status-bar" id="arStatus">
-            <div class="status-dot"></div>
-            <span id="statusText">Инициализация AR...</span>
-        </div>
-        
-        <button class="back-btn" id="backFromAR">
-            <span class="icon">←</span> Выйти из AR
-        </button>
-        
-        <div class="ar-controls">
-            <button class="control-btn" id="playPauseBtn" title="Воспроизвести/Пауза">
-                <span class="icon">▶️</span>
-            </button>
-            <button class="control-btn" id="volumeBtn" title="Громкость">
-                <span class="icon">🔊</span>
-            </button>
-            <button class="control-btn btn-danger" id="deleteBtn" title="Удалить видео">
-                <span class="icon">🗑️</span>
-            </button>
-            <button class="control-btn" id="resetBtn" title="Сбросить позицию">
-                <span class="icon">🔄</span>
-            </button>
-            <button class="control-btn btn-info" id="scaleBtn" title="Изменить размер">
-                <span class="icon">📐</span>
-            </button>
-        </div>
-        
-        <div class="volume-slider" id="volumeSlider">
-            <input type="range" id="volumeControl" min="0" max="1" step="0.1" value="0.7">
-        </div>
-        
-        <div style="position: absolute; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); color: #00dbde; padding: 10px 20px; border-radius: 20px; font-size: 14px; backdrop-filter: blur(10px);">
-            <span class="icon">👆</span> Коснитесь поверхности для размещения видео
-        </div>
-    </div>
-    
-    <!-- ===== СИСТЕМА СООБЩЕНИЙ ===== -->
-    <div id="message"></div>
+<input type="file" id="fileInput" accept="video/*">
+<button id="startBtn">Начать AR</button>
 
-    <!-- ===== ВЕСЬ JAVASCRIPT КОД ===== -->
-    <script>
-        // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
-        let currentVideoFile = null;
-        let currentVideoUrl = null;
-        let currentVideoName = "Не выбрано";
-        let isARActive = false;
-        let isVideoPlaying = false;
-        let videoVolume = 0.7;
-        let touchStartTime = 0;
-        let lastTouchTime = 0;
-        
-        // ========== ОСНОВНАЯ ИНИЦИАЛИЗАЦИЯ ==========
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 AR Video Room загружается...');
-            
-            // Симуляция прогресса загрузки
-            simulateLoadingProgress();
-            
-            // Настройка всех обработчиков событий
-            setupAllEventListeners();
-            
-            // Проверка совместимости устройства
-            checkDeviceCompatibility();
-            
-            // Настройка эффектов касания
-            setupTouchEffects();
-            
-            // Обновление информации о видео
-            updateVideoInfo();
-            
-            console.log('✅ Приложение инициализировано');
-        });
-        
-        // ========== СИМУЛЯЦИЯ ЗАГРУЗКИ ==========
-        function simulateLoadingProgress() {
-            const progress = document.getElementById('loadingProgress');
-            let width = 0;
-            
-            const interval = setInterval(() => {
-                width += Math.random() * 15 + 5;
-                if (width > 100) width = 100;
-                progress.style.width = width + '%';
-                
-                if (width >= 100) {
-                    clearInterval(interval);
-                    setTimeout(() => {
-                        switchScreen('mainScreen');
-                        showMessage('Приложение готово к работе!', 'success');
-                    }, 500);
-                }
-            }, 200);
-        }
-        
-        // ========== ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ ==========
-        function switchScreen(screenId) {
-            console.log('📱 Переключение экрана:', screenId);
-            
-            // Скрыть все экраны
-            ['loadingScreen', 'mainScreen', 'uploadScreen', 'instructionsScreen', 'arScreen'].forEach(id => {
-                const screen = document.getElementById(id);
-                if (screen) screen.classList.remove('active');
-            });
-            
-            // Показать целевой экран
-            const targetScreen = document.getElementById(screenId);
-            if (targetScreen) {
-                targetScreen.classList.add('active');
-                
-                // Специальные действия для экранов
-                if (screenId === 'arScreen') {
-                    startARMode();
-                } else if (isARActive) {
-                    stopARMode();
-                }
-                
-                // Прокрутка в начало
-                targetScreen.scrollTop = 0;
-            }
-            
-            // Обновить заголовок страницы
-            updatePageTitle(screenId);
-        }
-        
-        function updatePageTitle(screenId) {
-            const titles = {
-                'mainScreen': '🎥 AR Видео в Комнате',
-                'uploadScreen': '📁 Загрузка видео',
-                'instructionsScreen': '📖 Инструкция',
-                'arScreen': '🚀 AR режим'
-            };
-            if (titles[screenId]) {
-                document.title = titles[screenId];
-            }
-        }
-        
-        // ========== НАСТРОЙКА ВСЕХ ОБРАБОТЧИКОВ ==========
-        function setupAllEventListeners() {
-            console.log('⚙️ Настройка обработчиков событий...');
-            
-            // === ОСНОВНЫЕ КНОПКИ НАВИГАЦИИ ===
-            document.getElementById('startAR').addEventListener('click', function(e) {
-                createRippleEffect(e);
-                if (!currentVideoUrl) {
-                    showMessage('Сначала загрузите видео!', 'warning');
-                    return;
-                }
-                switchScreen('arScreen');
-            });
-            
-            document.getElementById('uploadVideo').addEventListener('click', function(e) {
-                createRippleEffect(e);
-                switchScreen('uploadScreen');
-            });
-            
-            document.getElementById('showInstructions').addEventListener('click', function(e) {
-                createRippleEffect(e);
-                switchScreen('instructionsScreen');
-            });
-            
-            // === КНОПКИ "НАЗАД" ===
-            document.getElementById('backFromUpload').addEventListener('click', function(e) {
-                createRippleEffect(e);
-                switchScreen('mainScreen');
-            });
-            
-            document.getElementById('backFromInstructions').addEventListener('click', function(e) {
-                createRippleEffect(e);
-                switchScreen('mainScreen');
-            });
-            
-            document.getElementById('backFromAR').addEventListener('click', function(e) {
-                createRippleEffect(e);
-                switchScreen('mainScreen');
-            });
-            
-            // === ЗАГРУЗКА ВИДЕО ===
-            const videoInput = document.getElementById('videoInput');
-            const dropArea = document.getElementById('dropArea');
-            
-            videoInput.addEventListener('change', handleVideoSelect);
-            
-            dropArea.addEventListener('click', function(e) {
-                createRippleEffect(e);
-                videoInput.click();
-            });
-            
-            // Drag and Drop функциональность
-            dropArea.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                dropArea.classList.add('dragover');
-            });
-            
-            dropArea.addEventListener('dragleave', function() {
-                dropArea.classList.remove('dragover');
-            });
-            
-            dropArea.addEventListener('drop', function(e) {
-                e.preventDefault();
-                dropArea.classList.remove('dragover');
-                
-                if (e.dataTransfer.files.length > 0) {
-                    handleVideoFile(e.dataTransfer.files[0]);
-                }
-            });
-            
-            // Кнопка использования видео
-            document.getElementById('useThisVideo').addEventListener('click', function(e) {
-                createRippleEffect(e);
-                if (currentVideoFile) {
-                    currentVideoName = currentVideoFile.name;
-                    document.getElementById('currentVideoName').textContent = currentVideoName;
-                    updateVideoInfo();
-                    showMessage('✅ Видео готово к использованию в AR!', 'success');
-                    switchScreen('mainScreen');
-                }
-            });
-            
-            // === AR КОНТРОЛЫ ===
-            const playPauseBtn = document.getElementById('playPauseBtn');
-            const volumeBtn = document.getElementById('volumeBtn');
-            const deleteBtn = document.getElementById('deleteBtn');
-            const resetBtn = document.getElementById('resetBtn');
-            const scaleBtn = document.getElementById('scaleBtn');
-            const volumeControl = document.getElementById('volumeControl');
-            
-            playPauseBtn.addEventListener('click', function(e) {
-                createRippleEffect(e);
-                toggleVideoPlayback();
-            });
-            
-            volumeBtn.addEventListener('click', function(e) {
-                createRippleEffect(e);
-                toggleVolumeSlider();
-            });
-            
-            deleteBtn.addEventListener('click', function(e) {
-                createRippleEffect(e);
-                showMessage('Видео удалено из сцены', 'info');
-            });
-            
-            resetBtn.addEventListener('click', function(e) {
-                createRippleEffect(e);
-                showMessage('Позиция видео сброшена', 'info');
-            });
-            
-            scaleBtn.addEventListener('click', function(e) {
-                createRippleEffect(e);
-                showMessage('Режим изменения размера активирован', 'info');
-            });
-            
-            volumeControl.addEventListener('input', function(e) {
-                videoVolume = parseFloat(e.target.value);
-                showMessage('Громкость: ' + Math.round(videoVolume * 100) + '%', 'info');
-            });
-            
-            // === ОБРАБОТКА КАСАНИЙ НА AR ЭКРАНЕ ===
-            document.addEventListener('touchstart', handleTouchStart, { passive: false });
-            document.addEventListener('touchend', handleTouchEnd, { passive: false });
-            document.addEventListener('touchmove', handleTouchMove, { passive: false });
-            
-            console.log('✅ Все обработчики настроены');
-        }
-        
-        // ========== ОБРАБОТКА ВИДЕО ФАЙЛОВ ==========
-        function handleVideoSelect(event) {
-            const file = event.target.files[0];
-            if (file) {
-                handleVideoFile(file);
-            }
-        }
-        
-        function handleVideoFile(file) {
-            console.log('📹 Обработка видео файла:', file.name);
-            
-            // Проверка типа файла
-            if (!file.type.startsWith('video/')) {
-                showMessage('❌ Выберите видео файл (MP4, MOV, WebM)', 'error');
-                return;
-            }
-            
-            // Проверка размера файла
-            if (file.size > 100 * 1024 * 1024) {
-                showMessage('❌ Файл слишком большой! Максимальный размер: 100MB', 'error');
-                return;
-            }
-            
-            currentVideoFile = file;
-            
-            // Создание URL для видео
-            const videoUrl = URL.createObjectURL(file);
-            
-            // Освобождение предыдущего URL
-            if (currentVideoUrl) {
-                URL.revokeObjectURL(currentVideoUrl);
-            }
-            currentVideoUrl = videoUrl;
-            
-            // Отображение предпросмотра
-            const previewVideo = document.getElementById('previewVideo');
-            const videoPreview = document.getElementById('videoPreview');
-            
-            previewVideo.src = videoUrl;
-            previewVideo.volume = videoVolume;
-            previewVideo.load();
-            videoPreview.classList.add('active');
-            
-            // Показ информации о файле
-            const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-            showMessage(`✅ Видео "${file.name}" загружено (${fileSizeMB} MB)`, 'success');
-            
-            // Автовоспроизведение предпросмотра
-            setTimeout(() => {
-                previewVideo.play().catch(e => {
-                    console.log('Автовоспроизведение заблокировано:', e.message);
-                });
-            }, 500);
-        }
-        
-        // ========== AR РЕЖИМ ==========
-        function startARMode() {
-            console.log('🚀 Запуск AR режима...');
-            isARActive = true;
-            
-            // Обновление статуса AR
-            const statusText = document.getElementById('statusText');
-            const statusDot = document.querySelector('.status-dot');
-            
-            statusText.textContent = 'Инициализация камеры...';
-            statusDot.style.background = '#ff9800';
-            
-            // Проверка HTTPS
-            if (window.location.protocol !== 'https:' && !window.location.hostname.includes('localhost')) {
-                showMessage('⚠️ Для работы камеры требуется HTTPS соединение!', 'warning');
-            }
-            
-            // Симуляция процесса AR
-            setTimeout(() => {
-                statusText.textContent = 'Поиск плоских поверхностей...';
-                statusDot.style.background = '#00dbde';
-            }, 1500);
-            
-            setTimeout(() => {
-                statusText.textContent = 'Готово! Коснитесь экрана для размещения видео';
-                statusDot.style.background = '#00ff00';
-            }, 3000);
-            
-            // Запуск анимации AR канваса
-            startARAnimation();
-        }
-        
-        function stopARMode() {
-            console.log('🛑 Остановка AR режима');
-            isARActive = false;
-            
-            // Скрытие слайдера громкости
-            document.getElementById('volumeSlider').classList.remove('active');
-        }
-        
-        function startARAnimation() {
-            const canvas = document.getElementById('arCanvas');
-            const ctx = canvas.getContext('2d');
-            
-            // Установка размеров канваса
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            
-            // Симуляция AR отслеживания
-            function draw() {
-                if (!isARActive) return;
-                
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                // Рисование сетки отслеживания
-                ctx.strokeStyle = 'rgba(0, 219, 222, 0.3)';
-                ctx.lineWidth = 2;
-                
-                const gridSize = 50;
-                for (let x = 0; x < canvas.width; x += gridSize) {
-                    ctx.beginPath();
-                    ctx.moveTo(x, 0);
-                    ctx.lineTo(x, canvas.height);
-                    ctx.stroke();
-                }
-                
-                for (let y = 0; y < canvas.height; y += gridSize) {
-                    ctx.beginPath();
-                    ctx.moveTo(0, y);
-                    ctx.lineTo(canvas.width, y);
-                    ctx.stroke();
-                }
-                
-                // Анимация точек отслеживания
-                const time = Date.now() * 0.001;
-                const pointCount = 15;
-                
-                for (let i = 0; i < pointCount; i++) {
-                    const angle = time * 0.5 + i * Math.PI * 2 / pointCount;
-                    const radius = 50 + Math.sin(time + i) * 30;
-                    const x = canvas.width / 2 + Math.cos(angle) * radius;
-                    const y = canvas.height / 2 + Math.sin(angle) * radius;
-                    
-                    ctx.fillStyle = `rgba(0, 219, 222, ${0.5 + Math.sin(time + i) * 0.3})`;
-                    ctx.beginPath();
-                    ctx.arc(x, y, 4 + Math.sin(time * 2 + i) * 2, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-                
-                requestAnimationFrame(draw);
-            }
-            
-            draw();
-        }
-        
-        // ========== УПРАВЛЕНИЕ ВИДЕО ==========
-        function toggleVideoPlayback() {
-            const previewVideo = document.getElementById('previewVideo');
-            const playPauseBtn = document.getElementById('playPauseBtn');
-            
-            if (previewVideo) {
-                if (previewVideo.paused) {
-                    previewVideo.play();
-                    playPauseBtn.innerHTML = '<span class="icon">⏸️</span>';
-                    showMessage('Воспроизведение видео', 'info');
-                } else {
-                    previewVideo.pause();
-                    playPauseBtn.innerHTML = '<span class="icon">▶️</span>';
-                    showMessage('Пауза видео', 'info');
-                }
-            }
-        }
-        
-        function toggleVolumeSlider() {
-            const volumeSlider = document.getElementById('volumeSlider');
-            volumeSlider.classList.toggle('active');
-        }
-        
-        // ========== ОБРАБОТКА КАСАНИЙ И ЖЕСТОВ ==========
-        function handleTouchStart(e) {
-            touchStartTime = Date.now();
-            createRippleEffect(e);
-            
-            if (isARActive) {
-                // Обработка жестов в AR режиме
-                if (e.touches.length === 1) {
-                    // Одиночное касание - размещение видео
-                    showMessage('Видео размещено на поверхности', 'success');
-                } else if (e.touches.length === 2) {
-                    // Два пальца - начало жеста масштабирования/вращения
-                    showMessage('Используйте два пальца для изменения размера и вращения', 'info');
-                }
-            }
-        }
-        
-        function handleTouchEnd(e) {
-            const touchEndTime = Date.now();
-            const touchDuration = touchEndTime - touchStartTime;
-            
-            // Определение двойного касания
-            const currentTime = Date.now();
-            if (currentTime - lastTouchTime < 300) {
-                // Двойное касание
-                if (isARActive) {
-                    toggleVideoPlayback();
-                }
-            }
-            lastTouchTime = currentTime;
-            
-            // Долгое касание
-            if (touchDuration > 500 && e.touches.length === 0) {
-                showMessage('Долгое касание - дополнительные опции', 'info');
-            }
-        }
-        
-        function handleTouchMove(e) {
-            if (isARActive && e.touches.length === 2) {
-                // Предотвращаем масштабирование страницы
-                e.preventDefault();
-            }
-        }
-        
-        // ========== ВИЗУАЛЬНЫЕ ЭФФЕКТЫ ==========
-        function createRippleEffect(event) {
-            const btn = event.currentTarget;
-            const circle = document.createElement('span');
-            const rect = btn.getBoundingClientRect();
-            
-            const diameter = Math.max(rect.width, rect.height);
-            const radius = diameter / 2;
-            
-            circle.style.width = circle.style.height = diameter + 'px';
-            circle.style.left = (event.clientX - rect.left - radius) + 'px';
-            circle.style.top = (event.clientY - rect.top - radius) + 'px';
-            circle.classList.add('ripple');
-            
-            const ripple = btn.getElementsByClassName('ripple')[0];
-            if (ripple) {
-                ripple.remove();
-            }
-            
-            btn.appendChild(circle);
-        }
-        
-        function setupTouchEffects() {
-            // Добавляем эффект ripple ко всем кнопкам
-            document.querySelectorAll('.btn, .control-btn, .back-btn').forEach(btn => {
-                btn.addEventListener('touchstart', createRippleEffect);
-                btn.addEventListener('mousedown', createRippleEffect);
-            });
-        }
-        
-        // ========== СИСТЕМА СООБЩЕНИЙ ==========
-        function showMessage(text, type = 'info') {
-            console.log('💬 Сообщение:', text);
-            
-            const messageEl = document.getElementById('message');
-            if (!messageEl) return;
-            
-            // Цвета для разных типов сообщений
-            const colors = {
-                'success': 'linear-gradient(135deg, #00b09b, #96c93d)',
-                'error': 'linear-gradient(135deg, #ff416c, #ff4b2b)',
-                'warning': 'linear-gradient(135deg, #f7971e, #ffd200)',
-                'info': 'linear-gradient(135deg, #00dbde, #0093e9)'
-            };
-            
-            messageEl.textContent = text;
-            messageEl.style.background = colors[type] || colors.info;
-            messageEl.classList.add('active');
-            
-            // Автоматическое скрытие
-            setTimeout(() => {
-                messageEl.classList.remove('active');
-            }, 3000);
-        }
-        
-        // ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
-        function updateVideoInfo() {
-            const videoInfo = document.getElementById('videoInfo');
-            if (currentVideoFile) {
-                const fileSizeMB = (currentVideoFile.size / (1024 * 1024)).toFixed(2);
-                const duration = 'N/A';
-                videoInfo.innerHTML = `
-                    📏 Размер: ${fileSizeMB} MB<br>
-                    ⏱️ Длительность: ${duration}<br>
-                    📅 Загружено: только что
-                `;
-            } else {
-                videoInfo.textContent = 'Загрузите видео чтобы начать работу с AR';
-            }
-        }
-        
-        function checkDeviceCompatibility() {
-            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            const isChrome = /Chrome/.test(navigator.userAgent);
-            const isEdge = /Edg/.test(navigator.userAgent);
-            
-            if (!isMobile) {
-                showMessage('📱 Рекомендуется использовать на телефоне для AR', 'info');
-            }
-            
-            if (!isChrome && !isEdge) {
-                showMessage('🌐 Для лучшей совместимости AR используйте Chrome или Edge', 'warning');
-            }
-            
-            // Проверка API камеры
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                showMessage('⚠️ Ваш браузер не поддерживает доступ к камере', 'warning');
-            }
-        }
-        
-        // ========== ОБРАБОТКА ОШИБОК ==========
-        window.addEventListener('error', function(e) {
-            console.error('❌ Ошибка:', e.message);
-            showMessage('Произошла ошибка. Проверьте консоль разработчика.', 'error');
-        });
-        
-        // ========== АДАПТАЦИЯ К РАЗМЕРАМ ЭКРАНА ==========
-        window.addEventListener('resize', function() {
-            const canvas = document.getElementById('arCanvas');
-            if (canvas && isARActive) {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-            }
-        });
-        
-        // ========== ДЕБАГ ИНФОРМАЦИЯ ==========
-        window.debugApp = function() {
-            console.log('=== ДЕБАГ ИНФОРМАЦИЯ ===');
-            console.log('Текущее видео:', currentVideoFile ? currentVideoFile.name : 'нет');
-            console.log('Видео URL:', currentVideoUrl ? 'есть' : 'нет');
-            console.log('AR активен:', isARActive);
-            console.log('Протокол:', window.location.protocol);
-            console.log('User Agent:', navigator.userAgent);
-            console.log('Разрешение экрана:', window.innerWidth, 'x', window.innerHeight);
-            
-            // Проверка всех элементов
-            const elements = ['startAR', 'uploadVideo', 'videoInput', 'previewVideo', 'arCanvas'];
-            elements.forEach(id => {
-                console.log(id + ':', document.getElementById(id) ? '✓ найден' : '✗ НЕ НАЙДЕН');
-            });
-        };
-        
-        // Автоматический дебаг при загрузке
-        setTimeout(() => {
-            console.log('✅ Приложение полностью загружено и готово');
-            console.log('ℹ️ Используйте debugApp() для получения дополнительной информации');
-        }, 1000);
-    </script>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js';
+import { ARButton } from 'https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/webxr/ARButton.js';
+
+let camera, scene, renderer;
+let reticle, controller;
+let videoMesh, videoTexture;
+let videoElement;
+
+init();
+
+function init() {
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+
+  scene = new THREE.Scene();
+
+  camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.01, 20);
+
+  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  container.appendChild(renderer.domElement);
+
+  // Свет
+  const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
+  light.position.set(0.5,1,0.25);
+  scene.add(light);
+
+  // Reticle
+  const geometry = new THREE.RingGeometry(0.07,0.09,32).rotateX(-Math.PI/2);
+  const material = new THREE.MeshBasicMaterial({ color:0x00ff00 });
+  reticle = new THREE.Mesh(geometry, material);
+  reticle.matrixAutoUpdate = false;
+  reticle.visible = false;
+  scene.add(reticle);
+
+  // Controller
+  controller = renderer.xr.getController(0);
+  controller.addEventListener('select', placeVideo);
+  scene.add(controller);
+
+  // File input
+  const fileInput = document.getElementById('fileInput');
+  fileInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const url = URL.createObjectURL(file);
+
+    videoElement = document.createElement('video');
+    videoElement.src = url;
+    videoElement.loop = true;
+    videoElement.muted = true; // обязательно для автоплей
+    videoElement.playsInline = true;
+    videoElement.play();
+
+    videoTexture = new THREE.VideoTexture(videoElement);
+    const geom = new THREE.PlaneGeometry(0.5,0.3);
+    const mat = new THREE.MeshBasicMaterial({ map:videoTexture, side:THREE.DoubleSide });
+    videoMesh = new THREE.Mesh(geom, mat);
+    videoMesh.visible = false;
+    scene.add(videoMesh);
+  });
+
+  // Start AR button
+  const startBtn = document.getElementById('startBtn');
+  startBtn.addEventListener('click', ()=>{
+    document.body.removeChild(startBtn);
+    document.body.removeChild(fileInput);
+    document.body.appendChild(ARButton.createButton(renderer,{ requiredFeatures:['hit-test'] }));
+    animate();
+  });
+
+  window.addEventListener('resize', ()=>{
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
+
+// Place video at reticle
+function placeVideo() {
+  if(videoMesh && reticle.visible) {
+    videoMesh.position.setFromMatrixPosition(reticle.matrix);
+    videoMesh.quaternion.setFromRotationMatrix(reticle.matrix);
+    videoMesh.visible = true;
+
+    // включаем звук после первого взаимодействия
+    if(videoElement.muted) videoElement.muted=false;
+    videoElement.play();
+  }
+}
+
+function animate() {
+  renderer.setAnimationLoop(render);
+}
+
+function render(timestamp, frame) {
+  if(frame){
+    const session = renderer.xr.getSession();
+    const referenceSpace = renderer.xr.getReferenceSpace();
+    const viewerSpace = renderer.xr.getReferenceSpace();
+    frame.getHitTestResults = frame.getHitTestResults || frame.getHitTestResults.bind(frame);
+    // Hit test
+    session.requestAnimationFrame((time, xrFrame)=>{
+      const hitTestSourcePromise = session.requestHitTestSource({ space: viewerSpace });
+      hitTestSourcePromise.then(hitTestSource=>{
+        const hitTestResults = frame.getHitTestResults(hitTestSource);
+        if(hitTestResults.length>0){
+          const pose = hitTestResults[0].getPose(referenceSpace);
+          reticle.visible = true;
+          reticle.matrix.fromArray(pose.transform.matrix);
+        } else reticle.visible = false;
+      });
+    });
+  }
+  renderer.render(scene,camera);
+}
+</script>
 </body>
 </html>
