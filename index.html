@@ -61,19 +61,19 @@ body { margin:0; overflow:hidden; }
   <a-entity id="buttons" position="0 -0.5 -2" visible="false">
 
     <a-plane class="btn" color="#00ff00" position="-0.6 0 0" width="0.35" height="0.15"
-      text="value: Play; align:center; width: 3"
+      text="value: Play; align:center; width:3"
       play-btn></a-plane>
 
     <a-plane class="btn" color="#ffff00" position="-0.2 0 0" width="0.35" height="0.15"
-      text="value: Pause; align:center; width: 3"
+      text="value: Pause; align:center; width:3"
       pause-btn></a-plane>
 
     <a-plane class="btn" color="#00ffff" position="0.2 0 0" width="0.35" height="0.15"
-      text="value: +5; align:center; width: 3"
+      text="value: +5; align:center; width:3"
       plus-btn></a-plane>
 
     <a-plane class="btn" color="#ff00ff" position="0.6 0 0" width="0.35" height="0.15"
-      text="value: -5; align:center; width: 3"
+      text="value: -5; align:center; width:3"
       minus-btn></a-plane>
 
   </a-entity>
@@ -97,7 +97,8 @@ fileInput.onchange = e => {
   videoEl.loop = true;
   videoEl.playsInline = true;
   videoEl.crossOrigin = 'anonymous';
-  videoEl.muted = false;
+  videoEl.muted = true; // Чтобы autoplay сработал без проблем в браузерах
+  videoEl.setAttribute('webkit-playsinline', ''); 
 
   videoPlane.setAttribute('src', videoEl);
   videoPlane.setAttribute('visible', true);
