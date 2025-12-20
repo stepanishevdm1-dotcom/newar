@@ -1,48 +1,40 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>AR Видео с Gaze и прогрессом</title>
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-  <style>
-    body { margin:0; overflow:hidden; }
-    #fileInput {
-      position: fixed; top:10px; left:50%; transform:translateX(-50%); z-index:100;
-      background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
-    }
-    #showBtnHTML {
-      position: fixed; bottom:60px; left:50%; transform: translateX(-50%);
-      padding: 10px 20px; background: rgba(0,0,0,0.5); color:white; border-radius:5px;
-      cursor: pointer; z-index:100;
-    }
-    #sizeSliderContainer {
-      position: fixed; bottom:20px; left:50%; transform: translateX(-50%);
-      background: rgba(0,0,0,0.5); padding:5px 10px; border-radius:5px; z-index:100;
-    }
-    #gaze-circle {
-      position: fixed; top:50%; left:50%; transform:translate(-50%,-50%);
-      width: 25px; height: 25px; border: 2px solid white; border-radius: 50%;
-      z-index:100; pointer-events: none;
-    }
-    #gaze-fill {
-      position: absolute; top:0; left:0; width:100%; height:100%;
-      background: rgba(255,255,255,0.5); border-radius:50%;
-      transform: scaleY(0); transform-origin: bottom; transition: transform 0.05s linear;
-    }
-    #videoTime {
-      position: fixed; top:10px; right:10px; z-index:100;
-      color:white; background: rgba(0,0,0,0.5); padding:3px 6px; border-radius:5px;
-      font-family: monospace; font-size:14px;
-    }
-  </style>
+<meta charset="utf-8">
+<title>AR Видео с Gaze 3с</title>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+<style>
+body { margin:0; overflow:hidden; }
+#gaze-circle {
+  position: fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  width: 25px; height: 25px; border: 2px solid white; border-radius: 50%;
+  z-index:100; pointer-events: none;
+}
+#gaze-fill {
+  position: absolute; top:0; left:0; width:100%; height:100%;
+  background: rgba(255,255,255,0.5); border-radius:50%;
+  transform: scaleY(0); transform-origin: bottom; transition: transform 0.05s linear;
+}
+#videoTime { position: fixed; top:10px; right:10px; z-index:100;
+  color:white; background: rgba(0,0,0,0.5); padding:3px 6px; border-radius:5px;
+  font-family: monospace; font-size:14px;}
+#fileInput { position: fixed; top:10px; left:50%; transform:translateX(-50%); z-index:100;
+  background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;}
+#showBtnHTML { position: fixed; bottom:60px; left:50%; transform: translateX(-50%);
+  padding: 10px 20px; background: rgba(0,0,0,0.5); color:white; border-radius:5px;
+  cursor: pointer; z-index:100;}
+#sizeSliderContainer { position: fixed; bottom:20px; left:50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.5); padding:5px 10px; border-radius:5px; z-index:100;}
+</style>
 </head>
 <body>
 <input type="file" id="fileInput" accept="video/*">
 <div id="showBtnHTML">📺 Show Video</div>
 <div id="sizeSliderContainer">
-  <label style="color:white;">Video Size:</label>
-  <input type="range" id="sizeSlider" min="0.2" max="5" step="0.05" value="1">
+<label style="color:white;">Video Size:</label>
+<input type="range" id="sizeSlider" min="0.2" max="5" step="0.05" value="1">
 </div>
 <div id="gaze-circle"><div id="gaze-fill"></div></div>
 <div id="videoTime">00:00 / 00:00</div>
@@ -202,23 +194,23 @@ scene.addEventListener('tick', ()=>{
       activeBtn = btn;
       gazeStartTime = performance.now();
     } else {
+      // заполняем кружок пропорционально времени
       const progress = (performance.now() - gazeStartTime)/3000;
       gazeFill.style.transform = `scaleY(${Math.min(progress,1)})`;
       if(progress>=1){
         executeButton(btn);
-        gazeFill.style.transform = 'scaleY(0)';
+        gazeFill.style.transform='scaleY(0)';
         activeBtn = null;
       }
     }
   } else {
+    // кружок ушёл с кнопки — сбрасываем
     activeBtn = null;
     gazeFill.style.transform='scaleY(0)';
   }
 });
 
 // --------------------- Show кнопка ---------------------
-showBtnHTML.addEventListener('mouseenter', ()=>{ gazeStartTime = performance.now(); });
-showBtnHTML.addEventListener('mouseleave', ()=>{ gazeFill.style.transform='scaleY(0)'; });
 showBtnHTML.addEventListener('click', showVideo);
 </script>
 </body>
