@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Fake AR Floor Video</title>
+<title>Fake AR Fixed Floor Video</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
 html, body { margin:0; padding:0; overflow:hidden; background:black; }
@@ -58,26 +58,23 @@ input.addEventListener('change', e=>{
 // Координаты видео
 let posX = 0, posY = 0, scale = 1, rotation = 0;
 
-// Ставим видео по тапу
+// Фиксируем позицию один раз по тапу
 cam.addEventListener('click', e=>{
   if(!videoLoaded) { alert("Сначала выберите видео"); return; }
-  posX = Math.max(50, Math.min(e.clientX, window.innerWidth - 50));   // ограничение по X
-  posY = Math.max(window.innerHeight/2, Math.min(e.clientY, window.innerHeight - 50)); // Y не выше середины
+  posX = Math.max(50, Math.min(e.clientX, window.innerWidth - 50));
+  posY = Math.max(window.innerHeight/2, Math.min(e.clientY, window.innerHeight - 50));
   videoLayer.style.left = posX+'px';
   videoLayer.style.top = posY+'px';
   videoLayer.style.display = 'block';
   updateTransform();
 });
 
-// Перетаскивание/масштаб/поворот
-let startX=0, startY=0, startDistance=null, startRotation=null;
+// Управление масштабом и поворотом без изменения позиции
+let startDistance = null, startRotation = null;
 
 videoLayer.addEventListener('touchstart', e=>{
   e.preventDefault();
-  if(e.touches.length===1){
-    startX = e.touches[0].clientX - posX;
-    startY = e.touches[0].clientY - posY;
-  } else if(e.touches.length===2){
+  if(e.touches.length === 2){
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
     startDistance = Math.hypot(dx,dy)/scale;
@@ -87,16 +84,13 @@ videoLayer.addEventListener('touchstart', e=>{
 
 videoLayer.addEventListener('touchmove', e=>{
   e.preventDefault();
-  if(e.touches.length===1){
-    posX = Math.max(50, Math.min(e.touches[0].clientX - startX, window.innerWidth - 50));
-    posY = Math.max(window.innerHeight/2, Math.min(e.touches[0].clientY - startY, window.innerHeight - 50));
-  } else if(e.touches.length===2 && startDistance!==null){
+  if(e.touches.length === 2 && startDistance!==null){
     const dx = e.touches[0].clientX - e.touches[1].clientX;
     const dy = e.touches[0].clientY - e.touches[1].clientY;
-    scale = Math.min(Math.max(Math.hypot(dx,dy)/startDistance,0.3),3); // ограничение масштаба 0.3–3
+    scale = Math.min(Math.max(Math.hypot(dx,dy)/startDistance,0.3),3);
     rotation = (Math.atan2(dy,dx) - startRotation) * 180/Math.PI;
+    updateTransform();
   }
-  updateTransform();
 }, {passive:false});
 
 videoLayer.addEventListener('touchend', e=>{
@@ -104,13 +98,14 @@ videoLayer.addEventListener('touchend', e=>{
 });
 
 function updateTransform(){
+  // позиция фиксирована по left/top
   videoLayer.style.transform = `translate(-50%,-50%) scale(${scale}) rotate(${rotation}deg)`;
 }
 
-// Кнопка сброса
+// Сброс
 resetBtn.addEventListener('click', ()=>{
   videoLayer.style.display='none';
-  posX=0; posY=0; scale=1; rotation=0;
+  scale=1; rotation=0;
 });
 </script>
 
