@@ -25,7 +25,7 @@ const scene = document.querySelector('a-scene');
 const fileInput = document.getElementById('fileInput');
 
 let videoEl, videoMesh, videoTexture;
-let videoWidth = 1, videoHeight = 0.6; // будут заменены на реальные после загрузки
+let videoWidth = 1, videoHeight = 0.6;
 
 fileInput.addEventListener('change', e => {
   const file = e.target.files[0];
@@ -41,7 +41,6 @@ fileInput.addEventListener('change', e => {
   videoEl.crossOrigin = 'anonymous';
 
   videoEl.addEventListener('loadeddata', () => {
-    // сохраняем оригинальные пропорции
     videoWidth = videoEl.videoWidth / videoEl.videoHeight;
     videoHeight = 1;
 
@@ -60,7 +59,7 @@ fileInput.addEventListener('change', e => {
   });
 });
 
-// Ставим видео по тапу вертикально
+// Ставим видео вертикально лицом к камере
 scene.addEventListener('click', event => {
   if(!videoMesh) return;
 
@@ -75,8 +74,8 @@ scene.addEventListener('click', event => {
 
   videoMesh.position.copy(pos);
   videoMesh.visible = true;
-  videoMesh.rotation.set(0, 0, 0); // вертикально
-  videoMesh.scale.set(1,1,1); // масштаб 1:1, пропорции исходные
+  videoMesh.rotation.set(0, Math.PI, 0); // вертикально лицом к камере
+  videoMesh.scale.set(1,1,1);
   videoEl.play().catch(()=>{});
 });
 
