@@ -1,17 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>AR Видео с кнопками</title>
-  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-  <style>
-    body { margin:0; overflow:hidden; }
-    #fileInput {
-      position:fixed; top:10px; left:50%; transform:translateX(-50%);
-      z-index:10; background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
-    }
-  </style>
+<meta charset="utf-8">
+<title>AR Видео с кнопками и таймером</title>
+<script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+<script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+<style>
+  body { margin:0; overflow:hidden; }
+  #fileInput {
+    position:fixed; top:10px; left:50%; transform:translateX(-50%);
+    z-index:10; background: rgba(0,0,0,0.5); color:white; padding:5px 10px; border-radius:5px;
+  }
+</style>
 </head>
 <body>
 <input type="file" id="fileInput" accept="video/*">
@@ -31,9 +31,10 @@ const fileInput = document.getElementById('fileInput');
 let videoEl, videoMesh, videoTexture;
 let videoWidth = 1, videoHeight = 0.6;
 let firstInteraction = true;
-let buttonsCreated = false;
-let buttonEntities = [];
+let buttons = [];
+let videoTimerText;
 
+// ------------------- Загрузка видео -------------------
 fileInput.addEventListener('change', e => {
   const file = e.target.files[0];
   if(!file) return;
@@ -57,12 +58,16 @@ fileInput.addEventListener('change', e => {
       const material = new THREE.MeshBasicMaterial({ map: videoTexture, side: THREE.DoubleSide });
       videoMesh = new THREE.Mesh(geometry, material);
       videoMesh.visible = false;
-      // отражаем, чтобы убрать зеркальность
-      videoMesh.scale.x = -1;
       scene.object3D.add(videoMesh);
-    } else {
-      videoMesh.geometry.dispose();
-      videoMesh.geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
+
+      // создаем текст таймера
+      videoTimerText = document.createElement('a-text');
+      videoTimerText.setAttribute('value','0:00 / 0:00');
+      videoTimerText.setAttribute('color','white');
+      videoTimerText.setAttribute('align','left');
+      videoTimerText.setAttribute('width',1);
+      videoTimerText.object3D.position.set(-videoWidth/2, videoHeight/2 + 0.05, 0.01);
+      scene.appendChild(videoTimerText);
     }
   });
 });
@@ -72,7 +77,7 @@ scene.addEventListener('click', async event => {
   if(!videoMesh || !videoEl) return;
 
   if(firstInteraction){
-    try { await videoEl.play(); } catch(e){}
+    try{ await videoEl.play(); } catch(e){}
     firstInteraction = false;
   }
 
@@ -86,19 +91,20 @@ scene.addEventListener('click', async event => {
 
   videoMesh.position.copy(pos);
   videoMesh.visible = true;
-  videoMesh.rotation.set(0, Math.PI, 0);
 
-  // создаем кнопки только один раз
-  if(!buttonsCreated){
-    const buttonNames = ['Произвести','Пауза','+5','-5'];
-    const actions = [
-      ()=>videoEl.play(),
-      ()=>videoEl.pause(),
-      ()=>videoEl.currentTime+=5,
-      ()=>videoEl.currentTime-=5
+  // видео всегда смотрит на камеру
+  videoMesh.lookAt(camera.position);
+
+  // создаем кнопки под видео
+  if(buttons.length===0){
+    const buttonData = [
+      {name:'Произвести', action:()=>videoEl.play()},
+      {name:'Пауза', action:()=>videoEl.pause()},
+      {name:'+5', action:()=>videoEl.currentTime+=5},
+      {name:'-5', action:()=>videoEl.currentTime-=5},
     ];
 
-    buttonNames.forEach((name,i)=>{
+    buttonData.forEach((b,i)=>{
       const btn = document.createElement('a-plane');
       btn.setAttribute('width',0.25);
       btn.setAttribute('height',0.08);
@@ -106,20 +112,19 @@ scene.addEventListener('click', async event => {
       btn.setAttribute('opacity',0.6);
 
       const text = document.createElement('a-text');
-      text.setAttribute('value',name);
+      text.setAttribute('value',b.name);
       text.setAttribute('align','center');
       text.setAttribute('color','white');
       text.setAttribute('width',2);
       text.setAttribute('position','0 0 0.01');
       btn.appendChild(text);
 
-      btn.object3D.position.set((i-1.5)*0.3,-videoHeight/2-0.15,0);
+      // позиция относительно видео
+      btn.object3D.position.set((i-1.5)*0.3, -videoHeight/2 -0.15, 0);
 
       // гейзинг
-      let hoverTime=0;
-      btn.addEventListener('mouseenter', ()=>{
-        btn.hovering=true;
-      });
+      let hoverTime = 0;
+      btn.addEventListener('mouseenter', ()=>btn.hovering=true);
       btn.addEventListener('mouseleave', ()=>{
         btn.hovering=false;
         hoverTime=0;
@@ -127,19 +132,18 @@ scene.addEventListener('click', async event => {
 
       scene.addEventListener('tick', ()=>{
         if(btn.hovering){
-          hoverTime += scene.clock ? scene.clock.getDelta() : 0.016;
+          hoverTime += scene.clock?scene.clock.getDelta():0.016;
           if(hoverTime>=3){
-            actions[i]();
+            b.action();
             hoverTime=0;
           }
         }
       });
 
-      videoMesh.add(btn.object3D); // кнопки привязаны к видео
-      buttonEntities.push(btn);
+      // добавляем в сцену
+      scene.appendChild(btn);
+      buttons.push(btn);
     });
-
-    buttonsCreated=true;
   }
 });
 
@@ -162,17 +166,27 @@ scene.addEventListener('touchmove', e=>{
     const newDistance = Math.sqrt(dx*dx + dy*dy);
     const scaleFactor = newDistance / startDistance;
 
-    videoMesh.scale.set(startScale*scaleFactor,startScale*scaleFactor,1);
-    buttonEntities.forEach(btn=>{
-      btn.object3D.scale.set(scaleFactor,scaleFactor,1);
+    videoMesh.scale.set(startScale*scaleFactor, startScale*scaleFactor, 1);
+    buttons.forEach(btn=>{
+      btn.object3D.scale.set(scaleFactor, scaleFactor, 1);
     });
   }
 });
 
-// ------------------- Видео всегда смотрит на камеру -------------------
+// ------------------- Видео всегда смотрит на камеру и обновляем таймер -------------------
 scene.addEventListener('tick', ()=>{
   if(videoMesh && videoMesh.visible){
     videoMesh.lookAt(scene.camera.position);
+
+    if(videoEl && videoTimerText){
+      const c = Math.floor(videoEl.currentTime);
+      const d = Math.floor(videoEl.duration || 0);
+      const format = t => `${Math.floor(t/60)}:${("0"+(t%60)).slice(-2)}`;
+      videoTimerText.setAttribute('value',`${format(c)} / ${format(d)}`);
+      videoTimerText.object3D.position.set(videoMesh.position.x - videoWidth/2,
+                                           videoMesh.position.y + videoHeight/2 +0.05,
+                                           videoMesh.position.z);
+    }
   }
 });
 </script>
