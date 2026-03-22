@@ -1,996 +1,551 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <meta charset="utf-8">
-    <title>AR Видео с кнопкой разместить</title>
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
-    <style>
-        body { 
-            margin:0; 
-            overflow:hidden;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            font-family: 'Segoe UI', system-ui, sans-serif;
-        }
-        
-        #fileInput {
-            position:fixed; 
-            top:15px; 
-            left:50%; 
-            transform:translateX(-50%); 
-            z-index:10;
-            background: rgba(255,255,255,0.95);
-            color:#2c3e50;
-            padding:12px 25px;
-            border-radius:50px;
-            border:2px solid #3498db;
-            font-size:14px;
-            font-weight:600;
-            cursor:pointer;
-            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
-            transition: all 0.3s ease;
-        }
-        
-        #fileInput:hover {
-            background: white;
-            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
-            transform: translateX(-50%) scale(1.05);
-        }
-        
-        #placeBtn {
-            position:fixed; 
-            bottom:20px; 
-            left:50%;
-            transform:translateX(-50%); 
-            z-index:10;
-            background: linear-gradient(135deg, #3498db 0%, #2ecc71 100%);
-            color:white;
-            padding:14px 40px;
-            border-radius:50px;
-            font-size:16px; 
-            font-weight:600;
-            cursor:pointer;
-            border:none;
-            box-shadow: 0 6px 20px rgba(46, 204, 113, 0.4);
-            transition: all 0.3s ease;
-            letter-spacing: 0.5px;
-        }
-        
-        #placeBtn:hover {
-            transform: translateX(-50%) scale(1.08);
-            box-shadow: 0 8px 25px rgba(46, 204, 113, 0.6);
-        }
-        
-        #videoTime {
-            position: fixed; 
-            top: 15px; 
-            right: 15px;
-            color: white; 
-            background: rgba(0,0,0,0.7);
-            padding: 8px 15px; 
-            border-radius: 25px;
-            font-family: 'Monaco', 'Courier New', monospace; 
-            z-index: 10;
-            font-size: 13px;
-            border: 1px solid rgba(255,255,255,0.1);
-            backdrop-filter: blur(10px);
-        }
-        
-        #cameraBtn {
-            position: fixed;
-            top: 15px;
-            left: 15px;
-            background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
-            color: white;
-            padding: 10px 15px;
-            border-radius: 50px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-            box-shadow: 0 4px 15px rgba(155, 89, 182, 0.4);
-            transition: all 0.3s ease;
-            z-index: 10;
-        }
-        
-        #cameraBtn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 20px rgba(155, 89, 182, 0.6);
-        }
-        
-        /* Скрытие VR кнопки */
-        .a-enter-vr {
-            display: none !important;
-        }
-        
-        /* Скрытие маркеров AR.js */
-        .a-enter-ar {
-            display: none !important;
-        }
-        
-        /* Индикатор загрузки */
-        .loading-spinner {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 50px;
-            height: 50px;
-            border: 4px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: #3498db;
-            animation: spin 1s ease-in-out infinite;
-            z-index: 1000;
-            display: none;
-        }
-        
-        @keyframes spin {
-            to { transform: translate(-50%, -50%) rotate(360deg); }
-        }
-        
-        /* Модальное окно выбора камеры */
-        .camera-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 10000;
-            backdrop-filter: blur(5px);
-        }
-        
-        .camera-modal-content {
-            background: white;
-            padding: 30px;
-            border-radius: 15px;
-            max-width: 400px;
-            width: 80%;
-            text-align: center;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-        }
-        
-        .camera-option {
-            background: #3498db;
-            color: white;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .camera-option:hover {
-            background: #2980b9;
-            transform: translateY(-2px);
-        }
-        
-        .close-modal {
-            background: #e74c3c;
-            color: white;
-            padding: 10px 20px;
-            margin-top: 15px;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: inline-block;
-        }
-        
-        .close-modal:hover {
-            background: #c0392b;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>SpatialOS</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:-apple-system,sans-serif;color:#fff;user-select:none}
+
+/* ═══ КАМЕРА — САМЫЙ ГЛАВНЫЙ СЛОЙ ═══ */
+#cam{
+  position:fixed;
+  top:0;left:0;
+  width:100vw;
+  height:100vh;
+  object-fit:cover;
+  z-index:0;
+  display:block;
+  /* НЕ зеркалим — задняя камера */
+  transform:none;
+}
+
+/* фон — виден только если камера не работает */
+#bg{
+  position:fixed;inset:0;z-index:0;
+  background:
+    radial-gradient(ellipse at 30% 40%,rgba(5,20,60,0.95),transparent 60%),
+    linear-gradient(170deg,#020508,#04080f,#020406);
+  transition:opacity 1s;
+}
+
+#vig{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse 90% 90% at center,transparent 38%,rgba(0,0,0,0.22) 65%,rgba(0,0,0,0.65) 100%)}
+#dim{position:fixed;inset:0;z-index:2;pointer-events:none;background:rgba(0,0,0,0);transition:background .4s}
+
+/* ═══ МИР — окна в пространстве ═══ */
+#world{
+  position:fixed;
+  width:320vw;height:240vh;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  z-index:10;
+  pointer-events:none;
+}
+#world .w{pointer-events:all}
+
+/* ═══ LIQUID GLASS ═══ */
+.w{position:absolute;border-radius:22px}
+.wb{
+  position:relative;border-radius:22px;overflow:hidden;
+  background:rgba(255,255,255,0.09);
+  backdrop-filter:blur(55px) saturate(210%) brightness(1.1);
+  -webkit-backdrop-filter:blur(55px) saturate(210%) brightness(1.1);
+  box-shadow:0 20px 70px rgba(0,0,0,0.55),0 5px 22px rgba(0,0,0,0.38),inset 0 0 0 0.5px rgba(255,255,255,0.05);
+  padding:20px 22px;
+}
+.wb::before{
+  content:'';position:absolute;inset:0;border-radius:22px;
+  border:1.5px solid transparent;
+  background:linear-gradient(145deg,rgba(255,255,255,0.68) 0%,rgba(255,255,255,0.13) 20%,rgba(255,255,255,0.02) 44%,rgba(255,255,255,0.07) 68%,rgba(255,255,255,0.5) 100%) border-box;
+  -webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);
+  mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);
+  -webkit-mask-composite:destination-out;mask-composite:exclude;
+  pointer-events:none;
+}
+.wb::after{content:'';position:absolute;top:0;left:9%;right:9%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.95) 35%,#fff 50%,rgba(255,255,255,0.95) 65%,transparent);pointer-events:none}
+.ll{position:absolute;left:-1.5px;top:8%;bottom:8%;width:3px;border-radius:2px;filter:blur(.7px);pointer-events:none;background:linear-gradient(180deg,transparent,rgba(255,255,255,.55) 25%,rgba(255,255,255,1) 50%,rgba(255,255,255,.55) 75%,transparent);animation:ll 4s ease-in-out infinite}
+.lr{position:absolute;right:-1px;top:16%;bottom:16%;width:2px;border-radius:2px;filter:blur(.6px);pointer-events:none;background:linear-gradient(180deg,transparent,rgba(255,255,255,.4) 50%,transparent);animation:lr 5.5s ease-in-out infinite}
+.lb{position:absolute;bottom:-1px;left:22%;right:22%;height:2px;border-radius:50%;filter:blur(1px);pointer-events:none;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent)}
+.ltl{position:absolute;top:1px;left:5px;width:22px;height:5px;border-radius:50%;background:rgba(255,255,255,.6);filter:blur(2px);pointer-events:none}
+@keyframes ll{0%,100%{top:8%;bottom:8%;opacity:.85}50%{top:4%;bottom:4%;opacity:1}}
+@keyframes lr{0%,100%{top:16%;bottom:16%;opacity:.65}50%{top:10%;bottom:22%;opacity:.9}}
+
+/* ═══ ПОЗИЦИИ ОКОН ═══ */
+#wclock{top:28%;left:50%;transform:translate(-50%,0);text-align:center}
+#wclock .wb{padding:26px 58px;min-width:230px}
+.ct{font-size:80px;font-weight:200;letter-spacing:-5px;line-height:1;background:linear-gradient(180deg,#fff 20%,rgba(255,255,255,.5) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.cd{font-size:15px;font-weight:300;color:rgba(255,255,255,.45);margin-top:8px}
+
+#wweather{top:27%;left:70%}
+#wweather .wb{min-width:138px}
+.wi{font-size:34px;margin-bottom:6px}.wc{font-size:12px;color:rgba(255,255,255,.42);font-weight:300}
+.wt{font-size:50px;font-weight:200;letter-spacing:-3px;line-height:1.05}
+.wd{font-size:12px;color:rgba(255,255,255,.38);margin-top:4px}
+
+#wctrl{top:27%;right:70%;transform:translateX(100%)}
+#wctrl .wb{width:158px}
+.cl{font-size:11px;color:rgba(255,255,255,.38);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
+.cr{margin-bottom:13px}.cr:last-child{margin-bottom:0}
+.cn{font-size:12px;color:rgba(255,255,255,.42);margin-bottom:7px;display:flex;justify-content:space-between}
+input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:rgba(255,255,255,.14);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.6)}
+
+#wapps{top:60%;left:50%;transform:translateX(-50%)}
+#wapps .wb{padding:22px 24px}
+.ag{display:grid;grid-template-columns:repeat(5,62px);gap:12px}
+.ap{width:62px;height:62px;border-radius:17px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;font-size:27px;position:relative;background:rgba(255,255,255,0.09);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
+.ap:active{transform:scale(.82)!important}
+.ap-lbl{font-size:9px;color:rgba(255,255,255,.45);line-height:1}
+.badge{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;border-radius:9px;background:#ff3b30;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px}
+
+#wmusic{top:57%;right:72%;transform:translateX(100%)}
+#wmusic .wb{min-width:222px}
+.mh{display:flex;gap:13px;align-items:center;margin-bottom:13px}
+.ma{width:48px;height:48px;border-radius:13px;flex-shrink:0;background:linear-gradient(135deg,#12285c,#3d8eff,#12573a);display:flex;align-items:center;justify-content:center;font-size:21px;box-shadow:0 4px 18px rgba(61,142,255,.45)}
+.mt{font-size:14px;font-weight:500}.ma2{font-size:12px;color:rgba(255,255,255,.4);margin-top:3px}
+.prg{height:3px;background:rgba(255,255,255,.1);border-radius:2px;margin-bottom:13px;overflow:hidden}
+.pf{height:100%;width:38%;background:linear-gradient(90deg,#3d8eff,#7bb8ff);border-radius:2px}
+.mb{display:flex;align-items:center;justify-content:center;gap:28px}
+.mb button{background:none;border:none;color:#fff;font-size:21px;cursor:pointer;opacity:.72;padding:4px;transition:opacity .15s,transform .1s}
+.mb button:active{transform:scale(.8);opacity:.35}
+.pb{width:43px;height:43px;border-radius:50%!important;background:rgba(255,255,255,.13)!important;display:flex;align-items:center;justify-content:center;font-size:17px!important;opacity:1!important}
+
+#wsys{top:57%;left:72%}
+.sr{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12.5px}
+.sr:last-child{margin-bottom:0}
+.sl{color:rgba(255,255,255,.4);font-weight:300;min-width:58px}
+.sb{flex:1;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}
+.sbf{height:100%;border-radius:2px}
+
+#wnotif{top:10%;left:50%;transform:translateX(-50%);opacity:0;pointer-events:none;transition:opacity .45s;z-index:50;white-space:nowrap}
+#wnotif.show{opacity:1;pointer-events:all}
+#wnotif .wb{display:flex;align-items:center;gap:14px;padding:13px 20px;border-radius:22px}
+.ni{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#30d158,#1a8a38);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+
+/* ═══ СТАТУСБАР — приклеен к экрану ═══ */
+#statusbar{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:100;white-space:nowrap}
+#statusbar .wb{display:flex;align-items:center;gap:14px;padding:7px 22px;border-radius:40px;font-size:13px;font-weight:300}
+
+/* ═══ HOME BAR — приклеен к экрану ═══ */
+#homebar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:100;white-space:nowrap}
+#homebar .wb{display:flex;align-items:center;gap:10px;padding:11px 16px;border-radius:36px}
+.hb{width:54px;height:54px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);transition:transform .2s cubic-bezier(.34,1.56,.64,1);font-size:26px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+.hb:active{transform:scale(.82)!important}
+.hb-sep{width:1px;height:38px;background:rgba(255,255,255,.1);margin:0 2px}
+.hb-home{width:60px;height:60px;border-radius:50%!important;background:rgba(255,255,255,.11)!important;border:1.5px solid rgba(255,255,255,.22)!important}
+.hb-dot{width:7px;height:7px;border-radius:50%;background:#3d8eff;box-shadow:0 0 10px rgba(61,142,255,.9);animation:blink 2s ease-in-out infinite}
+.hb-lbl{font-size:8.5px;color:rgba(255,255,255,.4)}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ═══ МЕНЮ ПРИЛОЖЕНИЯ ═══ */
+#appmenu{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);opacity:0;pointer-events:none;z-index:200;transition:all .35s cubic-bezier(.16,1,.3,1)}
+#appmenu.show{opacity:1;pointer-events:all;transform:translate(-50%,-50%) scale(1)}
+#appmenu .wb{padding:26px 30px;min-width:270px}
+.aclose{position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.abtn{width:100%;padding:12px 16px;border-radius:14px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.08);color:#fff;font-size:14px;cursor:pointer;font-family:-apple-system,sans-serif;margin-bottom:8px;text-align:left;transition:background .15s}
+.abtn:last-child{margin-bottom:0}
+.abtn:active{background:rgba(255,255,255,.04)}
+
+/* ═══ СТАРТОВЫЙ ЭКРАН ═══ */
+#splash{position:fixed;inset:0;z-index:900;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(0,0,0,0.94);backdrop-filter:blur(24px)}
+#splash .logo{font-size:62px;animation:float 3s ease-in-out infinite}
+#splash h1{font-size:27px;font-weight:300;letter-spacing:-.5px}
+#splash .sub{font-size:14px;color:rgba(255,255,255,.42);text-align:center;max-width:280px;line-height:1.75}
+
+/* ВАЖНОЕ ПРЕДУПРЕЖДЕНИЕ */
+#splash .warn{
+  background:rgba(255,159,10,0.15);border:1px solid rgba(255,159,10,0.35);
+  border-radius:14px;padding:14px 18px;
+  font-size:13px;color:rgba(255,200,100,.9);
+  max-width:300px;line-height:1.65;text-align:center;
+}
+#splash .warn strong{display:block;font-size:14px;margin-bottom:4px}
+
+.chip{display:inline-block;padding:5px 14px;border-radius:18px;font-size:11.5px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);margin:3px}
+#splash button{
+  padding:15px 52px;border-radius:32px;border:none;
+  background:linear-gradient(135deg,#2060d8,#3d8eff);color:#fff;
+  font-size:17px;font-weight:500;cursor:pointer;font-family:-apple-system,sans-serif;
+  box-shadow:0 4px 28px rgba(61,142,255,.55);transition:transform .15s;
+}
+#splash button:active{transform:scale(.95)}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+
+/* ═══ СТАТУС КАМЕРЫ ═══ */
+#camstatus{
+  position:fixed;top:60px;left:50%;transform:translateX(-50%);
+  z-index:500;font-size:13px;padding:8px 18px;border-radius:20px;
+  background:rgba(0,0,0,.7);white-space:nowrap;
+  transition:opacity 1s;
+}
+
+/* прицел */
+#reticle{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:24px;height:24px;z-index:15;pointer-events:none}
+#reticle::before,#reticle::after{content:'';position:absolute;background:rgba(255,255,255,.3)}
+#reticle::before{top:50%;left:0;right:0;height:1px;transform:translateY(-50%)}
+#reticle::after{left:50%;top:0;bottom:0;width:1px;transform:translateX(-50%)}
+</style>
 </head>
 <body>
-    <input type="file" id="fileInput" accept="video/*">
-    <button id="cameraBtn">📷 Сменить камеру</button>
-    <div id="videoTime">00:00 / 00:00</div>
-    <div id="placeBtn">🎬 Разместить видео</div>
-    <div class="loading-spinner" id="loadingSpinner"></div>
-    
-    <div id="cameraModal" class="camera-modal" style="display: none;">
-        <div class="camera-modal-content">
-            <h3 style="margin-bottom: 20px; color: #2c3e50;">Выберите камеру</h3>
-            <div id="cameraOptions"></div>
-            <div class="close-modal" id="closeModal">Закрыть</div>
-        </div>
+
+<!-- КАМЕРА ПЕРВАЯ -->
+<video id="cam" autoplay playsinline muted></video>
+<div id="bg"></div>
+<div id="vig"></div>
+<div id="dim"></div>
+<div id="reticle"></div>
+
+<!-- СТАРТОВЫЙ ЭКРАН -->
+<div id="splash">
+  <div class="logo">🥽</div>
+  <h1>SpatialOS</h1>
+  <p class="sub">Окна висят в реальном мире.<br>Поворачивай телефон — смотри на разные окна.</p>
+
+  <div class="warn">
+    <strong>⚠️ Важно для камеры!</strong>
+    Камера работает только через HTTPS.<br>
+    Открой через <strong>GitHub Pages</strong> или нажми кнопку ниже для теста без камеры.
+  </div>
+
+  <div>
+    <div class="chip">🌍 World-locked AR</div>
+    <div class="chip">🧭 Трекинг головы</div>
+    <div class="chip">✨ Liquid Glass</div>
+  </div>
+
+  <button onclick="launch()">▶ Запустить с камерой</button>
+  <div style="font-size:13px;color:rgba(255,255,255,.35);cursor:pointer;margin-top:-8px" onclick="launchNoCam()">Без камеры (тест)</div>
+</div>
+
+<!-- СТАТУС -->
+<div id="camstatus" style="display:none"></div>
+
+<!-- СТАТУСБАР (прибит к экрану) -->
+<div id="statusbar">
+  <div class="wb">
+    <span style="font-weight:500;font-size:14px" id="sbt">00:00</span>
+    <span style="opacity:.22">│</span>
+    <span style="font-size:12px;opacity:.6">📶</span>
+    <span style="opacity:.22">│</span>
+    <span style="font-size:12px;opacity:.6">🔋<span id="batpct"> 72%</span></span>
+  </div>
+  <div class="ll"></div><div class="lr"></div><div class="ltl"></div>
+</div>
+
+<!-- МИР -->
+<div id="world">
+
+  <!-- ЧАСЫ -->
+  <div class="w" id="wclock">
+    <div class="wb">
+      <div class="ct" id="ct">00:00</div>
+      <div class="cd" id="cd">Загрузка...</div>
     </div>
-    
-    <a-scene 
-        embedded 
-        arjs='sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;' 
-        cursor="rayOrigin: mouse"
-        vr-mode-ui="enabled: false"
-        id="arScene">
-        
-        <a-entity camera look-controls>
-            <!-- Курсор в виде пульсирующего кольца -->
-            <a-cursor id="main-cursor"
-                     fuse="true"
-                     fuse-timeout="2000"
-                     raycaster="objects: .clickable"
-                     geometry="primitive: ring; radiusInner: 0.006; radiusOuter: 0.012"
-                     material="color: #3498db; shader: flat; opacity: 0.8"
-                     position="0 0 -1"
-                     animation__click="property: scale; startEvents: click; easing: easeInCubic; dur: 150; from: 0.1 0.1 0.1; to: 1 1 1"
-                     animation__fusing="property: scale; startEvents: fusing; easing: easeInCubic; dur: 2000; from: 1 1 1; to: 0.1 0.1 0.1"
-                     animation__mouseleave="property: scale; startEvents: mouseleave; easing: easeInCubic; dur: 500; to: 1 1 1"
-                     animation__pulse="property: scale; dir: alternate; dur: 1500; easing: easeInOutSine; loop: true; from: 1 1 1; to: 1.2 1.2 1.2">
-            </a-cursor>
-        </a-entity>
-        
-        <!-- Свет для лучшей видимости -->
-        <a-entity light="type: ambient; color: #666; intensity: 0.8"></a-entity>
-        <a-entity light="type: directional; color: #fff; intensity: 0.5" position="-1 2 1"></a-entity>
-        
-    </a-scene>
-    
-    <script>
-        const scene = document.querySelector('a-scene');
-        const fileInput = document.getElementById('fileInput');
-        const placeBtn = document.getElementById('placeBtn');
-        const timeEl = document.getElementById('videoTime');
-        const loadingSpinner = document.getElementById('loadingSpinner');
-        const cameraBtn = document.getElementById('cameraBtn');
-        const cameraModal = document.getElementById('cameraModal');
-        const cameraOptions = document.getElementById('cameraOptions');
-        const closeModal = document.getElementById('closeModal');
-        
-        let videoEl, videoMesh, videoTexture;
-        let videoContainer;
-        let currentScale = 1;
-        let isPlaced = false;
-        let firstInteraction = true;
-        let playButton, pauseButton, volumeButton;
-        let videoWidth = 1.2;
-        let videoHeight = 0.8;
-        let isTimeUpdating = false;
-        let updateTimeInterval = null;
-        let currentCameraId = null;
-        let cameras = [];
-        let isWideAngleCamera = false;
-        let updateVideoRotationInterval = null;
+    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
+  </div>
 
-        // Функция для обновления вращения видео, чтобы оно всегда смотрело в камеру
-        function updateVideoRotation() {
-            if (!videoContainer || !scene.camera) return;
-            
-            // Получаем позицию камеры
-            const camera = scene.camera;
-            const cameraPosition = camera.getWorldPosition(new THREE.Vector3());
-            
-            // Получаем текущую позицию видео
-            const videoPosition = videoContainer.getWorldPosition(new THREE.Vector3());
-            
-            // Создаем вектор направления от видео к камере
-            const direction = new THREE.Vector3()
-                .subVectors(cameraPosition, videoPosition)
-                .normalize();
-            
-            // Вычисляем угол вращения вокруг оси Y
-            const angleY = Math.atan2(direction.x, direction.z);
-            
-            // Вычисляем угол наклона (pitch) для того, чтобы видео также наклонялось вверх/вниз
-            const horizontalDistance = Math.sqrt(direction.x * direction.x + direction.z * direction.z);
-            const angleX = Math.atan2(-direction.y, horizontalDistance);
-            
-            // Применяем вращение к видео
-            videoContainer.rotation.x = angleX;
-            videoContainer.rotation.y = angleY;
-            videoContainer.rotation.z = 0;
-            
-            // Также обновляем вращение кнопок, чтобы они оставались горизонтальными
-            if (playButton) {
-                playButton.rotation.x = -angleX;
-                playButton.rotation.y = 0;
-                playButton.rotation.z = 0;
-            }
-            if (pauseButton) {
-                pauseButton.rotation.x = -angleX;
-                pauseButton.rotation.y = 0;
-                pauseButton.rotation.z = 0;
-            }
-            if (volumeButton) {
-                volumeButton.rotation.x = -angleX;
-                volumeButton.rotation.y = 0;
-                volumeButton.rotation.z = 0;
-            }
-        }
+  <!-- ПОГОДА -->
+  <div class="w" id="wweather">
+    <div class="wb">
+      <div class="wi">⛅</div>
+      <div class="wc">Москва</div>
+      <div class="wt">+8°</div>
+      <div class="wd">Облачно · 12 км/ч</div>
+    </div>
+    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
+  </div>
 
-        // Запускаем интервал для обновления вращения видео
-        function startVideoRotationUpdate() {
-            if (updateVideoRotationInterval) {
-                clearInterval(updateVideoRotationInterval);
-            }
-            updateVideoRotationInterval = setInterval(updateVideoRotation, 50); // Обновляем 20 раз в секунду
-        }
+  <!-- КОНТРОЛЫ -->
+  <div class="w" id="wctrl">
+    <div class="wb">
+      <div class="cl">Среда</div>
+      <div class="cr">
+        <div class="cn"><span>🌍 Мир</span><span id="dv">0%</span></div>
+        <input type="range" min="0" max="95" value="0" id="ds">
+      </div>
+      <div class="cr">
+        <div class="cn"><span>☀️ Яркость</span><span id="bv">100%</span></div>
+        <input type="range" min="30" max="100" value="100" id="bs">
+      </div>
+    </div>
+    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
+  </div>
 
-        // Останавливаем обновление вращения
-        function stopVideoRotationUpdate() {
-            if (updateVideoRotationInterval) {
-                clearInterval(updateVideoRotationInterval);
-                updateVideoRotationInterval = null;
-            }
-        }
+  <!-- ПРИЛОЖЕНИЯ -->
+  <div class="w" id="wapps">
+    <div class="wb">
+      <div class="ag">
+        <div class="ap" onclick="openApp('Safari','🌐','Браузер')">🌐<div class="ap-lbl">Safari</div></div>
+        <div class="ap" onclick="openApp('Фото','🖼️','Галерея')">🖼️<div class="ap-lbl">Фото</div></div>
+        <div class="ap" onclick="openApp('Почта','📧','Входящие')">📧<div class="ap-lbl">Почта</div><div class="badge">5</div></div>
+        <div class="ap" onclick="openApp('Карты','🗺️','Навигация')">🗺️<div class="ap-lbl">Карты</div></div>
+        <div class="ap" onclick="openApp('Настройки','⚙️','Система')">⚙️<div class="ap-lbl">Настройки</div></div>
+        <div class="ap" onclick="openApp('Чаты','💬','Сообщения')">💬<div class="ap-lbl">Чаты</div><div class="badge">3</div></div>
+        <div class="ap" onclick="openApp('Музыка','🎵','Плеер')">🎵<div class="ap-lbl">Музыка</div></div>
+        <div class="ap" onclick="openApp('Видео','🎬','Кино')">🎬<div class="ap-lbl">Видео</div></div>
+        <div class="ap" onclick="openApp('Игры','🎮','Игровой центр')">🎮<div class="ap-lbl">Игры</div></div>
+        <div class="ap" onclick="openApp('Здоровье','❤️','Активность')">❤️<div class="ap-lbl">Здоровье</div></div>
+      </div>
+    </div>
+    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
+  </div>
 
-        // Функция для поиска доступных камер
-        async function getAvailableCameras() {
-            try {
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(device => device.kind === 'videoinput');
-                return videoDevices;
-            } catch (error) {
-                console.error('Error getting cameras:', error);
-                return [];
-            }
-        }
+  <!-- МУЗЫКА -->
+  <div class="w" id="wmusic">
+    <div class="wb">
+      <div class="mh">
+        <div class="ma">🎵</div>
+        <div><div class="mt">Midnight City</div><div class="ma2">M83</div></div>
+      </div>
+      <div class="prg"><div class="pf"></div></div>
+      <div class="mb">
+        <button>⏮</button>
+        <button class="pb" id="pb" onclick="togglePlay()">⏸</button>
+        <button>⏭</button>
+      </div>
+    </div>
+    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
+  </div>
 
-        // Функция для поиска широкоугольной камеры (0.6x)
-        function findWideAngleCamera(cameras) {
-            // Ищем камеру с широкоугольным объективом по названию
-            for (const camera of cameras) {
-                const label = camera.label.toLowerCase();
-                // Проверяем по ключевым словам, которые могут указывать на широкоугольную камеру
-                if (label.includes('wide') || label.includes('ultrawide') || 
-                    label.includes('0.6') || label.includes('ultra wide') ||
-                    label.includes('back') || label.includes('rear')) {
-                    return camera;
-                }
-            }
-            return cameras[0]; // Если не нашли, возвращаем первую камеру
-        }
+  <!-- СИСТЕМНЫЙ -->
+  <div class="w" id="wsys">
+    <div class="wb">
+      <div class="sr"><span class="sl">Батарея</span><div class="sb"><div class="sbf" id="batbar" style="width:72%;background:linear-gradient(90deg,#30d158,#34d270)"></div></div><span style="font-size:11px" id="batval">72%</span></div>
+      <div class="sr"><span class="sl">WiFi</span><div class="sb"><div class="sbf" style="width:88%;background:linear-gradient(90deg,#3d8eff,#7bb8ff)"></div></div><span style="font-size:11px">115M</span></div>
+      <div class="sr"><span class="sl">Камера</span><span style="font-size:12px;color:#30d158" id="cs">⏳ Ожидание</span></div>
+      <div class="sr"><span class="sl">Гироскоп</span><span style="font-size:11px;color:rgba(255,255,255,.4)" id="gyro">—</span></div>
+    </div>
+    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
+  </div>
 
-        // Функция для переключения камеры
-        async function switchCamera(deviceId) {
-            try {
-                loadingSpinner.style.display = 'block';
-                
-                const constraints = {
-                    video: {
-                        deviceId: deviceId ? { exact: deviceId } : undefined,
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                };
-                
-                // Получаем новый поток с выбранной камерой
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                
-                // Получаем информацию о камере для определения, является ли она широкоугольной
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const currentDevice = devices.find(d => d.deviceId === deviceId);
-                
-                // Проверяем, является ли камера широкоугольной
-                isWideAngleCamera = currentDevice.label.toLowerCase().includes('wide') || 
-                                    currentDevice.label.toLowerCase().includes('ultrawide') ||
-                                    currentDevice.label.toLowerCase().includes('0.6');
-                
-                // Обновляем видеоэлемент AR.js
-                const arSystem = scene.systems.arjs;
-                if (arSystem && arSystem._arSource) {
-                    // Останавливаем старый поток
-                    if (arSystem._arSource.domElement.srcObject) {
-                        arSystem._arSource.domElement.srcObject.getTracks().forEach(track => track.stop());
-                    }
-                    
-                    // Устанавливаем новый поток
-                    arSystem._arSource.domElement.srcObject = stream;
-                    
-                    // Перезапускаем AR.js
-                    arSystem._arSource.play();
-                    
-                    // Принудительно обновляем размеры видео
-                    setTimeout(() => {
-                        if (arSystem._arSource.onResize) {
-                            arSystem._arSource.onResize();
-                        }
-                    }, 100);
-                }
-                
-                currentCameraId = deviceId;
-                cameraBtn.innerHTML = isWideAngleCamera ? '📷 0.6x Камера' : '📷 Сменить камеру';
-                
-                loadingSpinner.style.display = 'none';
-                cameraModal.style.display = 'none';
-                
-                // Перезапускаем видео, если оно было размещено
-                if (videoContainer && videoEl && !videoEl.paused) {
-                    videoEl.play().catch(e => console.log('Play error:', e));
-                }
-                
-            } catch (error) {
-                console.error('Error switching camera:', error);
-                loadingSpinner.style.display = 'none';
-                alert('Не удалось переключить камеру. Убедитесь, что у приложения есть разрешение на использование камеры.');
-            }
-        }
+  <!-- УВЕДОМЛЕНИЕ -->
+  <div class="w" id="wnotif">
+    <div class="wb">
+      <div class="ni" id="ni">💬</div>
+      <div>
+        <div style="font-size:14px;font-weight:500" id="ntitle">Уведомление</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.42);margin-top:2px" id="nmsg">Текст</div>
+      </div>
+    </div>
+    <div class="ll"></div><div class="lr"></div><div class="ltl"></div>
+  </div>
 
-        // Показываем модальное окно выбора камеры
-        cameraBtn.addEventListener('click', async () => {
-            cameras = await getAvailableCameras();
-            
-            if (cameras.length === 0) {
-                alert('Камеры не найдены. Убедитесь, что у приложения есть доступ к камере.');
-                return;
-            }
-            
-            cameraOptions.innerHTML = '';
-            
-            cameras.forEach((camera, index) => {
-                const cameraDiv = document.createElement('div');
-                cameraDiv.className = 'camera-option';
-                cameraDiv.textContent = camera.label || `Камера ${index + 1}`;
-                cameraDiv.addEventListener('click', () => {
-                    switchCamera(camera.deviceId);
-                });
-                cameraOptions.appendChild(cameraDiv);
-            });
-            
-            cameraModal.style.display = 'flex';
-        });
+</div><!-- /world -->
 
-        // Закрываем модальное окно
-        closeModal.addEventListener('click', () => {
-            cameraModal.style.display = 'none';
-        });
+<!-- HOME BAR -->
+<div id="homebar">
+  <div class="wb">
+    <div class="hb" onclick="notify('📱','Телефон','Входящий звонок')">📱<div class="hb-lbl">Звонок</div></div>
+    <div class="hb" onclick="notify('🔍','Поиск','Голосовой поиск')">🔍<div class="hb-lbl">Поиск</div></div>
+    <div class="hb-sep"></div>
+    <div class="hb hb-home" onclick="goHome()"><div class="hb-dot"></div></div>
+    <div class="hb-sep"></div>
+    <div class="hb" id="cambtn" onclick="toggleCam()">👁️<div class="hb-lbl">Камера</div></div>
+    <div class="hb" onclick="notify('🔔','Уведомления','3 новых')">🔔<div class="hb-lbl">Центр</div></div>
+  </div>
+  <div class="ll"></div><div class="lr"></div><div class="ltl"></div>
+</div>
 
-        // Закрываем модальное окно при клике вне его
-        cameraModal.addEventListener('click', (e) => {
-            if (e.target === cameraModal) {
-                cameraModal.style.display = 'none';
-            }
-        });
+<!-- МЕНЮ ПРИЛОЖЕНИЯ -->
+<div id="appmenu">
+  <div class="wb">
+    <button class="aclose" onclick="closeApp()">✕</button>
+    <div style="font-size:38px;margin-bottom:10px" id="aicon">🌐</div>
+    <div style="font-size:20px;font-weight:400;margin-bottom:6px" id="atitle">Safari</div>
+    <div style="font-size:13px;color:rgba(255,255,255,.42);margin-bottom:20px" id="adesc">Браузер</div>
+    <button class="abtn">▶ Открыть</button>
+    <button class="abtn">📌 Закрепить в пространстве</button>
+    <button class="abtn" onclick="closeApp()">✕ Закрыть</button>
+  </div>
+  <div class="ll"></div><div class="lr"></div><div class="ltl"></div>
+</div>
 
-        // Загрузка видео
-        fileInput.addEventListener('change', async e => {
-            const file = e.target.files[0];
-            if(!file) return;
-            
-            loadingSpinner.style.display = 'block';
-            
-            try {
-                if(videoEl && videoEl.src) {
-                    URL.revokeObjectURL(videoEl.src);
-                    stopTimeUpdate();
-                }
-                
-                const url = URL.createObjectURL(file);
-                videoEl = document.createElement('video');
-                videoEl.src = url;
-                videoEl.loop = true;
-                videoEl.muted = true;
-                videoEl.playsInline = true;
-                videoEl.crossOrigin = 'anonymous';
-                
-                await new Promise((resolve) => {
-                    videoEl.addEventListener('loadeddata', resolve, { once: true });
-                });
-                
-                const aspectRatio = videoEl.videoWidth / videoEl.videoHeight;
-                // Автоматически настраиваем размер видео в зависимости от камеры
-                if (isWideAngleCamera) {
-                    // Для широкоугольной камеры (0.6x) делаем видео больше
-                    if (videoEl.videoHeight > videoEl.videoWidth) {
-                        videoWidth = 1.0; // Больший размер для широкоугольной камеры
-                        videoHeight = videoWidth / aspectRatio;
-                    } else {
-                        videoHeight = 1.2; // Больший размер для широкоугольной камеры
-                        videoWidth = videoHeight * aspectRatio;
-                    }
-                } else {
-                    // Для обычной камеры используем стандартный размер
-                    if (videoEl.videoHeight > videoEl.videoWidth) {
-                        videoWidth = 0.8;
-                        videoHeight = videoWidth / aspectRatio;
-                    } else {
-                        videoHeight = 1.0;
-                        videoWidth = videoHeight * aspectRatio;
-                    }
-                }
-                
-                if (videoTexture) videoTexture.dispose();
-                videoTexture = new THREE.VideoTexture(videoEl);
-                videoTexture.minFilter = THREE.LinearFilter;
-                videoTexture.magFilter = THREE.LinearFilter;
-                videoTexture.format = THREE.RGBAFormat;
-                
-            } catch (error) {
-                console.error('Error loading video:', error);
-            } finally {
-                loadingSpinner.style.display = 'none';
-            }
-        });
+<script>
+// ═══ МИРОВЫЕ ПОЗИЦИИ ОКОН (в градусах) ═══
+const WORLD_POS = {
+  wclock:   { az:  0,  el: 16 },
+  wweather: { az: 46,  el: 12 },
+  wctrl:    { az:-46,  el: 12 },
+  wapps:    { az:  0,  el:-20 },
+  wmusic:   { az:-42,  el:-22 },
+  wsys:     { az: 44,  el:-22 },
+  wnotif:   { az:  0,  el: 38 },
+};
+const PX = 20; // пикселей на градус
 
-        // Обновление времени видео
-        function startTimeUpdate() {
-            if (updateTimeInterval) {
-                clearInterval(updateTimeInterval);
-            }
-            
-            updateTimeInterval = setInterval(() => {
-                if(videoEl && videoEl.duration) {
-                    const f = t => `${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
-                    timeEl.textContent = `${f(videoEl.currentTime)} / ${f(videoEl.duration)}`;
-                }
-            }, 300);
-        }
+const WW = window.innerWidth * 3.2;
+const WH = window.innerHeight * 2.4;
 
-        function stopTimeUpdate() {
-            if (updateTimeInterval) {
-                clearInterval(updateTimeInterval);
-                updateTimeInterval = null;
-            }
-        }
+let viewAz=0, viewEl=0, smAz=0, smEl=0;
+let calibAz=null, calibEl=null;
 
-        // Размещение видео
-        placeBtn.addEventListener('click', () => {
-            if(!videoEl || !videoTexture) {
-                alert('Пожалуйста, сначала выберите видео файл');
-                return;
-            }
-            
-            const camera = scene.camera;
-            const distance = isPlaced ? 1.2 : 1.5;
-            
-            // Если видео уже размещено, просто обновляем позицию
-            if (!videoContainer) {
-                videoContainer = new THREE.Group();
-                scene.object3D.add(videoContainer);
-                
-                const geometry = new THREE.PlaneGeometry(videoWidth, videoHeight);
-                const material = new THREE.MeshBasicMaterial({
-                    map: videoTexture,
-                    side: THREE.DoubleSide,
-                    transparent: true,
-                    opacity: 1
-                });
-                
-                videoMesh = new THREE.Mesh(geometry, material);
-                videoContainer.add(videoMesh);
-                
-                createButtons();
-                
-                // Запускаем обновление вращения видео
-                startVideoRotationUpdate();
-            }
-            
-            // Позиционируем видео перед камерой
-            const pos = camera.position.clone().add(
-                camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(distance)
-            );
-            
-            videoContainer.position.copy(pos);
-            
-            // Не фиксируем вращение, так как оно будет обновляться автоматически
-            // videoContainer.rotation.set(0, 0, 0);
-            
-            // Сразу обновляем вращение, чтобы видео смотрело в камеру
-            updateVideoRotation();
-            
-            // Сохраняем текущий масштаб при перемещении
-            videoContainer.scale.set(currentScale, currentScale, currentScale);
-            
-            if(firstInteraction){
-                videoEl.muted = false;
-                videoEl.play().catch(e => console.log('Play error:', e));
-                firstInteraction = false;
-                startTimeUpdate();
-            }
-            
-            isPlaced = true;
-            placeBtn.textContent = '📌 Переместить видео';
-        });
+function updateWorld() {
+  for (const [id, p] of Object.entries(WORLD_POS)) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const dAz = p.az - smAz;
+    const dEl = p.el - smEl;
+    const x = WW/2 + dAz * PX;
+    const y = WH/2 - dEl * PX;
+    const dist = Math.sqrt(dAz*dAz + dEl*dEl);
+    const alpha = Math.max(0, 1 - dist/75);
+    const scale = Math.max(0.72, 1 - dist/300);
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+    el.style.transform = `translate(-50%,-50%) scale(${scale})`;
+    el.style.opacity = alpha;
+  }
+}
 
-        // Создание стилизованных кнопок под видео (увеличенных и ближе друг к другу)
-        function createButtons() {
-            // Удаляем старые кнопки
-            if (playButton) videoContainer.remove(playButton);
-            if (pauseButton) videoContainer.remove(pauseButton);
-            if (volumeButton) videoContainer.remove(volumeButton);
-            
-            // Позиция кнопок - ближе к видео и увеличенные
-            const buttonY = -videoHeight/2 - 0.15;
-            const buttonSpacing = videoWidth * 0.25;
-            
-            // Создаем УВЕЛИЧЕННЫЕ кнопки с новым дизайном
-            playButton = createModernButton('play-btn', -buttonSpacing, buttonY, 0.001, '#2ecc71', '▶', 'play', 0.08);
-            pauseButton = createModernButton('pause-btn', 0, buttonY, 0.001, '#e74c3c', '⏸', 'pause', 0.08);
-            volumeButton = createModernButton('volume-btn', buttonSpacing, buttonY, 0.001, '#3498db', '🔊', 'toggleVolume', 0.08);
-            
-            videoContainer.add(playButton);
-            videoContainer.add(pauseButton);
-            videoContainer.add(volumeButton);
-            
-            createAFrameButtons();
-        }
+// ═══ ГИРОСКОП ═══
+function onOrient(e) {
+  const az = e.gamma || 0;
+  const el = (e.beta  || 45) - 45;
+  if (calibAz === null) { calibAz = az; calibEl = el; }
+  viewAz = (az - calibAz) * 1.3;
+  viewEl = -(el - calibEl) * 1.3;
+  document.getElementById('gyro').textContent = `AZ:${Math.round(viewAz)}° EL:${Math.round(viewEl)}°`;
+}
 
-        function createModernButton(id, x, y, z, color, icon, action, size = 0.08) {
-            const buttonGroup = new THREE.Group();
-            buttonGroup.userData = { 
-                id: id, 
-                action: action,
-                originalColor: new THREE.Color(color),
-                isHovered: false
-            };
-            
-            const buttonGeometry = new THREE.CylinderGeometry(size, size, 0.02, 32);
-            const buttonMaterial = new THREE.MeshPhongMaterial({ 
-                color: color,
-                transparent: true,
-                opacity: 0.9,
-                shininess: 30,
-                emissive: new THREE.Color(color).multiplyScalar(0.3)
-            });
-            
-            const buttonMesh = new THREE.Mesh(buttonGeometry, buttonMaterial);
-            buttonMesh.rotation.x = Math.PI / 2;
-            
-            const iconCanvas = createButtonIcon(icon, size * 120);
-            const iconTexture = new THREE.CanvasTexture(iconCanvas);
-            const iconMaterial = new THREE.MeshBasicMaterial({
-                map: iconTexture,
-                transparent: true,
-                side: THREE.DoubleSide,
-                alphaTest: 0.5
-            });
-            
-            const iconGeometry = new THREE.PlaneGeometry(size * 1.6, size * 1.6);
-            const iconMesh = new THREE.Mesh(iconGeometry, iconMaterial);
-            iconMesh.position.z = 0.01;
-            
-            const glowGeometry = new THREE.CylinderGeometry(size * 1.15, size * 1.15, 0.021, 32);
-            const glowMaterial = new THREE.MeshBasicMaterial({
-                color: color,
-                transparent: true,
-                opacity: 0.3,
-                side: THREE.BackSide
-            });
-            const glowMesh = new THREE.Mesh(glowGeometry, glowMaterial);
-            glowMesh.rotation.x = Math.PI / 2;
-            glowMesh.visible = false;
-            
-            buttonGroup.add(glowMesh);
-            buttonGroup.add(buttonMesh);
-            buttonGroup.add(iconMesh);
-            buttonGroup.position.set(x, y, z);
-            
-            buttonGroup.userData.setHover = function(isHovering) {
-                this.userData.isHovered = isHovering;
-                glowMesh.visible = isHovering;
-                
-                if (isHovering) {
-                    buttonMesh.scale.set(1.2, 1.2, 1.2);
-                    buttonMaterial.emissive.setHex(0x555555);
-                } else {
-                    buttonMesh.scale.set(1, 1, 1);
-                    buttonMaterial.emissive.setHex(0x000000);
-                }
-            };
-            
-            return buttonGroup;
-        }
+function startGyro() {
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    DeviceOrientationEvent.requestPermission()
+      .then(s => { if(s==='granted') window.addEventListener('deviceorientation', onOrient, true); });
+  } else {
+    window.addEventListener('deviceorientation', onOrient, true);
+  }
+}
 
-        function createButtonIcon(icon, size = 90) {
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            canvas.width = 256;
-            canvas.height = 256;
-            
-            context.clearRect(0, 0, canvas.width, canvas.height);
-            
-            context.beginPath();
-            context.arc(128, 128, 110, 0, Math.PI * 2);
-            context.fillStyle = 'rgba(255, 255, 255, 0.25)';
-            context.fill();
-            
-            context.font = `bold ${size}px Arial`;
-            context.fillStyle = '#FFFFFF';
-            context.textAlign = 'center';
-            context.textBaseline = 'middle';
-            context.fillText(icon, 128, 128);
-            
-            context.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-            context.lineWidth = 5;
-            context.strokeText(icon, 128, 128);
-            
-            context.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-            context.lineWidth = 2;
-            context.strokeText(icon, 128, 128);
-            
-            return canvas;
-        }
+// ═══ КАМЕРА ═══
+let camOn = true;
+async function startCamera() {
+  const st = document.getElementById('camstatus');
+  st.style.display = 'block';
+  st.textContent = '📷 Запрашиваю доступ к камере...';
 
-        function createAFrameButtons() {
-            const oldButtons = scene.querySelectorAll('[cursor-listener]');
-            oldButtons.forEach(btn => {
-                if (btn.parentNode) btn.parentNode.removeChild(btn);
-            });
-            
-            const buttonY = -videoHeight/2 - 0.15;
-            const buttonSpacing = videoWidth * 0.25;
-            
-            const playBtn = document.createElement('a-entity');
-            playBtn.classList.add('clickable');
-            playBtn.setAttribute('id', 'a-play-btn');
-            playBtn.setAttribute('geometry', { primitive: 'plane', width: 0.16, height: 0.16 });
-            playBtn.setAttribute('material', { opacity: 0.001, transparent: true });
-            playBtn.setAttribute('position', { x: -buttonSpacing, y: buttonY, z: 0.002 });
-            
-            playBtn.addEventListener('mouseenter', () => {
-                if(playButton) playButton.userData.setHover(true);
-            });
-            playBtn.addEventListener('mouseleave', () => {
-                if(playButton) playButton.userData.setHover(false);
-            });
-            playBtn.addEventListener('click', () => executeButtonAction('play'));
-            playBtn.addEventListener('fusing', (e) => {
-                if(e.detail.progress === 1) executeButtonAction('play');
-            });
-            
-            const pauseBtn = document.createElement('a-entity');
-            pauseBtn.classList.add('clickable');
-            pauseBtn.setAttribute('id', 'a-pause-btn');
-            pauseBtn.setAttribute('geometry', { primitive: 'plane', width: 0.16, height: 0.16 });
-            pauseBtn.setAttribute('material', { opacity: 0.001, transparent: true });
-            pauseBtn.setAttribute('position', { x: 0, y: buttonY, z: 0.002 });
-            
-            pauseBtn.addEventListener('mouseenter', () => {
-                if(pauseButton) pauseButton.userData.setHover(true);
-            });
-            pauseBtn.addEventListener('mouseleave', () => {
-                if(pauseButton) pauseButton.userData.setHover(false);
-            });
-            pauseBtn.addEventListener('click', () => executeButtonAction('pause'));
-            pauseBtn.addEventListener('fusing', (e) => {
-                if(e.detail.progress === 1) executeButtonAction('pause');
-            });
-            
-            const volumeBtn = document.createElement('a-entity');
-            volumeBtn.classList.add('clickable');
-            volumeBtn.setAttribute('id', 'a-volume-btn');
-            volumeBtn.setAttribute('geometry', { primitive: 'plane', width: 0.16, height: 0.16 });
-            volumeBtn.setAttribute('material', { opacity: 0.001, transparent: true });
-            volumeBtn.setAttribute('position', { x: buttonSpacing, y: buttonY, z: 0.002 });
-            
-            volumeBtn.addEventListener('mouseenter', () => {
-                if(volumeButton) volumeButton.userData.setHover(true);
-            });
-            volumeBtn.addEventListener('mouseleave', () => {
-                if(volumeButton) volumeButton.userData.setHover(false);
-            });
-            volumeBtn.addEventListener('click', () => executeButtonAction('toggleVolume'));
-            volumeBtn.addEventListener('fusing', (e) => {
-                if(e.detail.progress === 1) executeButtonAction('toggleVolume');
-            });
-            
-            scene.appendChild(playBtn);
-            scene.appendChild(pauseBtn);
-            scene.appendChild(volumeBtn);
-            
-            if (videoContainer) {
-                playBtn.object3D.parent = videoContainer;
-                pauseBtn.object3D.parent = videoContainer;
-                volumeBtn.object3D.parent = videoContainer;
-            }
-        }
+  try {
+    const constraints = {
+      video: {
+        facingMode: { exact: 'environment' }, // ЗАДНЯЯ камера
+        width: { ideal: 1920 },
+        height: { ideal: 1080 }
+      },
+      audio: false
+    };
 
-        function executeButtonAction(action) {
-            switch(action) {
-                case 'play':
-                    if(videoEl) {
-                        videoEl.play().then(() => {
-                            startTimeUpdate();
-                        }).catch(e => console.log('Play error:', e));
-                        
-                        if(playButton) {
-                            playButton.children[1].material.emissive.setHex(0x666666);
-                            setTimeout(() => {
-                                playButton.children[1].material.emissive.setHex(0x000000);
-                            }, 300);
-                        }
-                    }
-                    break;
-                    
-                case 'pause':
-                    if(videoEl) {
-                        videoEl.pause();
-                        
-                        if(pauseButton) {
-                            pauseButton.children[1].material.emissive.setHex(0x666666);
-                            setTimeout(() => {
-                                pauseButton.children[1].material.emissive.setHex(0x000000);
-                            }, 300);
-                        }
-                    }
-                    break;
-                    
-                case 'toggleVolume':
-                    if(videoEl) {
-                        videoEl.muted = !videoEl.muted;
-                        if(volumeButton) {
-                            const iconMesh = volumeButton.children[2];
-                            const canvas = createButtonIcon(videoEl.muted ? '🔇' : '🔊', 90);
-                            iconMesh.material.map = new THREE.CanvasTexture(canvas);
-                            iconMesh.material.needsUpdate = true;
-                            
-                            volumeButton.children[1].material.emissive.setHex(0x666666);
-                            setTimeout(() => {
-                                volumeButton.children[1].material.emissive.setHex(0x000000);
-                            }, 300);
-                        }
-                    }
-                    break;
-            }
-        }
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch {
+      // Если exact не работает — пробуем ideal
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false
+      });
+    }
 
-        function updateButtonPositions() {
-            if (!videoContainer) return;
-            
-            const buttonY = -videoHeight/2 - 0.15;
-            const buttonSpacing = videoWidth * 0.25;
-            
-            if (playButton) playButton.position.set(-buttonSpacing, buttonY, 0.001);
-            if (pauseButton) pauseButton.position.set(0, buttonY, 0.001);
-            if (volumeButton) volumeButton.position.set(buttonSpacing, buttonY, 0.001);
-            
-            const playBtn = document.getElementById('a-play-btn');
-            const pauseBtn = document.getElementById('a-pause-btn');
-            const volumeBtn = document.getElementById('a-volume-btn');
-            
-            if (playBtn) playBtn.setAttribute('position', { x: -buttonSpacing, y: buttonY, z: 0.002 });
-            if (pauseBtn) pauseBtn.setAttribute('position', { x: 0, y: buttonY, z: 0.002 });
-            if (volumeBtn) volumeBtn.setAttribute('position', { x: buttonSpacing, y: buttonY, z: 0.002 });
-        }
+    const v = document.getElementById('cam');
+    v.srcObject = stream;
 
-        // Масштабирование пальцами
-        let startDistance = null;
-        let startScale = 1;
-        
-        scene.addEventListener('touchstart', e => {
-            if(e.touches.length == 2 && videoContainer){
-                const dx = e.touches[0].clientX - e.touches[1].clientX;
-                const dy = e.touches[0].clientY - e.touches[1].clientY;
-                startDistance = Math.sqrt(dx*dx + dy*dy);
-                startScale = videoContainer.scale.x;
-            }
-        });
-        
-        scene.addEventListener('touchmove', e => {
-            if(e.touches.length == 2 && videoContainer && startDistance){
-                e.preventDefault();
-                const dx = e.touches[0].clientX - e.touches[1].clientX;
-                const dy = e.touches[0].clientY - e.touches[1].clientY;
-                const currentDistance = Math.sqrt(dx*dx + dy*dy);
-                const scaleFactor = currentDistance / startDistance;
+    await new Promise(resolve => { v.onloadedmetadata = resolve; });
+    await v.play();
 
-                const newScale = Math.max(0.1, Math.min(5, startScale * scaleFactor));
-                videoContainer.scale.set(newScale, newScale, newScale);
-                currentScale = newScale;
-                
-                updateButtonPositions();
-            }
-        });
-        
-        scene.addEventListener('touchend', () => {
-            startDistance = null;
-        });
+    document.getElementById('bg').style.opacity = '0';
+    document.getElementById('cs').textContent = '● Онлайн';
+    st.textContent = '✅ Камера работает!';
+    setTimeout(() => { st.style.opacity = '0'; setTimeout(() => st.style.display='none', 1000); }, 2000);
 
-        // Вращение видео - отключаем ручное вращение, так как видео всегда смотрит в камеру
-        // let isRotating = false;
-        // let lastTouchX = 0;
-        
-        // scene.addEventListener('touchstart', e => {
-        //     if(e.touches.length == 1 && videoContainer){
-        //         isRotating = true;
-        //         lastTouchX = e.touches[0].clientX;
-        //     }
-        // });
-        
-        // scene.addEventListener('touchmove', e => {
-        //     if(isRotating && videoContainer && e.touches.length == 1){
-        //         e.preventDefault();
-        //         const deltaX = e.touches[0].clientX - lastTouchX;
-        //         videoContainer.rotation.y += deltaX * 0.01;
-        //         lastTouchX = e.touches[0].clientX;
-        //     }
-        // });
-        
-        // scene.addEventListener('touchend', () => {
-        //     isRotating = false;
-        // });
+  } catch(e) {
+    document.getElementById('cs').textContent = '❌ Нет доступа';
+    document.getElementById('cs').style.color = '#ff453a';
+    st.style.background = 'rgba(255,59,48,.25)';
+    st.textContent = '❌ ' + (e.message || 'Ошибка камеры. Нужен HTTPS!');
+  }
+}
 
-        // Управление с клавиатуры для тестирования
-        window.addEventListener('keydown', (e) => {
-            if(!videoContainer) return;
-            
-            switch(e.key) {
-                case ' ':
-                    if(videoEl) {
-                        if (videoEl.paused) {
-                            videoEl.play();
-                            startTimeUpdate();
-                        } else {
-                            videoEl.pause();
-                        }
-                    }
-                    break;
-                case '+':
-                case '=':
-                    currentScale = Math.min(5, currentScale * 1.1);
-                    videoContainer.scale.set(currentScale, currentScale, currentScale);
-                    updateButtonPositions();
-                    break;
-                case '-':
-                    currentScale = Math.max(0.1, currentScale * 0.9);
-                    videoContainer.scale.set(currentScale, currentScale, currentScale);
-                    updateButtonPositions();
-                    break;
-                case 'r':
-                    // Вращение больше не используется, так как видео всегда смотрит в камеру
-                    // videoContainer.rotation.y += 0.1;
-                    break;
-                case 'm':
-                    if(videoEl) videoEl.muted = !videoEl.muted;
-                    break;
-                case 'f':
-                    // Сброс вращения не нужен, так как видео всегда смотрит в камеру
-                    // videoContainer.rotation.set(0, 0, 0);
-                    break;
-                case 'c':
-                    cameraBtn.click();
-                    break;
-                case 'l':
-                    // Включить/выключить отслеживание камеры
-                    if (updateVideoRotationInterval) {
-                        stopVideoRotationUpdate();
-                        console.log('Отслеживание камеры выключено');
-                    } else {
-                        startVideoRotationUpdate();
-                        console.log('Отслеживание камеры включено');
-                    }
-                    break;
-            }
-        });
+function toggleCam() {
+  camOn = !camOn;
+  document.getElementById('cam').style.opacity = camOn ? '1' : '0';
+  document.getElementById('cambtn').querySelector('.hb-lbl').textContent = camOn ? 'Камера' : 'Выкл';
+}
 
-        // Очистка ресурсов при закрытии
-        window.addEventListener('beforeunload', () => {
-            if(videoEl && videoEl.src) {
-                URL.revokeObjectURL(videoEl.src);
-            }
-            stopTimeUpdate();
-            stopVideoRotationUpdate();
-        });
+// ═══ ЗАПУСК ═══
+async function launch() {
+  document.getElementById('splash').style.display = 'none';
+  await startCamera();
+  startGyro();
+  loop();
+  setTimeout(() => notify('🥽','SpatialOS','Поворачивай телефон!'), 2000);
+}
 
-        // Автоматическое обновление объектов рейкастера
-        scene.addEventListener('renderstart', () => {
-            const cursor = document.getElementById('main-cursor');
-            if (cursor && cursor.components.raycaster) {
-                setTimeout(() => {
-                    cursor.components.raycaster.refreshObjects();
-                }, 100);
-            }
-        });
+function launchNoCam() {
+  document.getElementById('splash').style.display = 'none';
+  startGyro();
+  loop();
+  setTimeout(() => notify('🥽','SpatialOS','Тест без камеры'), 1500);
+}
 
-        // Автоматически пытаемся найти и использовать широкоугольную камеру при загрузке
-        window.addEventListener('load', async () => {
-            setTimeout(async () => {
-                try {
-                    const cameras = await getAvailableCameras();
-                    if (cameras.length > 1) {
-                        const wideAngleCamera = findWideAngleCamera(cameras);
-                        if (wideAngleCamera) {
-                            // Автоматически переключаемся на широкоугольную камеру
-                            switchCamera(wideAngleCamera.deviceId);
-                        }
-                    }
-                } catch (error) {
-                    console.log('Auto camera detection failed:', error);
-                }
-            }, 1000);
-        });
-    </script>
+// ═══ ГЛАВНЫЙ ЦИКЛ ═══
+function loop() {
+  smAz += (viewAz - smAz) * 0.06;
+  smEl += (viewEl - smEl) * 0.06;
+  updateWorld();
+  requestAnimationFrame(loop);
+}
+
+// ═══ ВРЕМЯ ═══
+function tick() {
+  const n = new Date();
+  const t = `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  document.getElementById('ct').textContent = t;
+  document.getElementById('sbt').textContent = t;
+  const D=['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
+  const M=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  document.getElementById('cd').textContent = `${D[n.getDay()]}, ${n.getDate()} ${M[n.getMonth()]}`;
+}
+tick(); setInterval(tick,1000);
+
+// ═══ КОНТРОЛЫ ═══
+document.getElementById('ds').addEventListener('input', function() {
+  document.getElementById('dim').style.background = `rgba(0,0,0,${this.value/100})`;
+  document.getElementById('dv').textContent = this.value + '%';
+});
+document.getElementById('bs').addEventListener('input', function() {
+  document.getElementById('cam').style.filter = `brightness(${this.value/100})`;
+  document.getElementById('bv').textContent = this.value + '%';
+});
+
+let playing = true;
+function togglePlay() { playing=!playing; document.getElementById('pb').textContent=playing?'⏸':'▶️'; }
+
+function notify(icon, title, msg) {
+  document.getElementById('ni').textContent = icon||'🔔';
+  document.getElementById('ntitle').textContent = title||'';
+  document.getElementById('nmsg').textContent = msg||'';
+  const n = document.getElementById('wnotif');
+  n.classList.add('show');
+  setTimeout(() => n.classList.remove('show'), 3200);
+}
+
+function openApp(n,i,d) {
+  document.getElementById('atitle').textContent=n;
+  document.getElementById('aicon').textContent=i;
+  document.getElementById('adesc').textContent=d;
+  document.getElementById('appmenu').classList.add('show');
+}
+function closeApp() { document.getElementById('appmenu').classList.remove('show'); }
+function goHome() { closeApp(); }
+
+if (navigator.getBattery) {
+  navigator.getBattery().then(b => {
+    const p = Math.round(b.level*100);
+    document.getElementById('batpct').textContent = ' '+p+'%';
+    document.getElementById('batval').textContent = p+'%';
+    document.getElementById('batbar').style.width = p+'%';
+  });
+}
+</script>
 </body>
 </html>
