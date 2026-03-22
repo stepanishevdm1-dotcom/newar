@@ -3,40 +3,57 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="screen-orientation" content="landscape">
 <title>SpatialOS</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:-apple-system,sans-serif;color:#fff;user-select:none}
-
-/* ═══ КАМЕРА — САМЫЙ ГЛАВНЫЙ СЛОЙ ═══ */
-#cam{
-  position:fixed;
-  top:0;left:0;
-  width:100vw;
-  height:100vh;
-  object-fit:cover;
-  z-index:0;
-  display:block;
-  /* НЕ зеркалим — задняя камера */
-  transform:none;
+html,body{
+  width:100%;height:100%;overflow:hidden;
+  background:#000;
+  font-family:-apple-system,'Helvetica Neue',sans-serif;
+  color:#fff;user-select:none;
 }
 
-/* фон — виден только если камера не работает */
+/* ПРИНУДИТЕЛЬНО ЛАНДШАФТ */
+@media (orientation:portrait){
+  body{transform:rotate(90deg);transform-origin:center center;width:100vh;height:100vw;position:fixed;top:calc(50vh - 50vw);left:calc(50vw - 50vh)}
+}
+
+/* ═══ ЗАДНЯЯ КАМЕРА — МИР ═══ */
+#cam{
+  position:fixed;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;z-index:0;
+}
 #bg{
   position:fixed;inset:0;z-index:0;
-  background:
-    radial-gradient(ellipse at 30% 40%,rgba(5,20,60,0.95),transparent 60%),
-    linear-gradient(170deg,#020508,#04080f,#020406);
-  transition:opacity 1s;
+  background:linear-gradient(135deg,#020508 0%,#04080f 50%,#020508 100%);
+}
+#vig{
+  position:fixed;inset:0;z-index:1;pointer-events:none;
+  background:radial-gradient(ellipse 92% 88% at center,transparent 35%,rgba(0,0,0,0.2) 62%,rgba(0,0,0,0.72) 100%);
+}
+#dim{position:fixed;inset:0;z-index:2;pointer-events:none;background:rgba(0,0,0,0);transition:background .5s}
+
+/* ═══ ФРОНТАЛЬНАЯ КАМЕРА — ЖЕСТЫ (скрыта) ═══ */
+#frontcam{
+  position:fixed;bottom:10px;right:10px;
+  width:90px;height:70px;
+  object-fit:cover;border-radius:12px;
+  z-index:50;opacity:0.4;
+  border:1px solid rgba(255,255,255,0.2);
+  transform:scaleX(-1);/* зеркало */
+}
+#handcanvas{
+  position:fixed;bottom:10px;right:10px;
+  width:90px;height:70px;
+  z-index:51;border-radius:12px;
 }
 
-#vig{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse 90% 90% at center,transparent 38%,rgba(0,0,0,0.22) 65%,rgba(0,0,0,0.65) 100%)}
-#dim{position:fixed;inset:0;z-index:2;pointer-events:none;background:rgba(0,0,0,0);transition:background .4s}
-
-/* ═══ МИР — окна в пространстве ═══ */
+/* ═══ МИР — большой canvas пространства ═══ */
 #world{
   position:fixed;
-  width:320vw;height:240vh;
+  width:400vw;height:280vh;
   top:50%;left:50%;
   transform:translate(-50%,-50%);
   z-index:10;
@@ -45,190 +62,215 @@ html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:-ap
 #world .w{pointer-events:all}
 
 /* ═══ LIQUID GLASS ═══ */
-.w{position:absolute;border-radius:22px}
+.w{position:absolute;border-radius:20px}
 .wb{
-  position:relative;border-radius:22px;overflow:hidden;
-  background:rgba(255,255,255,0.09);
-  backdrop-filter:blur(55px) saturate(210%) brightness(1.1);
-  -webkit-backdrop-filter:blur(55px) saturate(210%) brightness(1.1);
-  box-shadow:0 20px 70px rgba(0,0,0,0.55),0 5px 22px rgba(0,0,0,0.38),inset 0 0 0 0.5px rgba(255,255,255,0.05);
-  padding:20px 22px;
+  position:relative;border-radius:20px;overflow:hidden;
+  background:rgba(255,255,255,0.085);
+  backdrop-filter:blur(55px) saturate(220%) brightness(1.1);
+  -webkit-backdrop-filter:blur(55px) saturate(220%) brightness(1.1);
+  box-shadow:0 18px 65px rgba(0,0,0,0.55),0 5px 20px rgba(0,0,0,0.38);
+  padding:16px 18px;
 }
 .wb::before{
-  content:'';position:absolute;inset:0;border-radius:22px;
+  content:'';position:absolute;inset:0;border-radius:20px;
   border:1.5px solid transparent;
-  background:linear-gradient(145deg,rgba(255,255,255,0.68) 0%,rgba(255,255,255,0.13) 20%,rgba(255,255,255,0.02) 44%,rgba(255,255,255,0.07) 68%,rgba(255,255,255,0.5) 100%) border-box;
+  background:linear-gradient(145deg,
+    rgba(255,255,255,0.68) 0%,rgba(255,255,255,0.12) 20%,
+    rgba(255,255,255,0.02) 44%,rgba(255,255,255,0.08) 68%,
+    rgba(255,255,255,0.52) 100%) border-box;
   -webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);
   mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);
   -webkit-mask-composite:destination-out;mask-composite:exclude;
   pointer-events:none;
 }
-.wb::after{content:'';position:absolute;top:0;left:9%;right:9%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.95) 35%,#fff 50%,rgba(255,255,255,0.95) 65%,transparent);pointer-events:none}
-.ll{position:absolute;left:-1.5px;top:8%;bottom:8%;width:3px;border-radius:2px;filter:blur(.7px);pointer-events:none;background:linear-gradient(180deg,transparent,rgba(255,255,255,.55) 25%,rgba(255,255,255,1) 50%,rgba(255,255,255,.55) 75%,transparent);animation:ll 4s ease-in-out infinite}
+.wb::after{content:'';position:absolute;top:0;left:9%;right:9%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.9) 35%,#fff 50%,rgba(255,255,255,.9) 65%,transparent);pointer-events:none}
+.ll{position:absolute;left:-1.5px;top:8%;bottom:8%;width:3px;border-radius:2px;filter:blur(.7px);pointer-events:none;background:linear-gradient(180deg,transparent,rgba(255,255,255,.55) 25%,#fff 50%,rgba(255,255,255,.55) 75%,transparent);animation:ll 4s ease-in-out infinite}
 .lr{position:absolute;right:-1px;top:16%;bottom:16%;width:2px;border-radius:2px;filter:blur(.6px);pointer-events:none;background:linear-gradient(180deg,transparent,rgba(255,255,255,.4) 50%,transparent);animation:lr 5.5s ease-in-out infinite}
 .lb{position:absolute;bottom:-1px;left:22%;right:22%;height:2px;border-radius:50%;filter:blur(1px);pointer-events:none;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent)}
-.ltl{position:absolute;top:1px;left:5px;width:22px;height:5px;border-radius:50%;background:rgba(255,255,255,.6);filter:blur(2px);pointer-events:none}
+.ltl{position:absolute;top:1px;left:5px;width:20px;height:4px;border-radius:50%;background:rgba(255,255,255,.6);filter:blur(2px);pointer-events:none}
 @keyframes ll{0%,100%{top:8%;bottom:8%;opacity:.85}50%{top:4%;bottom:4%;opacity:1}}
 @keyframes lr{0%,100%{top:16%;bottom:16%;opacity:.65}50%{top:10%;bottom:22%;opacity:.9}}
 
-/* ═══ ПОЗИЦИИ ОКОН ═══ */
-#wclock{top:28%;left:50%;transform:translate(-50%,0);text-align:center}
-#wclock .wb{padding:26px 58px;min-width:230px}
-.ct{font-size:80px;font-weight:200;letter-spacing:-5px;line-height:1;background:linear-gradient(180deg,#fff 20%,rgba(255,255,255,.5) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.cd{font-size:15px;font-weight:300;color:rgba(255,255,255,.45);margin-top:8px}
+/* ═══ ЧАСЫ (центр) ═══ */
+#wclock{text-align:center}
+#wclock .wb{padding:20px 50px;min-width:200px}
+.ct{font-size:68px;font-weight:200;letter-spacing:-4px;line-height:1;background:linear-gradient(180deg,#fff 20%,rgba(255,255,255,.5) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.cd{font-size:13px;font-weight:300;color:rgba(255,255,255,.42);margin-top:6px}
 
-#wweather{top:27%;left:70%}
-#wweather .wb{min-width:138px}
-.wi{font-size:34px;margin-bottom:6px}.wc{font-size:12px;color:rgba(255,255,255,.42);font-weight:300}
-.wt{font-size:50px;font-weight:200;letter-spacing:-3px;line-height:1.05}
-.wd{font-size:12px;color:rgba(255,255,255,.38);margin-top:4px}
+/* ═══ ПОГОДА ═══ */
+.wi{font-size:30px;margin-bottom:5px}.wc{font-size:11px;color:rgba(255,255,255,.4);font-weight:300}
+.wt{font-size:44px;font-weight:200;letter-spacing:-2px;line-height:1.05}
+.wd{font-size:11px;color:rgba(255,255,255,.38);margin-top:4px}
 
-#wctrl{top:27%;right:70%;transform:translateX(100%)}
-#wctrl .wb{width:158px}
-.cl{font-size:11px;color:rgba(255,255,255,.38);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
-.cr{margin-bottom:13px}.cr:last-child{margin-bottom:0}
-.cn{font-size:12px;color:rgba(255,255,255,.42);margin-bottom:7px;display:flex;justify-content:space-between}
+/* ═══ КОНТРОЛЫ ═══ */
+.cl{font-size:10px;color:rgba(255,255,255,.38);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+.cr{margin-bottom:11px}.cr:last-child{margin-bottom:0}
+.cn{font-size:11px;color:rgba(255,255,255,.4);margin-bottom:5px;display:flex;justify-content:space-between}
 input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:rgba(255,255,255,.14);outline:none;cursor:pointer}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.6)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.55)}
 
-#wapps{top:60%;left:50%;transform:translateX(-50%)}
-#wapps .wb{padding:22px 24px}
-.ag{display:grid;grid-template-columns:repeat(5,62px);gap:12px}
-.ap{width:62px;height:62px;border-radius:17px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;font-size:27px;position:relative;background:rgba(255,255,255,0.09);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
+/* ═══ ПРИЛОЖЕНИЯ ═══ */
+.ag{display:grid;grid-template-columns:repeat(5,58px);gap:10px}
+.ap{width:58px;height:58px;border-radius:15px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:24px;position:relative;background:rgba(255,255,255,0.09);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
 .ap:active{transform:scale(.82)!important}
-.ap-lbl{font-size:9px;color:rgba(255,255,255,.45);line-height:1}
-.badge{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;border-radius:9px;background:#ff3b30;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px}
+.ap-lbl{font-size:8px;color:rgba(255,255,255,.45);line-height:1}
+.badge{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;border-radius:9px;background:#ff3b30;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px}
 
-#wmusic{top:57%;right:72%;transform:translateX(100%)}
-#wmusic .wb{min-width:222px}
-.mh{display:flex;gap:13px;align-items:center;margin-bottom:13px}
-.ma{width:48px;height:48px;border-radius:13px;flex-shrink:0;background:linear-gradient(135deg,#12285c,#3d8eff,#12573a);display:flex;align-items:center;justify-content:center;font-size:21px;box-shadow:0 4px 18px rgba(61,142,255,.45)}
-.mt{font-size:14px;font-weight:500}.ma2{font-size:12px;color:rgba(255,255,255,.4);margin-top:3px}
-.prg{height:3px;background:rgba(255,255,255,.1);border-radius:2px;margin-bottom:13px;overflow:hidden}
+/* ═══ МУЗЫКА ═══ */
+.mh{display:flex;gap:11px;align-items:center;margin-bottom:12px}
+.ma{width:44px;height:44px;border-radius:12px;flex-shrink:0;background:linear-gradient(135deg,#12285c,#3d8eff,#12573a);display:flex;align-items:center;justify-content:center;font-size:19px;box-shadow:0 4px 16px rgba(61,142,255,.4)}
+.mt{font-size:13px;font-weight:500}.ma2{font-size:11px;color:rgba(255,255,255,.4);margin-top:3px}
+.prg{height:3px;background:rgba(255,255,255,.1);border-radius:2px;margin-bottom:12px;overflow:hidden}
 .pf{height:100%;width:38%;background:linear-gradient(90deg,#3d8eff,#7bb8ff);border-radius:2px}
-.mb{display:flex;align-items:center;justify-content:center;gap:28px}
-.mb button{background:none;border:none;color:#fff;font-size:21px;cursor:pointer;opacity:.72;padding:4px;transition:opacity .15s,transform .1s}
+.mb{display:flex;align-items:center;justify-content:center;gap:24px}
+.mb button{background:none;border:none;color:#fff;font-size:19px;cursor:pointer;opacity:.72;padding:4px;transition:opacity .15s,transform .1s}
 .mb button:active{transform:scale(.8);opacity:.35}
-.pb{width:43px;height:43px;border-radius:50%!important;background:rgba(255,255,255,.13)!important;display:flex;align-items:center;justify-content:center;font-size:17px!important;opacity:1!important}
+.pb{width:40px;height:40px;border-radius:50%!important;background:rgba(255,255,255,.13)!important;display:flex;align-items:center;justify-content:center;font-size:16px!important;opacity:1!important}
 
-#wsys{top:57%;left:72%}
-.sr{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:12.5px}
+/* ═══ СИСТЕМНЫЙ ═══ */
+.sr{display:flex;align-items:center;gap:7px;margin-bottom:9px;font-size:12px}
 .sr:last-child{margin-bottom:0}
-.sl{color:rgba(255,255,255,.4);font-weight:300;min-width:58px}
+.sl{color:rgba(255,255,255,.4);font-weight:300;min-width:54px}
 .sb{flex:1;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}
 .sbf{height:100%;border-radius:2px}
 
-#wnotif{top:10%;left:50%;transform:translateX(-50%);opacity:0;pointer-events:none;transition:opacity .45s;z-index:50;white-space:nowrap}
-#wnotif.show{opacity:1;pointer-events:all}
-#wnotif .wb{display:flex;align-items:center;gap:14px;padding:13px 20px;border-radius:22px}
-.ni{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#30d158,#1a8a38);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+/* ═══ СТАТУСБАР — прибит к экрану ═══ */
+#statusbar{
+  position:fixed;top:10px;left:50%;transform:translateX(-50%);
+  z-index:100;white-space:nowrap;
+}
+#statusbar .wb{display:flex;align-items:center;gap:12px;padding:6px 18px;border-radius:38px;font-size:12px;font-weight:300}
 
-/* ═══ СТАТУСБАР — приклеен к экрану ═══ */
-#statusbar{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:100;white-space:nowrap}
-#statusbar .wb{display:flex;align-items:center;gap:14px;padding:7px 22px;border-radius:40px;font-size:13px;font-weight:300}
-
-/* ═══ HOME BAR — приклеен к экрану ═══ */
-#homebar{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:100;white-space:nowrap}
-#homebar .wb{display:flex;align-items:center;gap:10px;padding:11px 16px;border-radius:36px}
-.hb{width:54px;height:54px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);transition:transform .2s cubic-bezier(.34,1.56,.64,1);font-size:26px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+/* ═══ HOME BAR — прибит к экрану ═══ */
+#homebar{
+  position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
+  z-index:100;white-space:nowrap;
+}
+#homebar .wb{display:flex;align-items:center;gap:8px;padding:9px 14px;border-radius:34px}
+.hb{width:50px;height:50px;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);transition:transform .2s cubic-bezier(.34,1.56,.64,1);font-size:22px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
 .hb:active{transform:scale(.82)!important}
-.hb-sep{width:1px;height:38px;background:rgba(255,255,255,.1);margin:0 2px}
-.hb-home{width:60px;height:60px;border-radius:50%!important;background:rgba(255,255,255,.11)!important;border:1.5px solid rgba(255,255,255,.22)!important}
+.hb-sep{width:1px;height:34px;background:rgba(255,255,255,.1);margin:0 2px}
+.hb-home{width:54px;height:54px;border-radius:50%!important;background:rgba(255,255,255,.11)!important;border:1.5px solid rgba(255,255,255,.22)!important}
 .hb-dot{width:7px;height:7px;border-radius:50%;background:#3d8eff;box-shadow:0 0 10px rgba(61,142,255,.9);animation:blink 2s ease-in-out infinite}
-.hb-lbl{font-size:8.5px;color:rgba(255,255,255,.4)}
+.hb-lbl{font-size:8px;color:rgba(255,255,255,.38)}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
 
+/* ═══ УВЕДОМЛЕНИЕ ═══ */
+#wnotif{opacity:0;pointer-events:none;transition:opacity .4s;z-index:50;white-space:nowrap}
+#wnotif.show{opacity:1;pointer-events:all}
+#wnotif .wb{display:flex;align-items:center;gap:12px;padding:12px 18px;border-radius:20px}
+.ni{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#30d158,#1a8a38);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+
+/* ═══ ЖЕСТ ИНДИКАТОР ═══ */
+#gesture{
+  position:fixed;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  z-index:200;pointer-events:none;
+  font-size:48px;opacity:0;
+  transition:opacity .2s;
+  filter:drop-shadow(0 4px 20px rgba(0,0,0,.8));
+}
+#gesture.show{opacity:1}
+
+/* ═══ КУРСОР РУКИ ═══ */
+#cursor{
+  position:fixed;z-index:150;
+  width:24px;height:24px;
+  border-radius:50%;
+  background:rgba(255,255,255,0.6);
+  box-shadow:0 0 20px rgba(255,255,255,0.5);
+  transform:translate(-50%,-50%);
+  pointer-events:none;
+  display:none;
+  transition:width .15s,height .15s,background .15s;
+}
+#cursor.pinch{
+  width:14px;height:14px;
+  background:rgba(61,142,255,0.9);
+  box-shadow:0 0 24px rgba(61,142,255,.8);
+}
+
 /* ═══ МЕНЮ ПРИЛОЖЕНИЯ ═══ */
-#appmenu{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);opacity:0;pointer-events:none;z-index:200;transition:all .35s cubic-bezier(.16,1,.3,1)}
+#appmenu{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);opacity:0;pointer-events:none;z-index:200;transition:all .3s cubic-bezier(.16,1,.3,1)}
 #appmenu.show{opacity:1;pointer-events:all;transform:translate(-50%,-50%) scale(1)}
-#appmenu .wb{padding:26px 30px;min-width:270px}
-.aclose{position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.abtn{width:100%;padding:12px 16px;border-radius:14px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.08);color:#fff;font-size:14px;cursor:pointer;font-family:-apple-system,sans-serif;margin-bottom:8px;text-align:left;transition:background .15s}
+#appmenu .wb{padding:22px 26px;min-width:240px}
+.aclose{position:absolute;top:12px;right:12px;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.abtn{width:100%;padding:11px 14px;border-radius:13px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.08);color:#fff;font-size:13px;cursor:pointer;font-family:-apple-system,sans-serif;margin-bottom:7px;text-align:left;transition:background .15s}
 .abtn:last-child{margin-bottom:0}
 .abtn:active{background:rgba(255,255,255,.04)}
 
 /* ═══ СТАРТОВЫЙ ЭКРАН ═══ */
-#splash{position:fixed;inset:0;z-index:900;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(0,0,0,0.94);backdrop-filter:blur(24px)}
-#splash .logo{font-size:62px;animation:float 3s ease-in-out infinite}
-#splash h1{font-size:27px;font-weight:300;letter-spacing:-.5px}
-#splash .sub{font-size:14px;color:rgba(255,255,255,.42);text-align:center;max-width:280px;line-height:1.75}
-
-/* ВАЖНОЕ ПРЕДУПРЕЖДЕНИЕ */
-#splash .warn{
-  background:rgba(255,159,10,0.15);border:1px solid rgba(255,159,10,0.35);
-  border-radius:14px;padding:14px 18px;
-  font-size:13px;color:rgba(255,200,100,.9);
-  max-width:300px;line-height:1.65;text-align:center;
-}
-#splash .warn strong{display:block;font-size:14px;margin-bottom:4px}
-
-.chip{display:inline-block;padding:5px 14px;border-radius:18px;font-size:11.5px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);margin:3px}
-#splash button{
-  padding:15px 52px;border-radius:32px;border:none;
-  background:linear-gradient(135deg,#2060d8,#3d8eff);color:#fff;
-  font-size:17px;font-weight:500;cursor:pointer;font-family:-apple-system,sans-serif;
-  box-shadow:0 4px 28px rgba(61,142,255,.55);transition:transform .15s;
-}
+#splash{position:fixed;inset:0;z-index:900;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:rgba(0,0,0,0.94);backdrop-filter:blur(24px)}
+.logo{font-size:52px;animation:float 3s ease-in-out infinite}
+#splash h1{font-size:24px;font-weight:300}
+#splash .sub{font-size:13px;color:rgba(255,255,255,.42);text-align:center;max-width:340px;line-height:1.7}
+.chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.chip{padding:5px 13px;border-radius:16px;font-size:11px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14)}
+#splash button{padding:13px 44px;border-radius:28px;border:none;background:linear-gradient(135deg,#2060d8,#3d8eff);color:#fff;font-size:15px;font-weight:500;cursor:pointer;font-family:-apple-system,sans-serif;box-shadow:0 4px 24px rgba(61,142,255,.5);transition:transform .15s}
 #splash button:active{transform:scale(.95)}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.hint-box{background:rgba(61,142,255,.12);border:1px solid rgba(61,142,255,.3);border-radius:14px;padding:12px 18px;font-size:12px;color:rgba(180,210,255,.9);max-width:340px;line-height:1.7;text-align:center}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 
-/* ═══ СТАТУС КАМЕРЫ ═══ */
-#camstatus{
-  position:fixed;top:60px;left:50%;transform:translateX(-50%);
-  z-index:500;font-size:13px;padding:8px 18px;border-radius:20px;
-  background:rgba(0,0,0,.7);white-space:nowrap;
-  transition:opacity 1s;
-}
-
-/* прицел */
-#reticle{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:24px;height:24px;z-index:15;pointer-events:none}
-#reticle::before,#reticle::after{content:'';position:absolute;background:rgba(255,255,255,.3)}
-#reticle::before{top:50%;left:0;right:0;height:1px;transform:translateY(-50%)}
-#reticle::after{left:50%;top:0;bottom:0;width:1px;transform:translateX(-50%)}
+/* ═══ DEBUG ПАНЕЛЬ ═══ */
+#debug{position:fixed;top:10px;left:10px;z-index:999;font-size:10px;color:rgba(255,255,255,.35);line-height:1.6;pointer-events:none}
 </style>
 </head>
 <body>
 
-<!-- КАМЕРА ПЕРВАЯ -->
+<!-- ЗАДНЯЯ КАМЕРА -->
 <video id="cam" autoplay playsinline muted></video>
 <div id="bg"></div>
 <div id="vig"></div>
 <div id="dim"></div>
-<div id="reticle"></div>
+
+<!-- ФРОНТАЛЬНАЯ КАМЕРА (жесты) -->
+<video id="frontcam" autoplay playsinline muted></video>
+<canvas id="handcanvas"></canvas>
+
+<!-- КУРСОР РУКИ -->
+<div id="cursor"></div>
+
+<!-- ЖЕСТ ИНДИКАТОР -->
+<div id="gesture">✌️</div>
+
+<!-- DEBUG -->
+<div id="debug">
+  AZ: <span id="daz">0°</span> |
+  EL: <span id="del">0°</span> |
+  Cam: <span id="dcam">—</span> |
+  Hand: <span id="dhand">—</span>
+</div>
 
 <!-- СТАРТОВЫЙ ЭКРАН -->
 <div id="splash">
   <div class="logo">🥽</div>
   <h1>SpatialOS</h1>
-  <p class="sub">Окна висят в реальном мире.<br>Поворачивай телефон — смотри на разные окна.</p>
-
-  <div class="warn">
-    <strong>⚠️ Важно для камеры!</strong>
-    Камера работает только через HTTPS.<br>
-    Открой через <strong>GitHub Pages</strong> или нажми кнопку ниже для теста без камеры.
-  </div>
-
-  <div>
-    <div class="chip">🌍 World-locked AR</div>
-    <div class="chip">🧭 Трекинг головы</div>
+  <p class="sub">Держи телефон горизонтально перед глазами.<br>Окна стоят в реальном мире — поворачивайся чтобы их видеть.</p>
+  <div class="chips">
+    <div class="chip">📱 Горизонтально</div>
+    <div class="chip">🌍 World-locked</div>
+    <div class="chip">🤚 Жесты рукой</div>
     <div class="chip">✨ Liquid Glass</div>
   </div>
-
-  <button onclick="launch()">▶ Запустить с камерой</button>
-  <div style="font-size:13px;color:rgba(255,255,255,.35);cursor:pointer;margin-top:-8px" onclick="launchNoCam()">Без камеры (тест)</div>
+  <div class="hint-box">
+    🤚 <strong>Жесты:</strong><br>
+    Щипок (большой+указательный) → нажать<br>
+    Ладонь открытая → меню<br>
+    Два пальца вверх → домой
+  </div>
+  <button onclick="launch()">▶ Запустить</button>
 </div>
 
-<!-- СТАТУС -->
-<div id="camstatus" style="display:none"></div>
-
-<!-- СТАТУСБАР (прибит к экрану) -->
+<!-- СТАТУСБАР -->
 <div id="statusbar">
   <div class="wb">
-    <span style="font-weight:500;font-size:14px" id="sbt">00:00</span>
+    <span style="font-weight:500;font-size:13px" id="sbt">00:00</span>
     <span style="opacity:.22">│</span>
-    <span style="font-size:12px;opacity:.6">📶</span>
+    <span style="font-size:11px;opacity:.6">📶 Wi-Fi</span>
     <span style="opacity:.22">│</span>
-    <span style="font-size:12px;opacity:.6">🔋<span id="batpct"> 72%</span></span>
+    <span style="font-size:11px;opacity:.6">🔋<span id="batpct"> 72%</span></span>
+    <span style="opacity:.22">│</span>
+    <span style="font-size:11px;opacity:.5" id="handstatus">🤚 —</span>
   </div>
   <div class="ll"></div><div class="lr"></div><div class="ltl"></div>
 </div>
@@ -258,7 +300,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 
   <!-- КОНТРОЛЫ -->
   <div class="w" id="wctrl">
-    <div class="wb">
+    <div class="wb" style="width:148px">
       <div class="cl">Среда</div>
       <div class="cr">
         <div class="cn"><span>🌍 Мир</span><span id="dv">0%</span></div>
@@ -274,7 +316,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 
   <!-- ПРИЛОЖЕНИЯ -->
   <div class="w" id="wapps">
-    <div class="wb">
+    <div class="wb" style="padding:18px 20px">
       <div class="ag">
         <div class="ap" onclick="openApp('Safari','🌐','Браузер')">🌐<div class="ap-lbl">Safari</div></div>
         <div class="ap" onclick="openApp('Фото','🖼️','Галерея')">🖼️<div class="ap-lbl">Фото</div></div>
@@ -284,8 +326,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
         <div class="ap" onclick="openApp('Чаты','💬','Сообщения')">💬<div class="ap-lbl">Чаты</div><div class="badge">3</div></div>
         <div class="ap" onclick="openApp('Музыка','🎵','Плеер')">🎵<div class="ap-lbl">Музыка</div></div>
         <div class="ap" onclick="openApp('Видео','🎬','Кино')">🎬<div class="ap-lbl">Видео</div></div>
-        <div class="ap" onclick="openApp('Игры','🎮','Игровой центр')">🎮<div class="ap-lbl">Игры</div></div>
-        <div class="ap" onclick="openApp('Здоровье','❤️','Активность')">❤️<div class="ap-lbl">Здоровье</div></div>
+        <div class="ap" onclick="openApp('Игры','🎮','Игры')">🎮<div class="ap-lbl">Игры</div></div>
+        <div class="ap" onclick="openApp('Здоровье','❤️','Здоровье')">❤️<div class="ap-lbl">Здоровье</div></div>
       </div>
     </div>
     <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
@@ -293,7 +335,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 
   <!-- МУЗЫКА -->
   <div class="w" id="wmusic">
-    <div class="wb">
+    <div class="wb" style="min-width:210px">
       <div class="mh">
         <div class="ma">🎵</div>
         <div><div class="mt">Midnight City</div><div class="ma2">M83</div></div>
@@ -311,10 +353,10 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
   <!-- СИСТЕМНЫЙ -->
   <div class="w" id="wsys">
     <div class="wb">
-      <div class="sr"><span class="sl">Батарея</span><div class="sb"><div class="sbf" id="batbar" style="width:72%;background:linear-gradient(90deg,#30d158,#34d270)"></div></div><span style="font-size:11px" id="batval">72%</span></div>
-      <div class="sr"><span class="sl">WiFi</span><div class="sb"><div class="sbf" style="width:88%;background:linear-gradient(90deg,#3d8eff,#7bb8ff)"></div></div><span style="font-size:11px">115M</span></div>
-      <div class="sr"><span class="sl">Камера</span><span style="font-size:12px;color:#30d158" id="cs">⏳ Ожидание</span></div>
-      <div class="sr"><span class="sl">Гироскоп</span><span style="font-size:11px;color:rgba(255,255,255,.4)" id="gyro">—</span></div>
+      <div class="sr"><span class="sl">Батарея</span><div class="sb"><div class="sbf" id="batbar" style="width:72%;background:linear-gradient(90deg,#30d158,#34d270)"></div></div><span style="font-size:10px" id="batval">72%</span></div>
+      <div class="sr"><span class="sl">WiFi</span><div class="sb"><div class="sbf" style="width:88%;background:linear-gradient(90deg,#3d8eff,#7bb8ff)"></div></div><span style="font-size:10px">115M</span></div>
+      <div class="sr"><span class="sl">Камера</span><span style="font-size:11px;color:#30d158" id="cs">⏳</span></div>
+      <div class="sr"><span class="sl">Жест</span><span style="font-size:11px;color:rgba(255,255,255,.4)" id="gstatus">Нет руки</span></div>
     </div>
     <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
   </div>
@@ -324,8 +366,8 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
     <div class="wb">
       <div class="ni" id="ni">💬</div>
       <div>
-        <div style="font-size:14px;font-weight:500" id="ntitle">Уведомление</div>
-        <div style="font-size:12px;color:rgba(255,255,255,.42);margin-top:2px" id="nmsg">Текст</div>
+        <div style="font-size:13px;font-weight:500" id="ntitle">Уведомление</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.42);margin-top:2px" id="nmsg">Текст</div>
       </div>
     </div>
     <div class="ll"></div><div class="lr"></div><div class="ltl"></div>
@@ -337,7 +379,7 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 <div id="homebar">
   <div class="wb">
     <div class="hb" onclick="notify('📱','Телефон','Входящий звонок')">📱<div class="hb-lbl">Звонок</div></div>
-    <div class="hb" onclick="notify('🔍','Поиск','Голосовой поиск')">🔍<div class="hb-lbl">Поиск</div></div>
+    <div class="hb" onclick="recalibrate()">🧭<div class="hb-lbl">Центр</div></div>
     <div class="hb-sep"></div>
     <div class="hb hb-home" onclick="goHome()"><div class="hb-dot"></div></div>
     <div class="hb-sep"></div>
@@ -351,9 +393,9 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
 <div id="appmenu">
   <div class="wb">
     <button class="aclose" onclick="closeApp()">✕</button>
-    <div style="font-size:38px;margin-bottom:10px" id="aicon">🌐</div>
-    <div style="font-size:20px;font-weight:400;margin-bottom:6px" id="atitle">Safari</div>
-    <div style="font-size:13px;color:rgba(255,255,255,.42);margin-bottom:20px" id="adesc">Браузер</div>
+    <div style="font-size:34px;margin-bottom:8px" id="aicon">🌐</div>
+    <div style="font-size:18px;font-weight:400;margin-bottom:5px" id="atitle">Safari</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.42);margin-bottom:18px" id="adesc">Браузер</div>
     <button class="abtn">▶ Открыть</button>
     <button class="abtn">📌 Закрепить в пространстве</button>
     <button class="abtn" onclick="closeApp()">✕ Закрыть</button>
@@ -361,189 +403,322 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;heigh
   <div class="ll"></div><div class="lr"></div><div class="ltl"></div>
 </div>
 
+<!-- MediaPipe -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+
 <script>
-// ═══ МИРОВЫЕ ПОЗИЦИИ ОКОН (в градусах) ═══
-const WORLD_POS = {
-  wclock:   { az:  0,  el: 16 },
-  wweather: { az: 46,  el: 12 },
-  wctrl:    { az:-46,  el: 12 },
-  wapps:    { az:  0,  el:-20 },
-  wmusic:   { az:-42,  el:-22 },
-  wsys:     { az: 44,  el:-22 },
-  wnotif:   { az:  0,  el: 38 },
+// ═══════════════════════════════════════════════
+// WORLD-LOCKED AR ENGINE (LANDSCAPE MODE)
+// ═══════════════════════════════════════════════
+
+// Позиции окон в градусах (AZ = горизонталь, EL = вертикаль)
+const WINS = {
+  wclock:   {az:  0, el:  8},   // центр
+  wweather: {az: 50, el:  6},   // вправо
+  wctrl:    {az:-50, el:  6},   // влево
+  wapps:    {az:  0, el:-16},   // вниз центр
+  wmusic:   {az:-48, el:-18},   // влево вниз
+  wsys:     {az: 48, el:-18},   // вправо вниз
+  wnotif:   {az:  0, el: 30},   // высоко
 };
-const PX = 20; // пикселей на градус
 
-const WW = window.innerWidth * 3.2;
-const WH = window.innerHeight * 2.4;
+const PX = 22;          // пикселей на градус
+const WW = window.innerWidth  * 4;
+const WH = window.innerHeight * 2.8;
 
-let viewAz=0, viewEl=0, smAz=0, smEl=0;
+let viewAz=0, viewEl=0;
+let smAz=0,   smEl=0;
 let calibAz=null, calibEl=null;
 
-function updateWorld() {
-  for (const [id, p] of Object.entries(WORLD_POS)) {
-    const el = document.getElementById(id);
-    if (!el) continue;
-    const dAz = p.az - smAz;
-    const dEl = p.el - smEl;
-    const x = WW/2 + dAz * PX;
-    const y = WH/2 - dEl * PX;
-    const dist = Math.sqrt(dAz*dAz + dEl*dEl);
-    const alpha = Math.max(0, 1 - dist/75);
-    const scale = Math.max(0.72, 1 - dist/300);
-    el.style.left = x + 'px';
-    el.style.top  = y + 'px';
-    el.style.transform = `translate(-50%,-50%) scale(${scale})`;
-    el.style.opacity = alpha;
+// Обновление позиций всех окон
+function updateWorld(){
+  for(const [id,p] of Object.entries(WINS)){
+    const el=document.getElementById(id);
+    if(!el) continue;
+    const dAz=p.az-smAz;
+    const dEl=p.el-smEl;
+    const x=WW/2+dAz*PX;
+    const y=WH/2-dEl*PX;
+    const dist=Math.sqrt(dAz*dAz+dEl*dEl);
+    const alpha=Math.max(0,1-dist/80);
+    const scale=Math.max(0.7,1-dist/320);
+    el.style.left=x+'px';
+    el.style.top=y+'px';
+    el.style.transform=`translate(-50%,-50%) scale(${scale})`;
+    el.style.opacity=alpha;
   }
+  document.getElementById('daz').textContent=Math.round(smAz)+'°';
+  document.getElementById('del').textContent=Math.round(smEl)+'°';
 }
 
-// ═══ ГИРОСКОП ═══
-function onOrient(e) {
-  const az = e.gamma || 0;
-  const el = (e.beta  || 45) - 45;
-  if (calibAz === null) { calibAz = az; calibEl = el; }
-  viewAz = (az - calibAz) * 1.3;
-  viewEl = -(el - calibEl) * 1.3;
-  document.getElementById('gyro').textContent = `AZ:${Math.round(viewAz)}° EL:${Math.round(viewEl)}°`;
+// ═══ ГИРОСКОП (ландшафт) ═══
+// В горизонтальном положении телефона перед глазами:
+// gamma = поворот влево/вправо (AZ)
+// beta  = наклон вверх/вниз (EL)
+function onOrient(e){
+  const rawAz = e.gamma || 0;
+  const rawEl = e.beta  || 0;
+  if(calibAz===null){ calibAz=rawAz; calibEl=rawEl; }
+  // Масштаб 1.4 — чуть усиливаем движение
+  viewAz=(rawAz-calibAz)*1.4;
+  viewEl=-(rawEl-calibEl)*1.4;
 }
 
-function startGyro() {
-  if (typeof DeviceOrientationEvent !== 'undefined' &&
-      typeof DeviceOrientationEvent.requestPermission === 'function') {
+function startGyro(){
+  if(typeof DeviceOrientationEvent!=='undefined' &&
+     typeof DeviceOrientationEvent.requestPermission==='function'){
     DeviceOrientationEvent.requestPermission()
-      .then(s => { if(s==='granted') window.addEventListener('deviceorientation', onOrient, true); });
+      .then(s=>{ if(s==='granted') window.addEventListener('deviceorientation',onOrient,true); });
   } else {
-    window.addEventListener('deviceorientation', onOrient, true);
+    window.addEventListener('deviceorientation',onOrient,true);
   }
 }
 
-// ═══ КАМЕРА ═══
-let camOn = true;
-async function startCamera() {
-  const st = document.getElementById('camstatus');
-  st.style.display = 'block';
-  st.textContent = '📷 Запрашиваю доступ к камере...';
-
-  try {
-    const constraints = {
-      video: {
-        facingMode: { exact: 'environment' }, // ЗАДНЯЯ камера
-        width: { ideal: 1920 },
-        height: { ideal: 1080 }
-      },
-      audio: false
-    };
-
-    let stream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
-    } catch {
-      // Если exact не работает — пробуем ideal
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
-        audio: false
-      });
-    }
-
-    const v = document.getElementById('cam');
-    v.srcObject = stream;
-
-    await new Promise(resolve => { v.onloadedmetadata = resolve; });
-    await v.play();
-
-    document.getElementById('bg').style.opacity = '0';
-    document.getElementById('cs').textContent = '● Онлайн';
-    st.textContent = '✅ Камера работает!';
-    setTimeout(() => { st.style.opacity = '0'; setTimeout(() => st.style.display='none', 1000); }, 2000);
-
-  } catch(e) {
-    document.getElementById('cs').textContent = '❌ Нет доступа';
-    document.getElementById('cs').style.color = '#ff453a';
-    st.style.background = 'rgba(255,59,48,.25)';
-    st.textContent = '❌ ' + (e.message || 'Ошибка камеры. Нужен HTTPS!');
-  }
-}
-
-function toggleCam() {
-  camOn = !camOn;
-  document.getElementById('cam').style.opacity = camOn ? '1' : '0';
-  document.getElementById('cambtn').querySelector('.hb-lbl').textContent = camOn ? 'Камера' : 'Выкл';
-}
-
-// ═══ ЗАПУСК ═══
-async function launch() {
-  document.getElementById('splash').style.display = 'none';
-  await startCamera();
-  startGyro();
-  loop();
-  setTimeout(() => notify('🥽','SpatialOS','Поворачивай телефон!'), 2000);
-}
-
-function launchNoCam() {
-  document.getElementById('splash').style.display = 'none';
-  startGyro();
-  loop();
-  setTimeout(() => notify('🥽','SpatialOS','Тест без камеры'), 1500);
+function recalibrate(){
+  calibAz=null; calibEl=null;
+  notify('🧭','Калибровка','Смотри прямо перед собой');
 }
 
 // ═══ ГЛАВНЫЙ ЦИКЛ ═══
-function loop() {
-  smAz += (viewAz - smAz) * 0.06;
-  smEl += (viewEl - smEl) * 0.06;
+function loop(){
+  smAz+=(viewAz-smAz)*0.055;
+  smEl+=(viewEl-smEl)*0.055;
   updateWorld();
   requestAnimationFrame(loop);
 }
 
+// ═══ ЗАДНЯЯ КАМЕРА ═══
+let camOn=true;
+async function startBackCamera(){
+  try{
+    const s=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:{exact:'environment'},width:{ideal:1920},height:{ideal:1080}},
+      audio:false
+    });
+    const v=document.getElementById('cam');
+    v.srcObject=s;
+    await new Promise(r=>{v.onloadedmetadata=r});
+    await v.play();
+    document.getElementById('bg').style.opacity='0';
+    document.getElementById('cs').textContent='● Онлайн';
+    document.getElementById('dcam').textContent='OK';
+  }catch(e){
+    // Пробуем без exact
+    try{
+      const s=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+      document.getElementById('cam').srcObject=s;
+      await document.getElementById('cam').play();
+      document.getElementById('bg').style.opacity='0';
+      document.getElementById('cs').textContent='● Онлайн';
+    }catch(e2){
+      document.getElementById('cs').textContent='❌ Нет';
+      document.getElementById('dcam').textContent='ERR';
+    }
+  }
+}
+
+function toggleCam(){
+  camOn=!camOn;
+  document.getElementById('cam').style.opacity=camOn?'1':'0';
+  document.getElementById('cambtn').querySelector('.hb-lbl').textContent=camOn?'Камера':'Выкл';
+}
+
+// ═══ ФРОНТАЛЬНАЯ КАМЕРА + MEDIAPIPE ЖЕСТЫ ═══
+let handActive=false;
+let lastPinch=false;
+let pinchCooldown=0;
+
+async function startHandTracking(){
+  try{
+    const frontStream=await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:'user',width:{ideal:320},height:{ideal:240}},
+      audio:false
+    });
+    const fv=document.getElementById('frontcam');
+    fv.srcObject=frontStream;
+    await fv.play();
+
+    // Настраиваем canvas
+    const hc=document.getElementById('handcanvas');
+    hc.width=90; hc.height=70;
+
+    // Инициализируем MediaPipe Hands
+    const hands=new Hands({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`});
+    hands.setOptions({
+      maxNumHands:1,
+      modelComplexity:0,        // 0 = быстрее на мобиле
+      minDetectionConfidence:0.7,
+      minTrackingConfidence:0.5
+    });
+
+    hands.onResults(onHandResults);
+
+    // Камера утилита для MediaPipe
+    const cam=new Camera(fv,{
+      onFrame:async()=>{ await hands.send({image:fv}); },
+      width:320,height:240
+    });
+    cam.start();
+
+    handActive=true;
+    document.getElementById('dhand').textContent='OK';
+
+  }catch(e){
+    document.getElementById('dhand').textContent='Нет';
+    // Жесты недоступны — не критично
+  }
+}
+
+// Обработка результатов руки
+function onHandResults(results){
+  const ctx=document.getElementById('handcanvas').getContext('2d');
+  ctx.clearRect(0,0,90,70);
+
+  if(!results.multiHandLandmarks||results.multiHandLandmarks.length===0){
+    document.getElementById('gstatus').textContent='Нет руки';
+    document.getElementById('handstatus').textContent='🤚 —';
+    document.getElementById('cursor').style.display='none';
+    return;
+  }
+
+  const lm=results.multiHandLandmarks[0];
+
+  // Индексный палец (8) — позиция курсора
+  const ix=lm[8].x; // 0..1
+  const iy=lm[8].y;
+
+  // Курсор на экране (зеркало фронталки)
+  const cx=(1-ix)*window.innerWidth;
+  const cy=iy*window.innerHeight;
+
+  const cursor=document.getElementById('cursor');
+  cursor.style.display='block';
+  cursor.style.left=cx+'px';
+  cursor.style.top=cy+'px';
+
+  // ── ЩИПОК (pinch) ──
+  // Расстояние между большим (4) и указательным (8)
+  const tx=lm[4].x, ty=lm[4].y;
+  const pinchDist=Math.sqrt((ix-tx)**2+(iy-ty)**2);
+  const isPinching=pinchDist<0.06;
+
+  cursor.className=isPinching?'pinch':'';
+
+  // Триггер нажатия (только один раз при щипке)
+  const now=Date.now();
+  if(isPinching&&!lastPinch&&now>pinchCooldown){
+    pinchCooldown=now+600;
+    // Нажимаем элемент под курсором
+    const el=document.elementFromPoint(cx,cy);
+    if(el&&el!==cursor) el.click();
+    showGesture('🤏');
+    document.getElementById('gstatus').textContent='Щипок!';
+  }
+  lastPinch=isPinching;
+
+  // ── ОТКРЫТАЯ ЛАДОНЬ ──
+  // Все пальцы вверх — палец выше запястья
+  const wrist=lm[0];
+  const fingersUp=[4,8,12,16,20].filter(i=>lm[i].y<wrist.y-0.08).length;
+  if(fingersUp>=4&&!isPinching){
+    document.getElementById('gstatus').textContent='Ладонь ✋';
+    document.getElementById('handstatus').textContent='✋ Ладонь';
+  } else if(isPinching){
+    document.getElementById('handstatus').textContent='🤏 Щипок';
+  } else {
+    document.getElementById('gstatus').textContent='Рука видна';
+    document.getElementById('handstatus').textContent='🤚 Рука';
+  }
+
+  // Мини точки на canvas
+  ctx.fillStyle='rgba(255,255,255,0.7)';
+  for(const l of lm){
+    ctx.beginPath();
+    ctx.arc(l.x*90,l.y*70,1.5,0,Math.PI*2);
+    ctx.fill();
+  }
+  // Линия большой-указательный
+  ctx.strokeStyle=isPinching?'rgba(61,142,255,0.9)':'rgba(255,255,255,0.4)';
+  ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.moveTo(lm[4].x*90,lm[4].y*70);
+  ctx.lineTo(lm[8].x*90,lm[8].y*70);
+  ctx.stroke();
+}
+
+let gestureTimer;
+function showGesture(emoji){
+  const g=document.getElementById('gesture');
+  g.textContent=emoji;
+  g.classList.add('show');
+  clearTimeout(gestureTimer);
+  gestureTimer=setTimeout(()=>g.classList.remove('show'),600);
+}
+
+// ═══ ЗАПУСК ═══
+async function launch(){
+  document.getElementById('splash').style.display='none';
+  // Параллельно запускаем всё
+  await Promise.all([
+    startBackCamera(),
+    startHandTracking()
+  ]);
+  startGyro();
+  loop();
+  setTimeout(()=>notify('🥽','SpatialOS','Поворачивайся — окна в мире!'),1800);
+  setTimeout(()=>notify('🤚','Жесты','Щипок = нажать · Ладонь = меню'),5000);
+}
+
 // ═══ ВРЕМЯ ═══
-function tick() {
-  const n = new Date();
-  const t = `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
-  document.getElementById('ct').textContent = t;
-  document.getElementById('sbt').textContent = t;
+function tick(){
+  const n=new Date();
+  const t=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  document.getElementById('ct').textContent=t;
+  document.getElementById('sbt').textContent=t;
   const D=['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
   const M=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
-  document.getElementById('cd').textContent = `${D[n.getDay()]}, ${n.getDate()} ${M[n.getMonth()]}`;
+  document.getElementById('cd').textContent=`${D[n.getDay()]}, ${n.getDate()} ${M[n.getMonth()]}`;
 }
 tick(); setInterval(tick,1000);
 
 // ═══ КОНТРОЛЫ ═══
-document.getElementById('ds').addEventListener('input', function() {
-  document.getElementById('dim').style.background = `rgba(0,0,0,${this.value/100})`;
-  document.getElementById('dv').textContent = this.value + '%';
+document.getElementById('ds').addEventListener('input',function(){
+  document.getElementById('dim').style.background=`rgba(0,0,0,${this.value/100})`;
+  document.getElementById('dv').textContent=this.value+'%';
 });
-document.getElementById('bs').addEventListener('input', function() {
-  document.getElementById('cam').style.filter = `brightness(${this.value/100})`;
-  document.getElementById('bv').textContent = this.value + '%';
+document.getElementById('bs').addEventListener('input',function(){
+  document.getElementById('cam').style.filter=`brightness(${this.value/100})`;
+  document.getElementById('bv').textContent=this.value+'%';
 });
 
-let playing = true;
-function togglePlay() { playing=!playing; document.getElementById('pb').textContent=playing?'⏸':'▶️'; }
+let playing=true;
+function togglePlay(){ playing=!playing; document.getElementById('pb').textContent=playing?'⏸':'▶️'; }
 
-function notify(icon, title, msg) {
-  document.getElementById('ni').textContent = icon||'🔔';
-  document.getElementById('ntitle').textContent = title||'';
-  document.getElementById('nmsg').textContent = msg||'';
-  const n = document.getElementById('wnotif');
+function notify(icon,title,msg){
+  document.getElementById('ni').textContent=icon||'🔔';
+  document.getElementById('ntitle').textContent=title||'';
+  document.getElementById('nmsg').textContent=msg||'';
+  const n=document.getElementById('wnotif');
   n.classList.add('show');
-  setTimeout(() => n.classList.remove('show'), 3200);
+  setTimeout(()=>n.classList.remove('show'),3200);
 }
 
-function openApp(n,i,d) {
+function openApp(n,i,d){
   document.getElementById('atitle').textContent=n;
   document.getElementById('aicon').textContent=i;
   document.getElementById('adesc').textContent=d;
   document.getElementById('appmenu').classList.add('show');
 }
-function closeApp() { document.getElementById('appmenu').classList.remove('show'); }
-function goHome() { closeApp(); }
+function closeApp(){ document.getElementById('appmenu').classList.remove('show'); }
+function goHome(){ closeApp(); recalibrate(); }
 
-if (navigator.getBattery) {
-  navigator.getBattery().then(b => {
-    const p = Math.round(b.level*100);
-    document.getElementById('batpct').textContent = ' '+p+'%';
-    document.getElementById('batval').textContent = p+'%';
-    document.getElementById('batbar').style.width = p+'%';
+if(navigator.getBattery){
+  navigator.getBattery().then(b=>{
+    const p=Math.round(b.level*100);
+    document.getElementById('batpct').textContent=' '+p+'%';
+    document.getElementById('batval').textContent=p+'%';
+    document.getElementById('batbar').style.width=p+'%';
   });
 }
 </script>
