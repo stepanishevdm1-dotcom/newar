@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vision OS Web V3</title>
+<title>Vision MAX</title>
 
 <style>
 body { margin:0; overflow:hidden; background:black; font-family:sans-serif; }
@@ -12,189 +12,195 @@ video {
   width:100%;
   height:100%;
   object-fit:cover;
-  z-index:-2;
+  z-index:-3;
 }
 
-canvas#overlay {
+canvas {
   position:absolute;
   top:0;
   left:0;
-  z-index:-1;
-}
-
-.app {
-  position:absolute;
-  width:120px;
-  height:120px;
-  background:rgba(255,255,255,0.1);
-  backdrop-filter:blur(20px);
-  border-radius:25px;
-  color:white;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-}
-
-.window {
-  position:absolute;
-  width:250px;
-  height:150px;
-  background:rgba(255,255,255,0.08);
-  backdrop-filter:blur(25px);
-  border-radius:25px;
-  color:white;
-  display:none;
-  align-items:center;
-  justify-content:center;
+  z-index:-2;
 }
 
 .cursor {
   position:absolute;
-  width:20px;
-  height:20px;
-  background:cyan;
+  width:18px;
+  height:18px;
   border-radius:50%;
+  background:cyan;
   pointer-events:none;
+  z-index:10;
+}
+
+.window {
+  position:absolute;
+  width:220px;
+  height:130px;
+  background:rgba(255,255,255,0.12);
+  backdrop-filter:blur(25px);
+  border-radius:20px;
+  color:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:transform 0.1s;
+}
+
+.app {
+  position:absolute;
+  width:110px;
+  height:110px;
+  border-radius:25px;
+  background:rgba(255,255,255,0.15);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:white;
 }
 </style>
 </head>
 
 <body>
 
-<video id="camera" autoplay playsinline></video>
-<canvas id="overlay"></canvas>
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas"></canvas>
 
 <div class="cursor" id="cursor"></div>
 
 <!-- HOME -->
-<div class="app" style="top:40%; left:30%" data-app="yt">YouTube</div>
-<div class="app" style="top:40%; left:60%" data-app="br">Browser</div>
+<div class="app" style="top:40%; left:30%" data-app="a1">App1</div>
+<div class="app" style="top:40%; left:55%" data-app="a2">App2</div>
 
 <!-- WINDOWS -->
-<div class="window" id="yt">🎬 YouTube App</div>
-<div class="window" id="br">🌐 Browser</div>
+<div class="window" id="a1" style="display:none">APP 1</div>
+<div class="window" id="a2" style="display:none">APP 2</div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
 // 📷 камера
-const video = document.getElementById("camera");
+const video = document.getElementById("video");
 navigator.mediaDevices.getUserMedia({
-  video: { facingMode: "environment" }
-}).then(s => video.srcObject = s);
+  video:{ facingMode:"environment" }
+}).then(s=>video.srcObject=s);
 
 
 // 🎨 canvas
-const canvas = document.getElementById("overlay");
+const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-canvas.width = innerWidth;
-canvas.height = innerHeight;
 
-
-// 🌌 THREE.JS
-const scene = new THREE.Scene();
-const camera3d = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
-const renderer = new THREE.WebGLRenderer({alpha:true});
-renderer.setSize(innerWidth, innerHeight);
-document.body.appendChild(renderer.domElement);
-
-camera3d.position.z = 5;
-
-function animate(){
-  requestAnimationFrame(animate);
-  renderer.render(scene, camera3d);
+function resize(){
+  canvas.width=innerWidth;
+  canvas.height=innerHeight;
 }
-animate();
+resize();
+onresize=resize;
 
 
-// 🖐️ MediaPipe
+// ✋ MediaPipe
 const hands = new Hands({
-  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+  locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
 
 hands.setOptions({
   maxNumHands:1,
-  minDetectionConfidence:0.7,
-  minTrackingConfidence:0.7
+  minDetectionConfidence:0.6,
+  minTrackingConfidence:0.6
 });
 
 const cursor = document.getElementById("cursor");
 
-let pinch = false;
-let lastClick = 0;
+let pinch=false;
+let grabbed=null;
 
-hands.onResults(results => {
+
+// 🎯 обработка руки
+hands.onResults(r=>{
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  if (!results.multiHandLandmarks.length) return;
+  if(!r.multiHandLandmarks.length) return;
 
-  const lm = results.multiHandLandmarks[0];
+  const lm=r.multiHandLandmarks[0];
 
-  // курсор
-  const x = lm[8].x * innerWidth;
-  const y = lm[8].y * innerHeight;
+  const x=lm[8].x*innerWidth;
+  const y=lm[8].y*innerHeight;
 
-  cursor.style.left = x + "px";
-  cursor.style.top = y + "px";
+  cursor.style.left=x+"px";
+  cursor.style.top=y+"px";
 
-  // pinch
-  const dx = lm[4].x - lm[8].x;
-  const dy = lm[4].y - lm[8].y;
-  const dist = Math.sqrt(dx*dx + dy*dy);
+  const dx=lm[4].x-lm[8].x;
+  const dy=lm[4].y-lm[8].y;
+  const dist=Math.sqrt(dx*dx+dy*dy);
 
-  if (dist < 0.05) {
-    if (!pinch && Date.now() - lastClick > 500) {
-      click(x,y);
-      lastClick = Date.now();
+  if(dist<0.07){
+    cursor.style.background="red";
+
+    if(!pinch){
+      pinch=true;
+      handleClick(x,y);
+      grabbed = getWindow(x,y);
     }
-    pinch = true;
-  } else {
-    pinch = false;
+
+    if(grabbed){
+      grabbed.style.left=(x-100)+"px";
+      grabbed.style.top=(y-60)+"px";
+    }
+
+  }else{
+    pinch=false;
+    grabbed=null;
+    cursor.style.background="cyan";
   }
 
   drawHand(lm);
 });
 
 
-// 🎯 клик
-function click(x,y){
-  document.querySelectorAll(".app").forEach(app=>{
-    const r = app.getBoundingClientRect();
-    if (x>r.left && x<r.right && y>r.top && y<r.bottom){
-      openApp(app.dataset.app);
+// 🪟 найти окно
+function getWindow(x,y){
+  const all=document.querySelectorAll(".window");
+  for(let w of all){
+    const r=w.getBoundingClientRect();
+    if(x>r.left && x<r.right && y>r.top && y<r.bottom){
+      return w;
+    }
+  }
+  return null;
+}
+
+
+// 📱 открыть приложение
+function handleClick(x,y){
+  document.querySelectorAll(".app").forEach(a=>{
+    const r=a.getBoundingClientRect();
+    if(x>r.left && x<r.right && y>r.top && y<r.bottom){
+      const w=document.getElementById(a.dataset.app);
+      w.style.display="flex";
+      w.style.left="40%";
+      w.style.top="30%";
       beep();
     }
   });
 }
 
 
-// 📱 открыть приложение
-function openApp(id){
-  const w = document.getElementById(id);
-  w.style.display = "flex";
-  w.style.left = "40%";
-  w.style.top = "30%";
-}
-
-
 // 🔊 звук
 function beep(){
-  const ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
-  const osc = ctxAudio.createOscillator();
-  osc.connect(ctxAudio.destination);
+  const ctxA=new (window.AudioContext||window.webkitAudioContext)();
+  const osc=ctxA.createOscillator();
+  osc.connect(ctxA.destination);
   osc.start();
-  osc.stop(ctxAudio.currentTime + 0.1);
+  osc.stop(ctxA.currentTime+0.1);
 }
 
 
 // ✋ рисование руки
 function drawHand(lm){
-  ctx.strokeStyle = "cyan";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle="lime";
+  ctx.lineWidth=3;
 
-  const c = [
+  const c=[
     [0,1],[1,2],[2,3],[3,4],
     [0,5],[5,6],[6,7],[7,8],
     [0,9],[9,10],[10,11],[11,12],
@@ -204,21 +210,31 @@ function drawHand(lm){
 
   c.forEach(([a,b])=>{
     ctx.beginPath();
-    ctx.moveTo(lm[a].x*innerWidth, lm[a].y*innerHeight);
-    ctx.lineTo(lm[b].x*innerWidth, lm[b].y*innerHeight);
+    ctx.moveTo(lm[a].x*innerWidth,lm[a].y*innerHeight);
+    ctx.lineTo(lm[b].x*innerWidth,lm[b].y*innerHeight);
     ctx.stroke();
   });
 }
 
 
-// 📷 камера MediaPipe
-const cam = new Camera(video, {
-  onFrame: async ()=> await hands.send({image:video}),
+// 📷 камера для MediaPipe
+const cam=new Camera(video,{
+  onFrame:async()=>await hands.send({image:video}),
   width:640,
   height:480
 });
 cam.start();
 
+
+// 📐 гироскоп = псевдо AR закрепление
+window.addEventListener("deviceorientation",e=>{
+  const x=e.gamma||0;
+  const y=e.beta||0;
+
+  document.querySelectorAll(".window").forEach((w,i)=>{
+    w.style.transform=`translate(${x*i}px, ${y*i}px)`;
+  });
+});
 </script>
 
 </body>
