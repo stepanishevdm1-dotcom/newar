@@ -2,41 +2,59 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vision Pro Web Demo</title>
+<title>Vision OS Web V3</title>
 
 <style>
-body {
-  margin: 0;
-  overflow: hidden;
-  background: black;
-  font-family: Arial;
-}
+body { margin:0; overflow:hidden; background:black; font-family:sans-serif; }
 
 video {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  z-index: -1;
+  position:absolute;
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  z-index:-2;
+}
+
+canvas#overlay {
+  position:absolute;
+  top:0;
+  left:0;
+  z-index:-1;
+}
+
+.app {
+  position:absolute;
+  width:120px;
+  height:120px;
+  background:rgba(255,255,255,0.1);
+  backdrop-filter:blur(20px);
+  border-radius:25px;
+  color:white;
+  display:flex;
+  align-items:center;
+  justify-content:center;
 }
 
 .window {
-  position: absolute;
-  width: 180px;
-  height: 100px;
-  background: rgba(255,255,255,0.1);
-  backdrop-filter: blur(15px);
-  border-radius: 20px;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  user-select: none;
-  transition: transform 0.1s;
+  position:absolute;
+  width:250px;
+  height:150px;
+  background:rgba(255,255,255,0.08);
+  backdrop-filter:blur(25px);
+  border-radius:25px;
+  color:white;
+  display:none;
+  align-items:center;
+  justify-content:center;
 }
 
-.window.active {
-  transform: scale(1.2);
+.cursor {
+  position:absolute;
+  width:20px;
+  height:20px;
+  background:cyan;
+  border-radius:50%;
+  pointer-events:none;
 }
 </style>
 </head>
@@ -44,89 +62,163 @@ video {
 <body>
 
 <video id="camera" autoplay playsinline></video>
+<canvas id="overlay"></canvas>
 
-<div class="window" id="w1" style="top:30%; left:20%">YouTube</div>
-<div class="window" id="w2" style="top:50%; left:50%">Browser</div>
-<div class="window" id="w3" style="top:70%; left:30%">Settings</div>
+<div class="cursor" id="cursor"></div>
 
+<!-- HOME -->
+<div class="app" style="top:40%; left:30%" data-app="yt">YouTube</div>
+<div class="app" style="top:40%; left:60%" data-app="br">Browser</div>
+
+<!-- WINDOWS -->
+<div class="window" id="yt">🎬 YouTube App</div>
+<div class="window" id="br">🌐 Browser</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
-// 📷 Включаем камеру
+// 📷 камера
 const video = document.getElementById("camera");
+navigator.mediaDevices.getUserMedia({
+  video: { facingMode: "environment" }
+}).then(s => video.srcObject = s);
 
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then(stream => video.srcObject = stream);
 
-// ✋ MediaPipe руки
+// 🎨 canvas
+const canvas = document.getElementById("overlay");
+const ctx = canvas.getContext("2d");
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+
+// 🌌 THREE.JS
+const scene = new THREE.Scene();
+const camera3d = new THREE.PerspectiveCamera(75, innerWidth/innerHeight, 0.1, 1000);
+const renderer = new THREE.WebGLRenderer({alpha:true});
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+
+camera3d.position.z = 5;
+
+function animate(){
+  requestAnimationFrame(animate);
+  renderer.render(scene, camera3d);
+}
+animate();
+
+
+// 🖐️ MediaPipe
 const hands = new Hands({
-  locateFile: (file) => {
-    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
-  }
+  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
 
 hands.setOptions({
-  maxNumHands: 1,
-  minDetectionConfidence: 0.7,
-  minTrackingConfidence: 0.7
+  maxNumHands:1,
+  minDetectionConfidence:0.7,
+  minTrackingConfidence:0.7
 });
 
-// 🪟 окна
-const windows = document.querySelectorAll(".window");
+const cursor = document.getElementById("cursor");
 
 let pinch = false;
+let lastClick = 0;
 
 hands.onResults(results => {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
   if (!results.multiHandLandmarks.length) return;
 
-  const landmarks = results.multiHandLandmarks[0];
+  const lm = results.multiHandLandmarks[0];
 
-  // большой палец (4) и указательный (8)
-  const dx = landmarks[4].x - landmarks[8].x;
-  const dy = landmarks[4].y - landmarks[8].y;
+  // курсор
+  const x = lm[8].x * innerWidth;
+  const y = lm[8].y * innerHeight;
 
-  const distance = Math.sqrt(dx*dx + dy*dy);
+  cursor.style.left = x + "px";
+  cursor.style.top = y + "px";
 
-  if (distance < 0.05) {
+  // pinch
+  const dx = lm[4].x - lm[8].x;
+  const dy = lm[4].y - lm[8].y;
+  const dist = Math.sqrt(dx*dx + dy*dy);
+
+  if (dist < 0.05) {
+    if (!pinch && Date.now() - lastClick > 500) {
+      click(x,y);
+      lastClick = Date.now();
+    }
     pinch = true;
-
-    const x = landmarks[8].x * window.innerWidth;
-    const y = landmarks[8].y * window.innerHeight;
-
-    windows.forEach(w => {
-      const rect = w.getBoundingClientRect();
-
-      if (
-        x > rect.left &&
-        x < rect.right &&
-        y > rect.top &&
-        y < rect.bottom
-      ) {
-        w.style.left = (x - 80) + "px";
-        w.style.top = (y - 50) + "px";
-        w.classList.add("active");
-      } else {
-        w.classList.remove("active");
-      }
-    });
-
   } else {
     pinch = false;
-    windows.forEach(w => w.classList.remove("active"));
   }
+
+  drawHand(lm);
 });
 
-// 📷 захват кадров
-const camera = new Camera(video, {
-  onFrame: async () => {
-    await hands.send({image: video});
-  },
-  width: 640,
-  height: 480
-});
 
-camera.start();
+// 🎯 клик
+function click(x,y){
+  document.querySelectorAll(".app").forEach(app=>{
+    const r = app.getBoundingClientRect();
+    if (x>r.left && x<r.right && y>r.top && y<r.bottom){
+      openApp(app.dataset.app);
+      beep();
+    }
+  });
+}
+
+
+// 📱 открыть приложение
+function openApp(id){
+  const w = document.getElementById(id);
+  w.style.display = "flex";
+  w.style.left = "40%";
+  w.style.top = "30%";
+}
+
+
+// 🔊 звук
+function beep(){
+  const ctxAudio = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = ctxAudio.createOscillator();
+  osc.connect(ctxAudio.destination);
+  osc.start();
+  osc.stop(ctxAudio.currentTime + 0.1);
+}
+
+
+// ✋ рисование руки
+function drawHand(lm){
+  ctx.strokeStyle = "cyan";
+  ctx.lineWidth = 2;
+
+  const c = [
+    [0,1],[1,2],[2,3],[3,4],
+    [0,5],[5,6],[6,7],[7,8],
+    [0,9],[9,10],[10,11],[11,12],
+    [0,13],[13,14],[14,15],[15,16],
+    [0,17],[17,18],[18,19],[19,20]
+  ];
+
+  c.forEach(([a,b])=>{
+    ctx.beginPath();
+    ctx.moveTo(lm[a].x*innerWidth, lm[a].y*innerHeight);
+    ctx.lineTo(lm[b].x*innerWidth, lm[b].y*innerHeight);
+    ctx.stroke();
+  });
+}
+
+
+// 📷 камера MediaPipe
+const cam = new Camera(video, {
+  onFrame: async ()=> await hands.send({image:video}),
+  width:640,
+  height:480
+});
+cam.start();
+
 </script>
 
 </body>
