@@ -1,75 +1,707 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AR Google App 3D</title>
-<style>
-  body { margin:0; overflow:hidden; font-family:sans-serif; }
-  video#camera { position:absolute; width:100%; height:100%; object-fit:cover; z-index:-3; }
-  #slider { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); z-index:10; width:80%; }
-  iframe#googleApp { position:absolute; width:600px; height:400px; border:none; left:50%; top:50%; transform:translate(-50%,-50%); z-index:5; box-shadow:0 0 20px rgba(0,255,255,0.5); }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>V6 MAX AR Interface - AR/VR пространство с жестами</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        /* Информационная панель */
+        #info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            font-size: 12px;
+            pointer-events: none;
+            font-family: monospace;
+        }
+        
+        /* Элементы управления */
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            gap: 10px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        button {
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: rgba(255,255,255,0.4);
+            transform: scale(1.05);
+        }
+        
+        button:active {
+            transform: scale(0.95);
+        }
+        
+        /* Джойстик */
+        .joystick-container {
+            position: fixed;
+            bottom: 30px;
+            left: 30px;
+            z-index: 100;
+            width: 120px;
+            height: 120px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 50%;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .joystick-base {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+        }
+        
+        .joystick-thumb {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.8);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            transition: transform 0.05s linear;
+        }
+        
+        /* Статус жестов */
+        #gesture-status {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            color: #0f0;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-family: monospace;
+            z-index: 100;
+            pointer-events: none;
+            backdrop-filter: blur(10px);
+        }
+        
+        /* Адаптивность */
+        @media (max-width: 768px) {
+            .joystick-container {
+                width: 80px;
+                height: 80px;
+            }
+            .joystick-thumb {
+                width: 35px;
+                height: 35px;
+            }
+            button {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+        }
+        
+        /* Стили для iframe и видео */
+        .app-window {
+            pointer-events: auto;
+            background: rgba(30,30,40,0.95);
+            border-radius: 15px;
+            overflow: hidden;
+            backdrop-filter: blur(5px);
+            border: 2px solid rgba(255,255,255,0.2);
+            transition: all 0.3s;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        
+        .app-window.active {
+            border-color: #00ff88;
+            box-shadow: 0 0 30px rgba(0,255,136,0.3);
+            transform: scale(1.02);
+        }
+        
+        .window-header {
+            background: rgba(0,0,0,0.7);
+            padding: 8px 12px;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            user-select: none;
+        }
+        
+        .close-btn {
+            cursor: pointer;
+            padding: 0 5px;
+            color: #ff4444;
+        }
+        
+        .close-btn:hover {
+            color: #ff8888;
+        }
+        
+        .window-content {
+            width: 100%;
+            height: calc(100% - 35px);
+        }
+        
+        iframe, video, canvas {
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: white;
+        }
+        
+        canvas {
+            background: #1a1a2e;
+        }
+        
+        /* Класс для курсора руки */
+        .hand-cursor {
+            position: fixed;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,0,0,0.8), rgba(255,0,0,0.2));
+            border: 2px solid red;
+            pointer-events: none;
+            z-index: 1000;
+            transform: translate(-50%, -50%);
+            transition: transform 0.05s linear;
+        }
+        
+        .hand-cursor.pinching {
+            transform: translate(-50%, -50%) scale(0.7);
+            background: radial-gradient(circle, rgba(0,255,0,0.8), rgba(0,255,0,0.2));
+            border-color: #00ff00;
+        }
+    </style>
 </head>
 <body>
-
-<video id="camera" autoplay playsinline></video>
-<input type="range" id="slider" min="-5" max="5" step="0.01" value="0">
-<iframe id="googleApp" src="https://www.google.com"></iframe>
-
-<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
-<script>
-// ======= 1. AR фон =======
-const video = document.getElementById("camera");
-navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" } })
-  .then(stream => video.srcObject = stream);
-
-// ======= 2. Three.js сцена =======
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 100);
-camera.position.z = 2;
-
-const renderer = new THREE.WebGLRenderer({ alpha:true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.body.appendChild(renderer.domElement);
-
-// Свет (для будущих объектов)
-scene.add(new THREE.AmbientLight(0xffffff,1));
-
-// ======= 3. Создаём “3D плоскость” для Google iframe =======
-const geometry = new THREE.PlaneGeometry(1.5,1);
-const material = new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:0 });
-const plane = new THREE.Mesh(geometry, material);
-plane.position.set(0,0,-2); // закрепляем в сцене
-scene.add(plane);
-
-const googleIframe = document.getElementById("googleApp");
-
-// ======= 4. Ползунок движения камеры =======
-const slider = document.getElementById("slider");
-slider.addEventListener("input", e => {
-  camera.position.z = 2 + parseFloat(e.target.value);
-});
-
-// ======= 5. Обновление позиции iframe под 3D объект =======
-function updateIframePosition() {
-  const vector = plane.position.clone();
-  vector.project(camera);
-
-  const x = (vector.x + 1) / 2 * window.innerWidth;
-  const y = (-vector.y + 1) / 2 * window.innerHeight;
-
-  googleIframe.style.left = x + "px";
-  googleIframe.style.top = y + "px";
-}
-
-// ======= 6. Анимация =======
-function animate() {
-  requestAnimationFrame(animate);
-  updateIframePosition();
-  renderer.render(scene, camera);
-}
-animate();
-</script>
+    <div id="info">
+        🚀 V6 MAX AR Interface<br>
+        📱 Камера + 3D пространство<br>
+        ✋ Покажите указательный палец<br>
+        🤏 Зажмите для выбора
+    </div>
+    
+    <div class="controls">
+        <button id="toggle-camera">📷 Камера ВКЛ/ВЫКЛ</button>
+        <button id="reset-view">🔄 Сброс вида</button>
+    </div>
+    
+    <div class="joystick-container" id="joystick">
+        <div class="joystick-base"></div>
+        <div class="joystick-thumb" id="joystick-thumb"></div>
+    </div>
+    
+    <div id="gesture-status">🤚 Ожидание руки...</div>
+    
+    <div id="hand-cursor" class="hand-cursor" style="display: none;"></div>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "@mediapipe/camera_utils": "https://unpkg.com/@mediapipe/camera_utils@0.3.1675465740/camera_utils.js",
+                "@mediapipe/control_utils": "https://unpkg.com/@mediapipe/control_utils@0.3.1675465740/control_utils.js",
+                "@mediapipe/drawing_utils": "https://unpkg.com/@mediapipe/drawing_utils@0.3.1675465740/drawing_utils.js",
+                "@mediapipe/hands": "https://unpkg.com/@mediapipe/hands@0.4.1646424915/hands.js"
+            }
+        }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { Hands } from '@mediapipe/hands';
+        import { Camera as MediaCamera } from '@mediapipe/camera_utils';
+        
+        // ==================== СОСТОЯНИЕ ПРИЛОЖЕНИЯ ====================
+        const state = {
+            cameraEnabled: true,
+            videoElement: null,
+            threeScene: null,
+            threeCamera: null,
+            threeRenderer: null,
+            windows: [],
+            activeWindow: null,
+            handPosition: { x: 0, y: 0 },
+            isPinching: false,
+            joystick: { x: 0, y: 0 },
+            cameraRotation: { x: 0, y: 0 },
+            cameraPosition: { x: 0, y: 2, z: 5 }
+        };
+        
+        // ==================== НАСТРОЙКА THREE.JS ====================
+        function setupThree() {
+            const container = document.createElement('div');
+            document.body.appendChild(container);
+            
+            // Сцена
+            state.threeScene = new THREE.Scene();
+            state.threeScene.background = new THREE.Color(0x000000);
+            state.threeScene.fog = new THREE.FogExp2(0x000000, 0.02);
+            
+            // Камера
+            state.threeCamera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            state.threeCamera.position.set(0, 2, 5);
+            state.threeCamera.lookAt(0, 0, 0);
+            
+            // Рендерер
+            state.threeRenderer = new THREE.WebGLRenderer({ alpha: true });
+            state.threeRenderer.setSize(window.innerWidth, window.innerHeight);
+            state.threeRenderer.setClearColor(0x000000, 0);
+            state.threeRenderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(state.threeRenderer.domElement);
+            container.style.position = 'fixed';
+            container.style.top = '0';
+            container.style.left = '0';
+            container.style.zIndex = '1';
+            container.style.pointerEvents = 'none';
+            
+            // Освещение
+            const ambientLight = new THREE.AmbientLight(0x404060);
+            state.threeScene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(1, 2, 1);
+            state.threeScene.add(directionalLight);
+            
+            const backLight = new THREE.PointLight(0x4466ff, 0.5);
+            backLight.position.set(0, 2, -2);
+            state.threeScene.add(backLight);
+            
+            // Пол (для ориентации)
+            const gridHelper = new THREE.GridHelper(20, 20, 0x88aaff, 0x335588);
+            gridHelper.position.y = -1.5;
+            state.threeScene.add(gridHelper);
+            
+            // Небольшие частицы для атмосферы
+            const particleGeometry = new THREE.BufferGeometry();
+            const particleCount = 500;
+            const particlePositions = new Float32Array(particleCount * 3);
+            for (let i = 0; i < particleCount; i++) {
+                particlePositions[i*3] = (Math.random() - 0.5) * 40;
+                particlePositions[i*3+1] = (Math.random() - 0.5) * 10;
+                particlePositions[i*3+2] = (Math.random() - 0.5) * 20 - 10;
+            }
+            particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+            const particleMaterial = new THREE.PointsMaterial({ color: 0x88aaff, size: 0.05 });
+            const particles = new THREE.Points(particleGeometry, particleMaterial);
+            state.threeScene.add(particles);
+            
+            animate();
+        }
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (state.threeCamera && state.threeScene) {
+                // Обновление позиции камеры на основе джойстика
+                state.cameraPosition.x += state.joystick.x * 0.05;
+                state.cameraPosition.z += state.joystick.y * 0.05;
+                
+                // Ограничения
+                state.cameraPosition.x = Math.max(-8, Math.min(8, state.cameraPosition.x));
+                state.cameraPosition.z = Math.max(2, Math.min(12, state.cameraPosition.z));
+                
+                state.threeCamera.position.x = state.cameraPosition.x;
+                state.threeCamera.position.y = state.cameraPosition.y;
+                state.threeCamera.position.z = state.cameraPosition.z;
+                state.threeCamera.lookAt(state.cameraPosition.x, 0, state.cameraPosition.z - 2);
+                
+                // Анимация частиц
+                particles.rotation.y += 0.002;
+                particles.rotation.x += 0.001;
+            }
+            
+            if (state.threeRenderer && state.threeScene && state.threeCamera) {
+                state.threeRenderer.render(state.threeScene, state.threeCamera);
+            }
+        }
+        
+        // ==================== СОЗДАНИЕ ОКОН-ПРИЛОЖЕНИЙ ====================
+        function createWindowApp(id, title, content, x, y, z, width = 3, height = 2) {
+            // Создаем HTML элемент окна
+            const div = document.createElement('div');
+            div.className = 'app-window';
+            div.style.position = 'absolute';
+            div.style.width = `${width * 100}px`;
+            div.style.height = `${height * 100}px`;
+            div.style.pointerEvents = 'auto';
+            div.style.cursor = 'pointer';
+            div.innerHTML = `
+                <div class="window-header">
+                    <span>${title}</span>
+                    <span class="close-btn" data-id="${id}">✕</span>
+                </div>
+                <div class="window-content" id="window-content-${id}"></div>
+            `;
+            document.body.appendChild(div);
+            
+            // Создаем 3D объект для окна
+            const canvas = document.createElement('canvas');
+            canvas.width = width * 200;
+            canvas.height = height * 200;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#2a2a3a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.strokeStyle = '#88aaff';
+            ctx.lineWidth = 5;
+            ctx.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.MeshStandardMaterial({ map: texture, side: THREE.DoubleSide });
+            const geometry = new THREE.BoxGeometry(width, height, 0.1);
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(x, y, z);
+            mesh.userData = { id, type: 'window', div, canvas, ctx, texture };
+            state.threeScene.add(mesh);
+            
+            // Сохраняем окно
+            const windowObj = { id, title, mesh, div, x, y, z, width, height, content };
+            state.windows.push(windowObj);
+            
+            // Заполняем содержимое
+            const contentDiv = document.getElementById(`window-content-${id}`);
+            if (contentDiv) {
+                if (content.type === 'video') {
+                    const video = document.createElement('video');
+                    video.src = content.url || 'https://www.w3schools.com/html/mov_bbb.mp4';
+                    video.controls = true;
+                    video.autoplay = true;
+                    video.loop = true;
+                    video.muted = false;
+                    video.style.width = '100%';
+                    video.style.height = '100%';
+                    video.style.objectFit = 'cover';
+                    contentDiv.appendChild(video);
+                    video.play().catch(e => console.log('Auto-play prevented:', e));
+                } else if (content.type === 'browser') {
+                    const iframe = document.createElement('iframe');
+                    iframe.src = content.url || 'https://example.com';
+                    iframe.sandbox = 'allow-same-origin allow-scripts allow-popups allow-forms';
+                    iframe.style.width = '100%';
+                    iframe.style.height = '100%';
+                    iframe.style.border = 'none';
+                    contentDiv.appendChild(iframe);
+                } else if (content.type === 'game') {
+                    const canvasGame = document.createElement('canvas');
+                    canvasGame.width = 400;
+                    canvasGame.height = 300;
+                    canvasGame.style.width = '100%';
+                    canvasGame.style.height = '100%';
+                    canvasGame.style.background = '#1a1a2e';
+                    contentDiv.appendChild(canvasGame);
+                    
+                    // Простая игра-кликер
+                    let score = 0;
+                    const gameCtx = canvasGame.getContext('2d');
+                    function drawGame() {
+                        gameCtx.fillStyle = '#1a1a2e';
+                        gameCtx.fillRect(0, 0, canvasGame.width, canvasGame.height);
+                        gameCtx.fillStyle = '#88aaff';
+                        gameCtx.font = '20px Arial';
+                        gameCtx.fillText(`Score: ${score}`, 20, 50);
+                        gameCtx.fillStyle = '#ffaa88';
+                        gameCtx.fillRect(canvasGame.width/2 - 50, canvasGame.height/2 - 50, 100, 100);
+                        gameCtx.fillStyle = '#ffffff';
+                        gameCtx.font = '16px Arial';
+                        gameCtx.fillText('Click me!', canvasGame.width/2 - 30, canvasGame.height/2);
+                    }
+                    drawGame();
+                    canvasGame.addEventListener('click', () => {
+                        score++;
+                        drawGame();
+                    });
+                }
+            }
+            
+            // Обработка закрытия окна
+            const closeBtn = div.querySelector('.close-btn');
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                removeWindow(id);
+            });
+            
+            // Подсветка при наведении курсором
+            return mesh;
+        }
+        
+        function removeWindow(id) {
+            const index = state.windows.findIndex(w => w.id === id);
+            if (index !== -1) {
+                const windowObj = state.windows[index];
+                state.threeScene.remove(windowObj.mesh);
+                windowObj.div.remove();
+                state.windows.splice(index, 1);
+                if (state.activeWindow === id) state.activeWindow = null;
+            }
+        }
+        
+        function highlightWindow(id, active) {
+            state.windows.forEach(w => {
+                if (w.id === id) {
+                    w.mesh.material.emissive = active ? new THREE.Color(0x44ff88) : new THREE.Color(0x000000);
+                    if (active) {
+                        w.div.classList.add('active');
+                    } else {
+                        w.div.classList.remove('active');
+                    }
+                }
+            });
+        }
+        
+        // ==================== КАМЕРА ФОН ====================
+        async function setupCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                video.style.position = 'fixed';
+                video.style.top = '0';
+                video.style.left = '0';
+                video.style.width = '100%';
+                video.style.height = '100%';
+                video.style.objectFit = 'cover';
+                video.style.zIndex = '0';
+                video.style.pointerEvents = 'none';
+                document.body.insertBefore(video, document.body.firstChild);
+                state.videoElement = video;
+                return true;
+            } catch (err) {
+                console.error('Camera error:', err);
+                return false;
+            }
+        }
+        
+        // ==================== MEDIAPIPE HANDS ====================
+        function setupHandTracking() {
+            const videoElement = document.createElement('video');
+            videoElement.style.display = 'none';
+            document.body.appendChild(videoElement);
+            
+            const hands = new Hands({
+                locateFile: (file) => {
+                    return `https://unpkg.com/@mediapipe/hands@0.4.1646424915/${file}`;
+                }
+            });
+            
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+            
+            hands.onResults((results) => {
+                const cursor = document.getElementById('hand-cursor');
+                if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                    cursor.style.display = 'block';
+                    const landmarks = results.multiHandLandmarks[0];
+                    const indexTip = landmarks[8];
+                    const thumbTip = landmarks[4];
+                    
+                    // Координаты для курсора (преобразуем в экранные)
+                    const x = 1 - indexTip.x;
+                    const y = indexTip.y;
+                    const screenX = x * window.innerWidth;
+                    const screenY = y * window.innerHeight;
+                    
+                    cursor.style.left = `${screenX}px`;
+                    cursor.style.top = `${screenY}px`;
+                    
+                    // Определяем жест pinch (расстояние между большим и указательным)
+                    const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+                    const isPinching = distance < 0.05;
+                    
+                    if (isPinching && !state.isPinching) {
+                        state.isPinching = true;
+                        cursor.classList.add('pinching');
+                        document.getElementById('gesture-status').innerHTML = '🤏 PINCH активирован';
+                        // Проверяем пересечение с окнами
+                        checkWindowIntersection(screenX, screenY);
+                    } else if (!isPinching && state.isPinching) {
+                        state.isPinching = false;
+                        cursor.classList.remove('pinching');
+                        document.getElementById('gesture-status').innerHTML = '✋ Палец отслеживается';
+                    }
+                    
+                    state.handPosition = { x: screenX, y: screenY };
+                } else {
+                    cursor.style.display = 'none';
+                    document.getElementById('gesture-status').innerHTML = '🤚 Рука не обнаружена';
+                    state.isPinching = false;
+                }
+            });
+            
+            // Запускаем камеру для MediaPipe
+            if (state.videoElement) {
+                const camera = new MediaCamera(state.videoElement, {
+                    onFrame: async () => {
+                        await hands.send({ image: state.videoElement });
+                    },
+                    width: 640,
+                    height: 480
+                });
+                camera.start();
+            }
+        }
+        
+        function checkWindowIntersection(x, y) {
+            // Проверяем, на какое окно наведен курсор
+            for (let i = state.windows.length - 1; i >= 0; i--) {
+                const win = state.windows[i];
+                const rect = win.div.getBoundingClientRect();
+                if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                    if (state.activeWindow !== win.id) {
+                        if (state.activeWindow) highlightWindow(state.activeWindow, false);
+                        state.activeWindow = win.id;
+                        highlightWindow(win.id, true);
+                        document.getElementById('gesture-status').innerHTML = `✅ Выбрано окно: ${win.title}`;
+                    }
+                    return;
+                }
+            }
+            if (state.activeWindow) {
+                highlightWindow(state.activeWindow, false);
+                state.activeWindow = null;
+            }
+        }
+        
+        // ==================== ДЖОЙСТИК ====================
+        function setupJoystick() {
+            const container = document.getElementById('joystick');
+            const thumb = document.getElementById('joystick-thumb');
+            let active = false;
+            let startX = 0, startY = 0;
+            let thumbStartX = 0, thumbStartY = 0;
+            
+            function onStart(e) {
+                e.preventDefault();
+                active = true;
+                const rect = container.getBoundingClientRect();
+                startX = (e.clientX || e.touches[0].clientX) - rect.left - rect.width/2;
+                startY = (e.clientY || e.touches[0].clientY) - rect.top - rect.height/2;
+                thumbStartX = parseFloat(thumb.style.left) || 0;
+                thumbStartY = parseFloat(thumb.style.top) || 0;
+            }
+            
+            function onMove(e) {
+                if (!active) return;
+                e.preventDefault();
+                const rect = container.getBoundingClientRect();
+                let currentX = (e.clientX || e.touches[0].clientX) - rect.left - rect.width/2;
+                let currentY = (e.clientY || e.touches[0].clientY) - rect.top - rect.height/2;
+                let deltaX = currentX - startX;
+                let deltaY = currentY - startY;
+                
+                let newX = thumbStartX + deltaX;
+                let newY = thumbStartY + deltaY;
+                const maxMove = rect.width/2 - 25;
+                newX = Math.max(-maxMove, Math.min(maxMove, newX));
+                newY = Math.max(-maxMove, Math.min(maxMove, newY));
+                
+                thumb.style.transform = `translate(calc(-50% + ${newX}px), calc(-50% + ${newY}px))`;
+                
+                state.joystick.x = newX / maxMove;
+                state.joystick.y = newY / maxMove;
+            }
+            
+            function onEnd(e) {
+                active = false;
+                thumb.style.transform = 'translate(-50%, -50%)';
+                state.joystick.x = 0;
+                state.joystick.y = 0;
+            }
+            
+            container.addEventListener('mousedown', onStart);
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onEnd);
+            container.addEventListener('touchstart', onStart);
+            window.addEventListener('touchmove', onMove);
+            window.addEventListener('touchend', onEnd);
+        }
+        
+        // ==================== ИНИЦИАЛИЗАЦИЯ ====================
+        async function init() {
+            setupThree();
+            await setupCamera();
+            setupHandTracking();
+            setupJoystick();
+            
+            // Создаем окна-приложения
+            createWindowApp('win1', '🎬 Видеоплеер', { type: 'video', url: 'https://www.w3schools.com/html/mov_bbb.mp4' }, -2, 1, -1, 3, 2);
+            createWindowApp('win2', '🌐 Браузер', { type: 'browser', url: 'https://example.com' }, 2, 1, -1, 3.5, 2.5);
+            createWindowApp('win3', '🎮 Мини-игра', { type: 'game' }, 0, -0.5, -2, 3, 2.5);
+            createWindowApp('win4', '📝 Заметки', { type: 'notes' }, -1, 2, -3, 2.5, 1.5);
+            
+            // Кнопки управления
+            document.getElementById('toggle-camera').addEventListener('click', () => {
+                if (state.videoElement) {
+                    state.videoElement.style.display = state.videoElement.style.display === 'none' ? 'block' : 'none';
+                }
+            });
+            
+            document.getElementById('reset-view').addEventListener('click', () => {
+                state.cameraPosition = { x: 0, y: 2, z: 5 };
+                state.cameraRotation = { x: 0, y: 0 };
+            });
+            
+            // Обработка гироскопа для дополнительного эффекта
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', (e) => {
+                    if (!state.isPinching) {
+                        // Небольшой эффект наклона
+                        const gamma = e.gamma || 0;
+                        const beta = e.beta || 0;
+                        state.threeScene.rotation.z = gamma * 0.005;
+                        state.threeScene.rotation.x = beta * 0.005;
+                    }
+                });
+            }
+        }
+        
+        // Запуск
+        init();
+        
+        // Адаптация под размер экрана
+        window.addEventListener('resize', () => {
+            if (state.threeCamera) {
+                state.threeCamera.aspect = window.innerWidth / window.innerHeight;
+                state.threeCamera.updateProjectionMatrix();
+                state.threeRenderer.setSize(window.innerWidth, window.innerHeight);
+            }
+        });
+    </script>
 </body>
 </html>
