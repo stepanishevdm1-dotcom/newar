@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>VR GAMING | Полное погружение | Поворот головы = поворот камеры</title>
+    <title>META QUEST AR | Окна закреплены в пространстве</title>
     <style>
         * {
             margin: 0;
@@ -17,9 +17,11 @@
             overflow: hidden;
             font-family: -apple-system, 'SF Pro Display', system-ui, sans-serif;
             background: #000;
+            position: fixed;
+            width: 100%;
+            height: 100%;
         }
 
-        /* Камера фон */
         #cameraVideo {
             position: fixed;
             top: 0;
@@ -30,75 +32,83 @@
             z-index: 0;
         }
 
-        /* VR контейнер - вращается вместе с головой */
-        .vr-container {
+        .ar-container {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            z-index: 10;
+            z-index: 20;
             pointer-events: none;
-            transform-style: preserve-3d;
         }
 
-        /* VR объекты - вращаются вместе с камерой */
-        .vr-object {
+        .ar-window {
             position: absolute;
-            background: rgba(25, 30, 45, 0.92);
-            backdrop-filter: blur(50px);
-            border-radius: 28px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            background: rgba(20, 25, 45, 0.92);
+            backdrop-filter: blur(60px);
+            border-radius: 32px;
+            border: 1.5px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.5);
             pointer-events: auto;
             display: flex;
             flex-direction: column;
             overflow: hidden;
             transition: all 0.2s ease;
-            transform-origin: center center;
             min-width: 280px;
             min-height: 240px;
+            cursor: pointer;
+            will-change: left, top;
         }
 
-        .vr-object.active {
-            border-color: #00ff88;
-            box-shadow: 0 0 35px rgba(0, 255, 136, 0.5);
+        .ar-window.active {
+            border-color: #00ffaa;
+            box-shadow: 0 0 40px rgba(0, 255, 170, 0.6);
             transform: scale(1.02);
         }
 
-        .object-header {
-            padding: 12px 16px;
+        .window-header {
+            padding: 14px 18px;
             background: rgba(255, 255, 255, 0.1);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 0.5px solid rgba(255, 255, 255, 0.15);
+            border-bottom: 0.5px solid rgba(255, 255, 255, 0.2);
+            cursor: grab;
         }
 
-        .object-title {
+        .window-header:active {
+            cursor: grabbing;
+        }
+
+        .window-title {
             color: white;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 15px;
         }
 
-        .object-controls {
+        .window-controls {
             display: flex;
-            gap: 14px;
+            gap: 16px;
         }
 
-        .object-controls span {
+        .window-controls span {
             cursor: pointer;
-            font-size: 16px;
+            font-size: 18px;
             opacity: 0.8;
-            transition: opacity 0.2s;
+            transition: all 0.2s;
+        }
+
+        .window-controls span:hover {
+            opacity: 1;
+            transform: scale(1.1);
         }
 
         .close-btn { color: #ff6b6b; }
         .minimize-btn { color: #ffd93d; }
 
-        .object-content {
+        .window-content {
             flex: 1;
-            padding: 12px;
+            padding: 14px;
             overflow: auto;
             min-height: 180px;
         }
@@ -107,39 +117,33 @@
             width: 100%;
             height: 100%;
             border: none;
-            border-radius: 16px;
-            background: rgba(0, 0, 0, 0.3);
-        }
-
-        video {
-            object-fit: contain;
+            border-radius: 20px;
+            background: rgba(0, 0, 0, 0.4);
         }
 
         .note-editor {
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.6);
-            color: #0f0;
-            padding: 12px;
-            border-radius: 16px;
-            border: 0.5px solid rgba(0, 255, 0, 0.3);
+            color: #aaffdd;
+            padding: 14px;
+            border-radius: 20px;
+            border: 1px solid rgba(100, 255, 200, 0.3);
             resize: none;
             font-family: monospace;
-            font-size: 12px;
+            font-size: 13px;
         }
 
-        /* Canvas для скелета руки */
-        #handCanvas {
+        #vrCursor {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            width: 40px;
+            height: 40px;
             pointer-events: none;
-            z-index: 100;
+            z-index: 200;
+            transform: translate(-50%, -50%);
+            filter: drop-shadow(0 0 10px #00ffaa);
         }
 
-        /* UI элементы */
         .ui-bar {
             position: fixed;
             top: 20px;
@@ -157,20 +161,20 @@
         .ui-card {
             background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(40px);
-            border-radius: 30px;
-            padding: 8px 16px;
+            border-radius: 40px;
+            padding: 8px 20px;
             border: 0.5px solid rgba(255, 255, 255, 0.2);
             color: white;
-            font-size: 12px;
+            font-size: 13px;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
         }
 
         .mode-btn {
-            padding: 6px 14px;
-            border-radius: 30px;
-            background: transparent;
+            padding: 6px 16px;
+            border-radius: 40px;
+            background: rgba(255, 255, 255, 0.1);
             border: none;
             color: white;
             font-size: 12px;
@@ -179,12 +183,13 @@
         }
 
         .mode-btn.active {
-            background: rgba(0, 170, 255, 0.6);
+            background: #00aaff;
+            box-shadow: 0 0 12px rgba(0, 170, 255, 0.5);
         }
 
         .led {
-            width: 8px;
-            height: 8px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             background: #ff4444;
             transition: all 0.3s;
@@ -192,34 +197,34 @@
 
         .led.active {
             background: #0f0;
-            box-shadow: 0 0 8px #0f0;
+            box-shadow: 0 0 12px #0f0;
             animation: pulse 1s infinite;
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 0.5; }
-            50% { opacity: 1; }
+            0%, 100% { opacity: 0.6; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.2); }
         }
 
         .action-buttons {
             position: fixed;
-            bottom: 25px;
-            left: 25px;
+            bottom: 30px;
+            left: 30px;
             display: flex;
-            gap: 10px;
+            gap: 12px;
             z-index: 200;
             pointer-events: auto;
         }
 
-        .action-btn, .vr-toggle-btn {
-            width: 50px;
-            height: 50px;
-            border-radius: 25px;
+        .action-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 28px;
             background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(40px);
-            border: 0.5px solid rgba(255, 255, 255, 0.2);
+            border: 0.5px solid rgba(255, 255, 255, 0.25);
             color: white;
-            font-size: 22px;
+            font-size: 24px;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -227,18 +232,22 @@
             transition: all 0.2s;
         }
 
+        .action-btn:active {
+            transform: scale(0.92);
+        }
+
         .fullscreen-btn {
             position: fixed;
-            bottom: 25px;
-            right: 25px;
-            width: 50px;
-            height: 50px;
-            border-radius: 25px;
+            bottom: 30px;
+            right: 30px;
+            width: 56px;
+            height: 56px;
+            border-radius: 28px;
             background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(40px);
-            border: 0.5px solid rgba(255, 255, 255, 0.2);
+            border: 0.5px solid rgba(255, 255, 255, 0.25);
             color: white;
-            font-size: 22px;
+            font-size: 24px;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -246,37 +255,46 @@
             z-index: 200;
         }
 
-        .action-btn:active, .fullscreen-btn:active, .vr-toggle-btn:active {
-            transform: scale(0.92);
-        }
-
         .status-text {
             position: fixed;
-            bottom: 100px;
-            left: 25px;
+            bottom: 110px;
+            left: 30px;
             background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(20px);
-            padding: 8px 16px;
-            border-radius: 24px;
-            color: #0f0;
-            font-size: 12px;
+            padding: 10px 20px;
+            border-radius: 30px;
+            color: #aaffdd;
+            font-size: 13px;
             z-index: 200;
             pointer-events: none;
+            font-weight: 500;
         }
 
-        .gyro-indicator {
+        .calibration-panel {
             position: fixed;
-            bottom: 100px;
-            right: 25px;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(20px);
-            padding: 6px 12px;
-            border-radius: 20px;
-            color: #00aaff;
-            font-size: 10px;
-            font-family: monospace;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(30px);
+            padding: 10px 24px;
+            border-radius: 40px;
+            color: white;
+            font-size: 12px;
             z-index: 200;
-            pointer-events: none;
+            display: flex;
+            gap: 15px;
+            pointer-events: auto;
+        }
+
+        .calibrate-btn {
+            background: #00aaff;
+            border: none;
+            padding: 6px 20px;
+            border-radius: 30px;
+            color: white;
+            cursor: pointer;
+            font-weight: bold;
         }
 
         .orientation-warning {
@@ -293,7 +311,6 @@
             flex-direction: column;
             color: white;
             font-size: 20px;
-            text-align: center;
         }
 
         @media (orientation: portrait) {
@@ -302,7 +319,6 @@
             }
         }
 
-        /* Загрузочный экран */
         #loader {
             position: fixed;
             top: 0;
@@ -333,88 +349,44 @@
             to { transform: rotate(360deg); }
         }
 
-        .progress-bar {
-            width: 200px;
-            height: 3px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 2px;
-            margin-top: 20px;
-            overflow: hidden;
-        }
-
-        .progress-fill {
-            width: 0%;
-            height: 100%;
-            background: #00aaff;
-            transition: width 0.3s;
-        }
-
-        /* Компас для VR */
-        .vr-crosshair {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            width: 30px;
-            height: 30px;
-            transform: translate(-50%, -50%);
-            border: 2px solid rgba(255, 255, 255, 0.8);
-            border-radius: 50%;
-            z-index: 150;
-            pointer-events: none;
-        }
-        .vr-crosshair::before,
-        .vr-crosshair::after {
-            content: '';
-            position: absolute;
-            background: rgba(255, 255, 255, 0.8);
-        }
-        .vr-crosshair::before {
-            top: 50%;
-            left: 0;
-            right: 0;
-            height: 2px;
-            transform: translateY(-50%);
-        }
-        .vr-crosshair::after {
-            left: 50%;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            transform: translateX(-50%);
+        @keyframes ripple {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
         }
     </style>
 </head>
 <body>
     <div id="loader">
         <div class="spinner"></div>
-        <div class="loader-text" id="loaderText">Инициализация VR пространства...</div>
-        <div class="progress-bar">
-            <div class="progress-fill" id="progressFill"></div>
-        </div>
+        <div class="loader-text">🔮 Инициализация AR пространства...</div>
     </div>
 
     <video id="cameraVideo" autoplay playsinline muted></video>
     
     <div class="orientation-warning">
-        <div>📱 Поверните телефон горизонтально для VR режима</div>
+        <div>📱 Поверните телефон горизонтально для AR эффекта</div>
         <div style="font-size: 48px; margin-top: 20px;">↻</div>
     </div>
 
-    <div class="vr-container" id="vrContainer"></div>
-    <canvas id="handCanvas"></canvas>
-    <div class="vr-crosshair"></div>
+    <div class="ar-container" id="arContainer"></div>
+    <div id="vrCursor">
+        <svg viewBox="0 0 40 40" fill="none">
+            <circle cx="20" cy="20" r="16" stroke="#00ffaa" stroke-width="2.5" fill="rgba(0,255,170,0.2)"/>
+            <circle cx="20" cy="20" r="6" fill="#00ffaa" fill-opacity="0.9">
+                <animate attributeName="r" values="6;9;6" dur="0.6s" repeatCount="indefinite"/>
+            </circle>
+        </svg>
+    </div>
 
     <div class="ui-bar">
-        <div class="ui-card">
-            <span>🥽 VR GAMING MODE</span>
-        </div>
+        <div class="ui-card">🔮 META QUEST AR</div>
         <div class="ui-card">
             <button class="mode-btn active" data-mode="gesture">✋ Жесты</button>
             <button class="mode-btn" data-mode="touch">👆 Тачпад</button>
         </div>
         <div class="ui-card">
             <div class="led" id="handLed"></div>
-            <span id="modeText">VR режим: поворот головы</span>
+            <span id="modeText">AR режим: Жесты</span>
         </div>
     </div>
 
@@ -425,60 +397,35 @@
         <button class="action-btn" id="resetView">🔄</button>
     </div>
 
+    <div class="calibration-panel">
+        <span>🎯 AR привязка к пространству</span>
+        <button class="calibrate-btn" id="calibrateBtn">Калибровать</button>
+    </div>
+
     <button class="fullscreen-btn" id="fullscreenBtn">⤢</button>
-    <div class="status-text" id="statusText">🥽 VR активен | Поворачивайте голову</div>
-    <div class="gyro-indicator" id="gyroIndicator">Гироскоп: калибровка...</div>
+    <div class="status-text" id="statusText">🎯 Двигайте телефон — окна остаются на месте!</div>
 
     <input type="file" id="videoUpload" accept="video/*" style="display: none">
 
     <script>
-        // ==================== ПРОГРЕСС ====================
-        let progress = 0;
-        const progressFill = document.getElementById('progressFill');
-        const loaderText = document.getElementById('loaderText');
-        const texts = [
-            'Запуск VR движка...',
-            'Активация камеры...',
-            'Калибровка гироскопа для VR...',
-            'Настройка отслеживания головы...',
-            'Создание VR пространства...',
-            'Готово! Поворачивайте голову - мир вращается!'
-        ];
+        // ==================== ПОЛНОЦЕННЫЙ AR ЭФФЕКТ С ПРАВИЛЬНОЙ МАТЕМАТИКОЙ ====================
         
-        const progressInterval = setInterval(() => {
-            progress += 10;
-            progressFill.style.width = Math.min(100, progress) + '%';
-            const idx = Math.min(Math.floor(progress / 17), texts.length - 1);
-            loaderText.textContent = texts[idx];
-            
-            if (progress >= 100) {
-                clearInterval(progressInterval);
-                setTimeout(() => {
-                    const loader = document.getElementById('loader');
-                    loader.style.opacity = '0';
-                    setTimeout(() => loader.remove(), 500);
-                }, 500);
-            }
-        }, 200);
-
-        // ==================== СОСТОЯНИЕ ====================
         const state = {
-            objects: [],
-            activeObjectId: null,
+            windows: [],
+            activeWindowId: null,
             controlMode: 'gesture',
             cursorX: window.innerWidth / 2,
             cursorY: window.innerHeight / 2,
-            isPinching: false,
-            // VR: углы поворота головы
-            headRotation: { yaw: 0, pitch: 0, roll: 0 },
-            // Позиция камеры в VR пространстве
-            cameraPos: { x: 0, y: 0, z: 0 },
-            nextId: 1,
-            gamepad: null,
-            gamepadConnected: false,
-            lastButtons: {}
+            
+            // Данные гироскопа
+            orientation: { alpha: 0, beta: 0, gamma: 0 },
+            // Калибровка (начальная точка отсчета)
+            calibration: { alpha: 0, beta: 0, gamma: 0 },
+            isCalibrated: false,
+            
+            nextId: 1
         };
-
+        
         // ==================== КАМЕРА ====================
         async function setupCamera() {
             try {
@@ -489,91 +436,130 @@
                 video.srcObject = stream;
                 return true;
             } catch (err) {
-                console.error('Camera error:', err);
                 document.getElementById('statusText').innerHTML = '⚠️ Камера недоступна';
                 return false;
             }
         }
-
-        // ==================== VR: ОТСЛЕЖИВАНИЕ ПОВОРОТА ГОЛОВЫ ====================
-        function setupVRHeadTracking() {
-            const gyroIndicator = document.getElementById('gyroIndicator');
-            
-            if (window.DeviceOrientationEvent) {
-                // Запрашиваем разрешение на iOS 13+
-                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    document.body.addEventListener('click', () => {
+        
+        // ==================== ГИРОСКОП С КАЛИБРОВКОЙ ====================
+        function setupGyroscope() {
+            // Для iOS нужно разрешение
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                document.body.addEventListener('click', () => {
+                    if (!state.gyroRequested) {
+                        state.gyroRequested = true;
                         DeviceOrientationEvent.requestPermission()
-                            .then(permissionState => {
-                                if (permissionState === 'granted') {
+                            .then(response => {
+                                if (response === 'granted') {
                                     window.addEventListener('deviceorientation', handleOrientation);
+                                    setTimeout(() => calibrate(), 500);
                                 }
                             })
                             .catch(console.error);
-                    });
-                } else {
-                    window.addEventListener('deviceorientation', handleOrientation);
-                }
-            }
-            
-            function handleOrientation(e) {
-                // Получаем углы поворота телефона/головы
-                // alpha = поворот вокруг вертикальной оси (влево-вправо)
-                // beta = наклон вперед-назад
-                // gamma = наклон влево-вправо
-                
-                let alpha = e.alpha || 0;      // 0-360
-                let beta = e.beta || 0;        // -180 - 180
-                let gamma = e.gamma || 0;       // -90 - 90
-                
-                // Нормализуем для VR: 
-                // yaw (поворот головы влево-вправо) = alpha
-                // pitch (наклон головы вверх-вниз) = beta
-                // roll (наклон головы вбок) = gamma
-                
-                state.headRotation = {
-                    yaw: alpha,
-                    pitch: beta,
-                    roll: gamma
-                };
-                
-                // Обновляем индикатор
-                gyroIndicator.innerHTML = `🎯 VR: ${Math.round(alpha)}° | ${Math.round(beta)}° | ${Math.round(gamma)}°`;
-                
-                // Применяем поворот ко всем VR объектам
-                updateAllVRPositions();
+                    }
+                }, { once: true });
+            } else {
+                window.addEventListener('deviceorientation', handleOrientation);
+                setTimeout(() => calibrate(), 1000);
             }
         }
         
-        // ==================== VR ОБЪЕКТЫ (ВРАЩАЮТСЯ ВМЕСТЕ С ГОЛОВОЙ) ====================
-        function createVRObject(worldX, worldY, worldZ, title, content, width = 320, height = 280) {
+        function handleOrientation(e) {
+            state.orientation = {
+                alpha: e.alpha || 0,
+                beta: e.beta || 0,
+                gamma: e.gamma || 0
+            };
+            updateAllWindowsPosition();
+        }
+        
+        function calibrate() {
+            state.calibration = { ...state.orientation };
+            state.isCalibrated = true;
+            
+            // Визуальный фидбек
+            const flash = document.createElement('div');
+            flash.style.cssText = `position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,255,170,0.3); pointer-events:none; z-index:9999; animation:ripple 0.5s ease-out;`;
+            document.body.appendChild(flash);
+            setTimeout(() => flash.remove(), 500);
+            
+            document.getElementById('statusText').innerHTML = '✅ Калибровка! Окна закреплены в пространстве';
+            setTimeout(() => {
+                document.getElementById('statusText').innerHTML = '🎯 Поворачивайте телефон — окна остаются на месте';
+            }, 2500);
+            
+            updateAllWindowsPosition();
+        }
+        
+        // ==================== ПРАВИЛЬНОЕ AR ПРЕОБРАЗОВАНИЕ (как в VR очках) ====================
+        function worldToScreen(worldX, worldY) {
+            if (!state.isCalibrated) {
+                // До калибровки показываем в центре
+                return { x: window.innerWidth / 2 + worldX, y: window.innerHeight / 2 + worldY };
+            }
+            
+            // Получаем относительные углы (сколько повернулся телефон относительно калибровки)
+            let deltaAlpha = state.orientation.alpha - state.calibration.alpha;
+            let deltaBeta = state.orientation.beta - state.calibration.beta;
+            let deltaGamma = state.orientation.gamma - state.calibration.gamma;
+            
+            // Нормализация углов (чтобы не было скачков на 360°)
+            if (deltaAlpha > 180) deltaAlpha -= 360;
+            if (deltaAlpha < -180) deltaAlpha += 360;
+            
+            // Ограничиваем вертикальные углы
+            if (deltaBeta > 60) deltaBeta = 60;
+            if (deltaBeta < -60) deltaBeta = -60;
+            
+            // Чувствительность AR эффекта (чем выше, тем сильнее окна "прилипают")
+            const sensitivity = 3.5;
+            
+            // Центр экрана
+            let screenX = window.innerWidth / 2;
+            let screenY = window.innerHeight / 2;
+            
+            // КЛЮЧЕВАЯ ФОРМУЛА: окно закреплено в мире
+            // При повороте телефона окно смещается в противоположную сторону
+            // Это создает иллюзию, что окно стоит на месте в реальном пространстве
+            screenX += worldX + (deltaAlpha * sensitivity);
+            screenY += worldY + (deltaBeta * sensitivity * 1.2);
+            
+            // Гамма (наклон телефона) добавляет дополнительный эффект
+            screenX += deltaGamma * 1.5;
+            
+            return { x: screenX, y: screenY };
+        }
+        
+        // ==================== СОЗДАНИЕ AR ОКНА ====================
+        function createARWindow(worldX, worldY, title, content, width = 320, height = 280) {
             const div = document.createElement('div');
-            div.className = 'vr-object';
+            div.className = 'ar-window';
             div.style.width = `${width}px`;
             div.style.height = `${height}px`;
-            div.dataset.id = state.nextId;
+            const windowId = state.nextId;
+            div.dataset.id = windowId;
             
-            const contentId = `obj-${Date.now()}`;
+            const contentId = `win-${Date.now()}-${windowId}`;
             div.innerHTML = `
-                <div class="object-header">
-                    <span class="object-title">${title}</span>
-                    <div class="object-controls">
+                <div class="window-header">
+                    <span class="window-title">${title}</span>
+                    <div class="window-controls">
                         <span class="minimize-btn">−</span>
                         <span class="close-btn">✕</span>
                     </div>
                 </div>
-                <div class="object-content" id="${contentId}"></div>
+                <div class="window-content" id="${contentId}"></div>
             `;
-            document.getElementById('vrContainer').appendChild(div);
+            document.getElementById('arContainer').appendChild(div);
             
             const contentDiv = document.getElementById(contentId);
             
             if (content.type === 'browser') {
                 const iframe = document.createElement('iframe');
-                iframe.src = 'https://www.apple.com/visionos/';
+                iframe.src = 'https://www.meta.com/experiences/';
                 iframe.style.width = '100%';
                 iframe.style.height = '100%';
-                iframe.style.borderRadius = '16px';
+                iframe.style.borderRadius = '20px';
                 contentDiv.appendChild(iframe);
             } else if (content.type === 'video') {
                 const video = document.createElement('video');
@@ -585,13 +571,13 @@
                 video.controls = true;
                 video.style.width = '100%';
                 video.style.height = '100%';
-                video.style.borderRadius = '16px';
+                video.style.borderRadius = '20px';
                 contentDiv.appendChild(video);
                 video.play().catch(() => {});
             } else if (content.type === 'notes') {
                 const textarea = document.createElement('textarea');
                 textarea.className = 'note-editor';
-                textarea.value = '🥽 VR РЕЖИМ АКТИВЕН!\n\nПоворачивайте голову -\nвесь мир вращается!\n\nКак в VR очках:\n• Лево/право = поворот\n• Вверх/вниз = наклон\n• Полное погружение!';
+                textarea.value = '🔮 META QUEST AR\n\n═══════════════════\n📌 ЭТО ОКНО ЗАКРЕПЛЕНО В ПРОСТРАНСТВЕ!\n\n🔹 Поворачивайте телефон\n🔹 Окно остается на месте\n🔹 Как в настоящих VR очках!\n\n═══════════════════\n✋ Управление:\n• Движение пальца = курсор\n• Pinch/Клик = выбор окна\n\n🎯 Нажмите "Калибровать"\nчтобы зафиксировать начальную точку';
                 contentDiv.appendChild(textarea);
             }
             
@@ -599,7 +585,7 @@
             closeBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 div.remove();
-                state.objects = state.objects.filter(o => o.id !== state.nextId);
+                state.windows = state.windows.filter(w => w.id !== windowId);
             });
             
             const minimizeBtn = div.querySelector('.minimize-btn');
@@ -610,127 +596,92 @@
                 div.style.display = minimized ? 'none' : 'flex';
             });
             
-            const objectObj = {
-                id: state.nextId,
+            const windowObj = {
+                id: windowId,
                 div,
-                worldX, worldY, worldZ,
+                worldX, worldY,
                 width, height,
                 title
             };
-            state.objects.push(objectObj);
+            state.windows.push(windowObj);
             state.nextId++;
             
-            updateVRObjectPosition(objectObj);
+            updateWindowPosition(windowObj);
             
+            // Анимация появления
             div.style.opacity = '0';
-            div.style.transform = 'scale(0.9)';
+            div.style.transform = 'scale(0.95)';
             setTimeout(() => {
                 div.style.opacity = '1';
                 div.style.transform = 'scale(1)';
             }, 50);
             
-            return objectObj;
+            return windowObj;
         }
         
-        function updateVRObjectPosition(obj) {
-            // КЛЮЧЕВАЯ ФУНКЦИЯ VR: объекты вращаются вместе с головой
-            // При повороте телефона, экранная позиция объекта меняется,
-            // создавая эффект, что вы смотрите вокруг
-            
-            const { yaw, pitch, roll } = state.headRotation;
-            
-            // Преобразуем мировые координаты в экранные с учетом поворота головы
-            // Поворот по горизонтали (yaw) влияет на X
-            // Поворот по вертикали (pitch) влияет на Y
-            
-            // Базовое смещение от центра
-            let screenX = window.innerWidth / 2;
-            let screenY = window.innerHeight / 2;
-            
-            // Добавляем мировые координаты объекта
-            screenX += obj.worldX;
-            screenY += obj.worldY;
-            
-            // ВРАЩЕНИЕ ГОЛОВЫ - объекты двигаются в противоположную сторону
-            // Чем больше поворот головы, тем дальше объект смещается
-            const yawRad = (yaw / 180) * Math.PI;
-            const pitchRad = (pitch / 90) * Math.PI;
-            
-            // Горизонтальный поворот (влево-вправо)
-            screenX += Math.sin(yawRad) * 300;
-            // Вертикальный поворот (вверх-вниз)
-            screenY += Math.sin(pitchRad) * 200;
-            
-            // Добавляем смещение от джойстика
-            screenX -= state.cameraPos.x;
-            screenY -= state.cameraPos.y;
-            
-            // Ограничиваем, чтобы объекты не уходили за экран
-            screenX = Math.max(-obj.width + 20, Math.min(window.innerWidth + obj.width - 20, screenX));
-            screenY = Math.max(-obj.height + 20, Math.min(window.innerHeight + obj.height - 20, screenY));
-            
-            obj.div.style.left = `${screenX}px`;
-            obj.div.style.top = `${screenY}px`;
+        function updateWindowPosition(win) {
+            const screenPos = worldToScreen(win.worldX, win.worldY);
+            win.div.style.left = `${screenPos.x - win.width/2}px`;
+            win.div.style.top = `${screenPos.y - win.height/2}px`;
         }
         
-        function updateAllVRPositions() {
-            state.objects.forEach(obj => updateVRObjectPosition(obj));
-            requestAnimationFrame(updateAllVRPositions);
+        function updateAllWindowsPosition() {
+            state.windows.forEach(win => updateWindowPosition(win));
+            requestAnimationFrame(updateAllWindowsPosition);
         }
         
-        function selectObjectAtPosition(x, y) {
-            for (let i = state.objects.length - 1; i >= 0; i--) {
-                const obj = state.objects[i];
-                const rect = obj.div.getBoundingClientRect();
+        function selectWindowAtPosition(x, y) {
+            for (let i = state.windows.length - 1; i >= 0; i--) {
+                const win = state.windows[i];
+                const rect = win.div.getBoundingClientRect();
                 if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-                    if (state.activeObjectId) {
-                        const prev = state.objects.find(o => o.id === state.activeObjectId);
+                    if (state.activeWindowId) {
+                        const prev = state.windows.find(w => w.id === state.activeWindowId);
                         if (prev) prev.div.classList.remove('active');
                     }
-                    state.activeObjectId = obj.id;
-                    obj.div.classList.add('active');
-                    document.getElementById('modeText').innerHTML = `✅ ${obj.title}`;
+                    state.activeWindowId = win.id;
+                    win.div.classList.add('active');
+                    document.getElementById('modeText').innerHTML = `✅ ${win.title}`;
                     setTimeout(() => {
-                        document.getElementById('modeText').innerHTML = `VR режим: поворот головы`;
+                        document.getElementById('modeText').innerHTML = `AR режим: ${state.controlMode === 'gesture' ? 'Жесты' : 'Тачпад'}`;
                     }, 1500);
+                    
+                    // Визуальный фидбек выбора
+                    const ripple = document.createElement('div');
+                    ripple.style.cssText = `position:fixed; left:${x}px; top:${y}px; width:70px; height:70px; border-radius:50%; border:2px solid #0f0; transform:translate(-50%,-50%); pointer-events:none; z-index:1000; animation:ripple 0.3s ease-out;`;
+                    document.body.appendChild(ripple);
+                    setTimeout(() => ripple.remove(), 300);
                     return;
                 }
             }
         }
-
-        // ==================== ЖЕСТЫ И СКЕЛЕТ ====================
+        
+        // ==================== УПРАВЛЕНИЕ ЖЕСТАМИ ====================
         function setupGestures() {
-            const canvas = document.getElementById('handCanvas');
-            const ctx = canvas.getContext('2d');
-            
-            function resizeCanvas() {
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
-            }
-            window.addEventListener('resize', resizeCanvas);
-            resizeCanvas();
-            
             let touchActive = false;
             let touchX = window.innerWidth / 2;
             let touchY = window.innerHeight / 2;
-            let lastPinchTime = 0;
+            
+            const cursor = document.getElementById('vrCursor');
+            
+            function updateCursor(x, y) {
+                cursor.style.left = `${x}px`;
+                cursor.style.top = `${y}px`;
+                state.cursorX = x;
+                state.cursorY = y;
+            }
             
             document.addEventListener('touchstart', (e) => {
                 if (e.touches.length > 0) {
                     touchActive = true;
                     touchX = e.touches[0].clientX;
                     touchY = e.touches[0].clientY;
-                    state.cursorX = touchX;
-                    state.cursorY = touchY;
+                    updateCursor(touchX, touchY);
                     document.getElementById('handLed').classList.add('active');
-                    document.getElementById('statusText').innerHTML = '✋ Палец отслеживается | Сведите пальцы для выбора';
+                    document.getElementById('statusText').innerHTML = '🎯 Курсор активен | Нажмите для выбора окна';
                     
                     if (e.touches.length >= 2) {
-                        const now = Date.now();
-                        if (now - lastPinchTime > 300) {
-                            lastPinchTime = now;
-                            handlePinch(touchX, touchY);
-                        }
+                        selectWindowAtPosition(touchX, touchY);
                     }
                 }
             });
@@ -739,183 +690,60 @@
                 if (e.touches.length > 0) {
                     touchX = e.touches[0].clientX;
                     touchY = e.touches[0].clientY;
-                    state.cursorX = touchX;
-                    state.cursorY = touchY;
+                    updateCursor(touchX, touchY);
                 }
             });
             
-            document.addEventListener('touchend', (e) => {
-                if (e.touches.length === 0) {
-                    touchActive = false;
-                    document.getElementById('handLed').classList.remove('active');
-                    document.getElementById('statusText').innerHTML = '🥽 VR активен | Поворачивайте голову';
-                }
+            document.addEventListener('touchend', () => {
+                touchActive = false;
+                document.getElementById('handLed').classList.remove('active');
+                document.getElementById('statusText').innerHTML = '🎯 Поворачивайте телефон — окна закреплены в пространстве';
             });
             
             document.addEventListener('mousemove', (e) => {
                 if (state.controlMode === 'gesture') {
-                    touchX = e.clientX;
-                    touchY = e.clientY;
-                    state.cursorX = touchX;
-                    state.cursorY = touchY;
-                    touchActive = true;
+                    updateCursor(e.clientX, e.clientY);
                     document.getElementById('handLed').classList.add('active');
                 }
             });
             
             document.addEventListener('click', (e) => {
                 if (state.controlMode === 'gesture') {
-                    handlePinch(e.clientX, e.clientY);
+                    selectWindowAtPosition(e.clientX, e.clientY);
                 }
             });
-            
-            function handlePinch(x, y) {
-                if (!state.isPinching) {
-                    state.isPinching = true;
-                    document.getElementById('statusText').innerHTML = '🤏 PINCH! Выбор объекта';
-                    selectObjectAtPosition(x, y);
-                    
-                    const ripple = document.createElement('div');
-                    ripple.style.position = 'fixed';
-                    ripple.style.left = x + 'px';
-                    ripple.style.top = y + 'px';
-                    ripple.style.width = '60px';
-                    ripple.style.height = '60px';
-                    ripple.style.borderRadius = '50%';
-                    ripple.style.border = '2px solid #0f0';
-                    ripple.style.transform = 'translate(-50%, -50%)';
-                    ripple.style.pointerEvents = 'none';
-                    ripple.style.zIndex = '1000';
-                    ripple.style.animation = 'ripple 0.3s ease-out';
-                    document.body.appendChild(ripple);
-                    setTimeout(() => ripple.remove(), 300);
-                    
-                    setTimeout(() => {
-                        state.isPinching = false;
-                        document.getElementById('statusText').innerHTML = '🥽 VR активен | Поворачивайте голову';
-                    }, 300);
-                }
-            }
-            
-            // Отрисовка скелета
-            function drawSkeleton() {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                
-                if ((touchActive || state.controlMode === 'gesture') && state.cursorX) {
-                    const x = state.cursorX;
-                    const y = state.cursorY;
-                    
-                    ctx.save();
-                    ctx.beginPath();
-                    ctx.ellipse(x - 8, y + 20, 28, 38, 0, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(0, 170, 255, 0.25)';
-                    ctx.fill();
-                    ctx.strokeStyle = '#00aaff';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                    
-                    const fingers = [
-                        { angle: -0.4, length: 58, offsetX: -18, offsetY: 8 },
-                        { angle: -0.18, length: 68, offsetX: -10, offsetY: 4 },
-                        { angle: 0, length: 65, offsetX: 0, offsetY: 0 },
-                        { angle: 0.18, length: 60, offsetX: 10, offsetY: 4 },
-                        { angle: 0.4, length: 52, offsetX: 18, offsetY: 8 }
-                    ];
-                    
-                    fingers.forEach((finger, idx) => {
-                        const startX = x + finger.offsetX;
-                        const startY = y + 18 + finger.offsetY;
-                        ctx.beginPath();
-                        ctx.moveTo(startX, startY);
-                        const endX = startX + Math.sin(finger.angle) * finger.length;
-                        const endY = startY - Math.cos(finger.angle) * finger.length;
-                        ctx.lineTo(endX, endY);
-                        ctx.strokeStyle = '#00aaff';
-                        ctx.lineWidth = 3;
-                        ctx.stroke();
-                        
-                        for (let j = 1; j <= 3; j++) {
-                            const jointX = startX + Math.sin(finger.angle) * (finger.length * j / 3);
-                            const jointY = startY - Math.cos(finger.angle) * (finger.length * j / 3);
-                            ctx.beginPath();
-                            ctx.arc(jointX, jointY, j === 3 ? 7 : 5, 0, Math.PI * 2);
-                            ctx.fillStyle = j === 3 && idx === 1 ? '#ffaa44' : '#00aaff';
-                            ctx.fill();
-                        }
-                    });
-                    
-                    const idxStartX = x - 10;
-                    const idxStartY = y + 22;
-                    const idxEndX = idxStartX + Math.sin(-0.18) * 68;
-                    const idxEndY = idxStartY - Math.cos(-0.18) * 68;
-                    
-                    ctx.beginPath();
-                    ctx.arc(idxEndX, idxEndY, 18, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(0, 255, 136, 0.5)';
-                    ctx.fill();
-                    ctx.strokeStyle = '#0f0';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                    
-                    ctx.beginPath();
-                    ctx.arc(idxEndX, idxEndY, 9, 0, Math.PI * 2);
-                    ctx.fillStyle = '#0f0';
-                    ctx.fill();
-                    
-                    ctx.restore();
-                }
-                
-                requestAnimationFrame(drawSkeleton);
-            }
-            
-            drawSkeleton();
         }
-
+        
         // ==================== UI ====================
         function setupUI() {
             document.getElementById('addBrowser').onclick = () => {
-                const x = (Math.random() - 0.5) * 400;
-                const y = (Math.random() - 0.5) * 300;
-                createVRObject(x, y, 0, '🌐 VR Браузер', { type: 'browser' }, 360, 320);
+                const x = (Math.random() - 0.5) * 500;
+                const y = (Math.random() - 0.5) * 400;
+                createARWindow(x, y, '🌐 META WORLD', { type: 'browser' }, 380, 340);
             };
             
             document.getElementById('addVideo').onclick = () => {
                 const input = document.getElementById('videoUpload');
                 input.onchange = (e) => {
-                    if (e.target.files[0]) {
-                        const x = (Math.random() - 0.5) * 400;
-                        const y = (Math.random() - 0.5) * 300;
-                        createVRObject(x, y, 0, '🎬 VR Видео', { type: 'video', file: e.target.files[0] }, 340, 300);
-                    } else {
-                        const x = (Math.random() - 0.5) * 400;
-                        const y = (Math.random() - 0.5) * 300;
-                        createVRObject(x, y, 0, '🎬 VR Демо', { type: 'video' }, 340, 300);
-                    }
+                    const x = (Math.random() - 0.5) * 500;
+                    const y = (Math.random() - 0.5) * 400;
+                    createARWindow(x, y, '🎬 VR Video', { type: 'video', file: e.target.files[0] }, 360, 320);
                 };
                 input.click();
             };
             
             document.getElementById('addNotes').onclick = () => {
-                const x = (Math.random() - 0.5) * 400;
-                const y = (Math.random() - 0.5) * 300;
-                createVRObject(x, y, 0, '📝 VR Заметки', { type: 'notes' }, 320, 280);
+                const x = (Math.random() - 0.5) * 500;
+                const y = (Math.random() - 0.5) * 400;
+                createARWindow(x, y, '📝 AR Notes', { type: 'notes' }, 340, 300);
             };
             
             document.getElementById('resetView').onclick = () => {
-                state.cameraPos = { x: 0, y: 0, z: 0 };
-                updateAllVRPositions();
-                const flash = document.createElement('div');
-                flash.style.position = 'fixed';
-                flash.style.top = '0';
-                flash.style.left = '0';
-                flash.style.width = '100%';
-                flash.style.height = '100%';
-                flash.style.background = 'rgba(0, 170, 255, 0.3)';
-                flash.style.pointerEvents = 'none';
-                flash.style.zIndex = '1000';
-                flash.style.animation = 'fadeOut 0.3s ease-out';
-                document.body.appendChild(flash);
-                setTimeout(() => flash.remove(), 300);
+                calibrate();
+            };
+            
+            document.getElementById('calibrateBtn').onclick = () => {
+                calibrate();
             };
             
             const modeBtns = document.querySelectorAll('.mode-btn');
@@ -924,60 +752,43 @@
                     state.controlMode = btn.dataset.mode;
                     modeBtns.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
+                    document.getElementById('modeText').innerHTML = `AR режим: ${state.controlMode === 'gesture' ? 'Жесты' : 'Тачпад'}`;
                 });
             });
             
             document.getElementById('fullscreenBtn').onclick = () => {
                 if (!document.fullscreenElement) {
                     document.documentElement.requestFullscreen();
-                    document.getElementById('fullscreenBtn').innerHTML = '✕';
                 } else {
                     document.exitFullscreen();
-                    document.getElementById('fullscreenBtn').innerHTML = '⤢';
                 }
             };
         }
         
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes ripple {
-                0% { transform: translate(-50%, -50%) scale(0.5); opacity: 1; }
-                100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
-            }
-            @keyframes fadeOut {
-                0% { opacity: 1; }
-                100% { opacity: 0; }
-            }
-        `;
-        document.head.appendChild(style);
-        
-        // ==================== ИНИЦИАЛИЗАЦИЯ ====================
+        // ==================== ЗАПУСК С ОТКРЫТЫМИ ОКНАМИ ====================
         async function init() {
             await setupCamera();
-            setupVRHeadTracking();
+            setupGyroscope();
             setupGestures();
             setupUI();
-            updateAllVRPositions();
+            updateAllWindowsPosition();
             
+            // СОЗДАЕМ ВСЕ ОКНА СРАЗУ — ВСЕ ОТКРЫТЫ И ВИДИМЫ
+            createARWindow(-220, -90, '🌐 META Horizon Worlds', { type: 'browser' }, 380, 340);
+            createARWindow(240, -70, '🎬 4K VR Video', { type: 'video' }, 360, 320);
+            createARWindow(60, 170, '📝 AR Заметки', { type: 'notes' }, 340, 300);
+            createARWindow(-260, 130, '🌐 Explore VR', { type: 'browser' }, 360, 320);
+            createARWindow(300, -150, '🎬 Демо трейлер', { type: 'video' }, 350, 310);
+            createARWindow(-100, -220, '📝 Быстрые заметки', { type: 'notes' }, 320, 280);
+            
+            // Скрываем загрузчик
             setTimeout(() => {
-                createVRObject(-200, -80, 0, '🌐 VR Apple', { type: 'browser' }, 380, 340);
-                createVRObject(220, -60, 0, '🎬 VR 4K Видео', { type: 'video' }, 360, 320);
-                createVRObject(50, 180, 0, '📝 VR Заметки', { type: 'notes' }, 340, 300);
-                createVRObject(-250, 150, 0, '🌐 VR Wikipedia', { type: 'browser' }, 360, 320);
-                createVRObject(280, -150, 0, '🎬 VR Трейлер', { type: 'video' }, 350, 310);
-                createVRObject(-80, -220, 0, '📝 VR Быстрые заметки', { type: 'notes' }, 320, 280);
+                const loader = document.getElementById('loader');
+                loader.style.opacity = '0';
+                setTimeout(() => loader.remove(), 500);
             }, 800);
             
-            function checkOrientation() {
-                const warning = document.querySelector('.orientation-warning');
-                if (window.innerHeight > window.innerWidth) {
-                    warning.style.display = 'flex';
-                } else {
-                    warning.style.display = 'none';
-                }
-            }
-            window.addEventListener('resize', checkOrientation);
-            checkOrientation();
+            document.getElementById('statusText').innerHTML = '✅ AR активирован! 6 окон закреплены в пространстве';
         }
         
         init();
