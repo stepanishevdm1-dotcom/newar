@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Vision Pro AR | Жесты руками + AR пространство</title>
+    <title>Vision Pro AR | Полноценное AR пространство + Жесты</title>
     <style>
         * {
             margin: 0;
@@ -97,7 +97,7 @@
         }
 
         .vision-card {
-            background: rgba(30,30,40,0.8);
+            background: rgba(30,30,40,0.85);
             backdrop-filter: blur(40px);
             border-radius: 30px;
             padding: 8px 16px;
@@ -159,35 +159,35 @@
             50% { opacity: 1; }
         }
 
-        /* AR Окна */
+        /* AR Окна - закреплены в пространстве */
         .ar-window {
             position: absolute;
-            background: rgba(20,20,35,0.9);
+            background: rgba(20,20,35,0.92);
             backdrop-filter: blur(50px);
             border-radius: 28px;
             overflow: hidden;
-            border: 1px solid rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.25);
             box-shadow: 0 20px 40px rgba(0,0,0,0.4);
             pointer-events: auto;
             display: flex;
             flex-direction: column;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-            will-change: transform;
+            will-change: left, top;
         }
 
         .ar-window.active {
             border-color: #00aaff;
-            box-shadow: 0 0 30px rgba(0,170,255,0.4);
+            box-shadow: 0 0 30px rgba(0,170,255,0.5);
             transform: scale(1.02);
         }
 
         .window-header {
             padding: 12px 16px;
-            background: rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.1);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 0.5px solid rgba(255,255,255,0.1);
+            border-bottom: 0.5px solid rgba(255,255,255,0.15);
         }
 
         .window-title {
@@ -236,7 +236,7 @@
         .note-editor {
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.6);
+            background: rgba(0,0,0,0.7);
             color: #0f0;
             padding: 12px;
             border-radius: 16px;
@@ -272,7 +272,7 @@
             width: 48px;
             height: 48px;
             border-radius: 24px;
-            background: rgba(30,30,40,0.85);
+            background: rgba(30,30,40,0.9);
             backdrop-filter: blur(40px);
             border: 0.5px solid rgba(255,255,255,0.2);
             color: white;
@@ -299,12 +299,12 @@
             position: fixed;
             bottom: 100px;
             left: 25px;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.75);
             backdrop-filter: blur(20px);
-            padding: 6px 14px;
-            border-radius: 20px;
+            padding: 8px 16px;
+            border-radius: 24px;
             color: #0f0;
-            font-size: 11px;
+            font-size: 12px;
             font-family: monospace;
             z-index: 200;
             pointer-events: none;
@@ -333,31 +333,18 @@
             }
         }
 
-        .camera-control {
+        .camera-info {
             position: fixed;
-            bottom: 25px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.7);
+            bottom: 100px;
+            right: 25px;
+            background: rgba(0,0,0,0.6);
             backdrop-filter: blur(20px);
-            padding: 6px 12px;
+            padding: 4px 12px;
             border-radius: 20px;
             color: white;
-            font-size: 11px;
+            font-size: 10px;
             z-index: 200;
-            pointer-events: auto;
-            display: flex;
-            gap: 10px;
-        }
-
-        .zoom-btn {
-            background: rgba(255,255,255,0.2);
-            border: none;
-            color: white;
-            padding: 4px 10px;
-            border-radius: 15px;
-            cursor: pointer;
-            font-size: 12px;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -396,16 +383,11 @@
             <button class="action-btn" id="add-notes">📝</button>
             <button class="action-btn" id="reset-view">🔄</button>
         </div>
-
-        <div class="camera-control">
-            <span>📷 Зум:</span>
-            <button class="zoom-btn" id="zoom-out">− 0.6x</button>
-            <button class="zoom-btn" id="zoom-in">+ 1x</button>
-        </div>
     </div>
 
     <button class="fullscreen-btn" id="fullscreen-btn">⤢</button>
-    <div class="hand-status" id="hand-status">🤚 Ожидание руки...</div>
+    <div class="hand-status" id="hand-status">🤚 Ожидание жеста...</div>
+    <div class="camera-info" id="camera-info">📷 Широкий угол (максимальный обзор)</div>
     <canvas id="hand-canvas"></canvas>
     <input type="file" id="video-upload" accept="video/*" style="display: none">
 
@@ -416,10 +398,10 @@
         const loaderText = document.getElementById('loader-text');
         const texts = [
             'Запуск AR движка...',
-            'Активация камеры...',
+            'Активация широкоугольной камеры...',
             'Настройка отслеживания жестов...',
-            'Закрепление окон в пространстве...',
-            'Готово!'
+            'Закрепление AR окон в пространстве...',
+            'Готово! Управляйте жестами'
         ];
         
         const progressInterval = setInterval(() => {
@@ -444,22 +426,24 @@
             windows: [],
             activeWindow: null,
             cursorPosition: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-            cameraPosition: { x: 0, y: 0 },
-            cameraZoom: 0.6,
+            cameraOffset: { x: 0, y: 0 },
             videoElement: null,
             handTracked: false,
             isPinching: false,
-            nextWindowId: 1
+            nextWindowId: 1,
+            lastTouchX: 0,
+            lastTouchY: 0
         };
 
-        // ==================== КАМЕРА С ЗУМОМ ====================
+        // ==================== КАМЕРА - МАКСИМАЛЬНЫЙ ОБЗОР ====================
         async function setupCamera() {
             try {
+                // Запрашиваем камеру с максимальным полем зрения
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         facingMode: 'environment',
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
+                        width: { ideal: 3840 },
+                        height: { ideal: 2160 }
                     } 
                 });
                 
@@ -474,37 +458,43 @@
                 video.style.height = '100%';
                 video.style.objectFit = 'cover';
                 video.style.zIndex = '-1';
-                video.style.transition = 'transform 0.3s ease';
+                // Максимальный обзор - без масштабирования, только cover
+                video.style.transform = 'scale(1)';
                 document.body.insertBefore(video, document.body.firstChild);
                 
                 state.videoElement = video;
                 
-                // Применяем начальный зум 0.6x
-                setTimeout(() => {
-                    updateCameraZoom(0.6);
-                }, 100);
+                // Пытаемся получить информацию о треке для увеличения FOV
+                const track = stream.getVideoTracks()[0];
+                if (track && track.getCapabilities) {
+                    const capabilities = track.getCapabilities();
+                    console.log('Camera capabilities:', capabilities);
+                }
+                
+                document.getElementById('camera-info').innerHTML = '📷 Широкий угол | Максимальный обзор';
                 
                 return video;
             } catch (err) {
                 console.error('Camera error:', err);
-                document.getElementById('hand-status').innerHTML = '⚠️ Камера недоступна';
+                document.getElementById('hand-status').innerHTML = '⚠️ Камера недоступна, используем AR фон';
                 document.getElementById('hand-led').style.background = '#ff4444';
+                
+                // Создаем градиентный фон вместо камеры
+                const fallbackDiv = document.createElement('div');
+                fallbackDiv.style.position = 'fixed';
+                fallbackDiv.style.top = '0';
+                fallbackDiv.style.left = '0';
+                fallbackDiv.style.width = '100%';
+                fallbackDiv.style.height = '100%';
+                fallbackDiv.style.background = 'linear-gradient(135deg, #1a1a2e, #16213e, #0f3460)';
+                fallbackDiv.style.zIndex = '-1';
+                document.body.insertBefore(fallbackDiv, document.body.firstChild);
                 return null;
             }
         }
-        
-        function updateCameraZoom(zoom) {
-            state.cameraZoom = zoom;
-            if (state.videoElement) {
-                // 0.6x = увеличение поля зрения (уменьшение масштаба)
-                const scale = 1 / zoom;
-                state.videoElement.style.transform = `scale(${scale})`;
-                state.videoElement.style.transformOrigin = 'center center';
-            }
-        }
 
-        // ==================== ЖЕСТЫ РУК (СИМУЛЯЦИЯ ДЛЯ ТЕЛЕФОНА) ====================
-        function setupHandTracking() {
+        // ==================== ЖЕСТЫ (РАБОТАЮТ НА ТЕЛЕФОНЕ) ====================
+        function setupGestureTracking() {
             const canvas = document.getElementById('hand-canvas');
             const ctx = canvas.getContext('2d');
             
@@ -515,49 +505,75 @@
             window.addEventListener('resize', resizeCanvas);
             resizeCanvas();
             
-            let handX = window.innerWidth / 2;
-            let handY = window.innerHeight / 2;
-            let handVisible = false;
+            let touchActive = false;
+            let touchX = window.innerWidth / 2;
+            let touchY = window.innerHeight / 2;
+            let lastPinchTime = 0;
             
-            // Отслеживание движения пальца на экране (для телефона)
-            document.addEventListener('touchmove', (e) => {
-                if (e.touches[0]) {
-                    handX = e.touches[0].clientX;
-                    handY = e.touches[0].clientY;
-                    handVisible = true;
-                    state.cursorPosition = { x: handX, y: handY };
+            // Отслеживание касаний для жестов
+            document.addEventListener('touchstart', (e) => {
+                if (e.touches.length > 0) {
+                    touchActive = true;
+                    touchX = e.touches[0].clientX;
+                    touchY = e.touches[0].clientY;
+                    state.cursorPosition = { x: touchX, y: touchY };
                     document.getElementById('hand-led').classList.add('active');
-                    document.getElementById('hand-status').innerHTML = '✋ Палец отслеживается | Сведите пальцы для выбора';
+                    document.getElementById('hand-status').innerHTML = '✋ Жест активен | Сведите пальцы для выбора';
+                    
+                    // Два пальца = pinch жест
+                    if (e.touches.length >= 2) {
+                        const now = Date.now();
+                        if (now - lastPinchTime > 300) {
+                            lastPinchTime = now;
+                            handlePinchGesture(touchX, touchY);
+                        }
+                    }
                 }
             });
             
-            document.addEventListener('touchstart', (e) => {
-                if (e.touches[0] && state.controlMode === 'gesture') {
-                    handVisible = true;
-                    state.cursorPosition = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            document.addEventListener('touchmove', (e) => {
+                if (e.touches.length > 0) {
+                    touchX = e.touches[0].clientX;
+                    touchY = e.touches[0].clientY;
+                    state.cursorPosition = { x: touchX, y: touchY };
                     
-                    // Симуляция pinch жеста (два пальца)
-                    if (e.touches.length >= 2) {
-                        handlePinchGesture(e.touches[0].clientX, e.touches[0].clientY);
+                    // Перемещение камеры при движении двумя пальцами
+                    if (e.touches.length === 2 && state.controlMode === 'gesture') {
+                        const avgX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+                        const avgY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+                        if (state.lastTouchX !== 0) {
+                            const deltaX = avgX - state.lastTouchX;
+                            const deltaY = avgY - state.lastTouchY;
+                            state.cameraOffset.x += deltaX * 0.5;
+                            state.cameraOffset.y += deltaY * 0.5;
+                            updateAllWindowPositions();
+                        }
+                        state.lastTouchX = avgX;
+                        state.lastTouchY = avgY;
+                    } else {
+                        state.lastTouchX = 0;
+                        state.lastTouchY = 0;
                     }
                 }
             });
             
             document.addEventListener('touchend', (e) => {
                 if (e.touches.length === 0) {
-                    handVisible = false;
+                    touchActive = false;
                     document.getElementById('hand-led').classList.remove('active');
-                    document.getElementById('hand-status').innerHTML = '🤚 Рука не обнаружена';
+                    document.getElementById('hand-status').innerHTML = '🤚 Ожидание жеста...';
+                    state.lastTouchX = 0;
+                    state.lastTouchY = 0;
                 }
             });
             
             // Для ПК - мышь
             document.addEventListener('mousemove', (e) => {
                 if (state.controlMode === 'gesture') {
-                    handX = e.clientX;
-                    handY = e.clientY;
-                    handVisible = true;
-                    state.cursorPosition = { x: handX, y: handY };
+                    touchX = e.clientX;
+                    touchY = e.clientY;
+                    touchActive = true;
+                    state.cursorPosition = { x: touchX, y: touchY };
                     document.getElementById('hand-led').classList.add('active');
                     document.getElementById('hand-status').innerHTML = '✋ Курсор активен | Клик для выбора';
                 }
@@ -580,8 +596,8 @@
                     ripple.style.position = 'fixed';
                     ripple.style.left = x + 'px';
                     ripple.style.top = y + 'px';
-                    ripple.style.width = '50px';
-                    ripple.style.height = '50px';
+                    ripple.style.width = '60px';
+                    ripple.style.height = '60px';
                     ripple.style.borderRadius = '50%';
                     ripple.style.border = '2px solid #0f0';
                     ripple.style.transform = 'translate(-50%, -50%)';
@@ -595,10 +611,10 @@
                         state.isPinching = false;
                         document.getElementById('hand-status').innerHTML = '✋ Жест завершен';
                         setTimeout(() => {
-                            if (handVisible) {
-                                document.getElementById('hand-status').innerHTML = '✋ Палец отслеживается';
+                            if (touchActive) {
+                                document.getElementById('hand-status').innerHTML = '✋ Жест активен | Сведите пальцы для выбора';
                             }
-                        }, 1000);
+                        }, 800);
                     }, 300);
                 }
             }
@@ -607,36 +623,38 @@
             function drawSkeleton() {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                 
-                if (handVisible && state.controlMode === 'gesture') {
+                if ((touchActive || state.controlMode === 'gesture') && state.cursorPosition) {
                     const x = state.cursorPosition.x;
                     const y = state.cursorPosition.y;
                     
-                    // Рисуем красивый скелет руки
                     ctx.save();
                     
                     // Ладонь
                     ctx.beginPath();
-                    ctx.ellipse(x - 5, y + 15, 20, 28, 0, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(0,170,255,0.2)';
+                    ctx.ellipse(x - 8, y + 20, 25, 35, 0, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0,170,255,0.25)';
                     ctx.fill();
                     ctx.strokeStyle = '#00aaff';
                     ctx.lineWidth = 2;
                     ctx.stroke();
                     
-                    // Пальцы
+                    // Пальцы с анимацией
                     const fingers = [
-                        { angle: -0.3, length: 45, offset: -12 },
-                        { angle: -0.1, length: 50, offset: -5 },
-                        { angle: 0, length: 48, offset: 0 },
-                        { angle: 0.1, length: 45, offset: 5 },
-                        { angle: 0.25, length: 40, offset: 10 }
+                        { angle: -0.35, length: 55, offsetX: -15, offsetY: 5 },
+                        { angle: -0.15, length: 62, offsetX: -8, offsetY: 2 },
+                        { angle: 0, length: 60, offsetX: 0, offsetY: 0 },
+                        { angle: 0.15, length: 55, offsetX: 8, offsetY: 2 },
+                        { angle: 0.35, length: 48, offsetX: 15, offsetY: 5 }
                     ];
                     
-                    fingers.forEach((finger, i) => {
+                    fingers.forEach((finger, idx) => {
                         ctx.beginPath();
-                        ctx.moveTo(x + finger.offset, y + 10);
-                        const endX = x + finger.offset + Math.sin(finger.angle) * finger.length;
-                        const endY = y + 10 - Math.cos(finger.angle) * finger.length;
+                        const startX = x + finger.offsetX;
+                        const startY = y + 15 + finger.offsetY;
+                        ctx.moveTo(startX, startY);
+                        
+                        const endX = startX + Math.sin(finger.angle) * finger.length;
+                        const endY = startY - Math.cos(finger.angle) * finger.length;
                         ctx.lineTo(endX, endY);
                         ctx.strokeStyle = '#00aaff';
                         ctx.lineWidth = 3;
@@ -644,35 +662,37 @@
                         
                         // Суставы
                         for (let j = 1; j <= 3; j++) {
-                            const jointX = x + finger.offset + Math.sin(finger.angle) * (finger.length * j / 3);
-                            const jointY = y + 10 - Math.cos(finger.angle) * (finger.length * j / 3);
+                            const jointX = startX + Math.sin(finger.angle) * (finger.length * j / 3);
+                            const jointY = startY - Math.cos(finger.angle) * (finger.length * j / 3);
                             ctx.beginPath();
-                            ctx.arc(jointX, jointY, j === 3 ? 6 : 4, 0, Math.PI * 2);
-                            ctx.fillStyle = j === 3 ? '#ffaa44' : '#00aaff';
+                            ctx.arc(jointX, jointY, j === 3 ? 7 : 5, 0, Math.PI * 2);
+                            ctx.fillStyle = j === 3 && idx === 1 ? '#ffaa44' : '#00aaff';
                             ctx.fill();
                             ctx.shadowBlur = 8;
                             ctx.shadowColor = '#00aaff';
                         }
                     });
                     
-                    // Указательный палец с эффектом курсора
-                    const indexTip = {
-                        x: x - 5 + Math.sin(-0.1) * 50,
-                        y: y + 10 - Math.cos(-0.1) * 50
-                    };
+                    // Указательный палец - основной курсор
+                    const indexStartX = x - 8;
+                    const indexStartY = y + 17;
+                    const indexEndX = indexStartX + Math.sin(-0.15) * 62;
+                    const indexEndY = indexStartY - Math.cos(-0.15) * 62;
                     
                     ctx.beginPath();
-                    ctx.arc(indexTip.x, indexTip.y, 14, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(0,255,136,0.4)';
+                    ctx.arc(indexEndX, indexEndY, 16, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(0,255,136,0.5)';
                     ctx.fill();
                     ctx.strokeStyle = '#0f0';
                     ctx.lineWidth = 2;
                     ctx.stroke();
                     
                     ctx.beginPath();
-                    ctx.arc(indexTip.x, indexTip.y, 6, 0, Math.PI * 2);
+                    ctx.arc(indexEndX, indexEndY, 8, 0, Math.PI * 2);
                     ctx.fillStyle = '#0f0';
                     ctx.fill();
+                    ctx.shadowBlur = 12;
+                    ctx.shadowColor = '#0f0';
                     
                     ctx.restore();
                 }
@@ -704,7 +724,7 @@
         }
 
         // ==================== AR ОКНА В ПРОСТРАНСТВЕ ====================
-        function createARWindow(x, y, title, content, width = 300, height = 260) {
+        function createARWindow(x, y, title, content, width = 320, height = 280) {
             const div = document.createElement('div');
             div.className = 'ar-window';
             div.style.width = `${width}px`;
@@ -730,7 +750,7 @@
                 iframe.src = 'https://www.apple.com/visionos/';
                 iframe.style.width = '100%';
                 iframe.style.height = '100%';
-                iframe.style.borderRadius = '14px';
+                iframe.style.borderRadius = '16px';
                 contentDiv.appendChild(iframe);
             } 
             else if (content.type === 'video') {
@@ -743,14 +763,14 @@
                 video.controls = true;
                 video.style.width = '100%';
                 video.style.height = '100%';
-                video.style.borderRadius = '14px';
+                video.style.borderRadius = '16px';
                 contentDiv.appendChild(video);
                 video.play().catch(() => {});
             }
             else if (content.type === 'notes') {
                 const textarea = document.createElement('textarea');
                 textarea.className = 'note-editor';
-                textarea.value = '✨ AR Заметки\n\n• Окна закреплены в пространстве\n• Управляйте жестами рук\n• Камера с зумом 0.6x\n• Полное AR погружение';
+                textarea.value = '✨ AR Заметки\n\n• Окна закреплены в AR пространстве\n• Управляйте жестами (pinch для выбора)\n• Двумя пальцами перемещайте вид\n• Максимальный обзор камеры';
                 contentDiv.appendChild(textarea);
             }
             
@@ -785,7 +805,7 @@
             
             // Анимация появления
             div.style.opacity = '0';
-            div.style.transform = 'scale(0.8)';
+            div.style.transform = 'scale(0.9)';
             setTimeout(() => {
                 div.style.opacity = '1';
                 div.style.transform = 'scale(1)';
@@ -795,17 +815,17 @@
         }
         
         function updateWindowPosition(win) {
-            // Окна закреплены в пространстве - не двигаются при перемещении камеры
-            const screenX = window.innerWidth / 2 + (win.x - state.cameraPosition.x);
-            const screenY = window.innerHeight / 2 + (win.y - state.cameraPosition.y);
+            // AR окна закреплены в пространстве - реагируют на смещение камеры
+            const screenX = window.innerWidth / 2 + (win.x - state.cameraOffset.x);
+            const screenY = window.innerHeight / 2 + (win.y - state.cameraOffset.y);
             win.div.style.left = `${screenX}px`;
             win.div.style.top = `${screenY}px`;
         }
         
         function updateAllWindowPositions() {
             state.windows.forEach(win => {
-                const screenX = window.innerWidth / 2 + (win.x - state.cameraPosition.x);
-                const screenY = window.innerHeight / 2 + (win.y - state.cameraPosition.y);
+                const screenX = window.innerWidth / 2 + (win.x - state.cameraOffset.x);
+                const screenY = window.innerHeight / 2 + (win.y - state.cameraOffset.y);
                 win.div.style.left = `${screenX}px`;
                 win.div.style.top = `${screenY}px`;
             });
@@ -858,57 +878,39 @@
             });
         }
 
-        // ==================== УПРАВЛЕНИЕ ЗУМОМ ====================
-        function setupZoomControls() {
-            document.getElementById('zoom-out').addEventListener('click', () => {
-                updateCameraZoom(0.6);
-                document.getElementById('zoom-out').style.background = 'rgba(0,170,255,0.5)';
-                setTimeout(() => {
-                    document.getElementById('zoom-out').style.background = '';
-                }, 200);
-            });
-            
-            document.getElementById('zoom-in').addEventListener('click', () => {
-                updateCameraZoom(1.0);
-                document.getElementById('zoom-in').style.background = 'rgba(0,170,255,0.5)';
-                setTimeout(() => {
-                    document.getElementById('zoom-in').style.background = '';
-                }, 200);
-            });
-        }
-
         // ==================== UI КНОПКИ ====================
         function setupUI() {
             document.getElementById('add-browser').onclick = () => {
-                const x = (Math.random() - 0.5) * 400;
-                const y = (Math.random() - 0.5) * 300;
-                createARWindow(x, y, '🌐 Vision Browser', { type: 'browser' }, 340, 300);
+                const x = (Math.random() - 0.5) * 500;
+                const y = (Math.random() - 0.5) * 400;
+                createARWindow(x, y, '🌐 Vision Browser', { type: 'browser' }, 360, 320);
             };
             
             document.getElementById('add-video').onclick = () => {
                 const input = document.getElementById('video-upload');
                 input.onchange = (e) => {
                     if (e.target.files[0]) {
-                        const x = (Math.random() - 0.5) * 400;
-                        const y = (Math.random() - 0.5) * 300;
-                        createARWindow(x, y, '🎬 Видео', { type: 'video', file: e.target.files[0] }, 320, 280);
+                        const x = (Math.random() - 0.5) * 500;
+                        const y = (Math.random() - 0.5) * 400;
+                        createARWindow(x, y, '🎬 ' + e.target.files[0].name.substring(0, 15), { type: 'video', file: e.target.files[0] }, 340, 300);
                     } else {
-                        const x = (Math.random() - 0.5) * 400;
-                        const y = (Math.random() - 0.5) * 300;
-                        createARWindow(x, y, '🎬 Демо видео', { type: 'video' }, 320, 280);
+                        const x = (Math.random() - 0.5) * 500;
+                        const y = (Math.random() - 0.5) * 400;
+                        createARWindow(x, y, '🎬 Демо видео', { type: 'video' }, 340, 300);
                     }
                 };
                 input.click();
             };
             
             document.getElementById('add-notes').onclick = () => {
-                const x = (Math.random() - 0.5) * 400;
-                const y = (Math.random() - 0.5) * 300;
-                createARWindow(x, y, '📝 AR Заметки', { type: 'notes' }, 300, 260);
+                const x = (Math.random() - 0.5) * 500;
+                const y = (Math.random() - 0.5) * 400;
+                createARWindow(x, y, '📝 AR Заметки', { type: 'notes' }, 320, 280);
             };
             
             document.getElementById('reset-view').onclick = () => {
-                state.cameraPosition = { x: 0, y: 0 };
+                state.cameraOffset = { x: 0, y: 0 };
+                updateAllWindowPositions();
                 // Эффект сброса
                 const flash = document.createElement('div');
                 flash.style.position = 'fixed';
@@ -942,22 +944,22 @@
         // ==================== ИНИЦИАЛИЗАЦИЯ ====================
         async function init() {
             await setupCamera();
-            setupHandTracking();
+            setupGestureTracking();
             setupTouchControl();
             setupModeSwitching();
             setupFullscreen();
-            setupZoomControls();
             setupUI();
             updateAllWindowPositions();
             
-            // Создаем окна, закрепленные в пространстве
+            // Создаем AR окна, закрепленные в пространстве комнаты
             setTimeout(() => {
-                createARWindow(-180, -80, '🌐 Apple Vision Pro', { type: 'browser' }, 360, 320);
-                createARWindow(200, -60, '🎬 Демо ролик', { type: 'video' }, 340, 300);
-                createARWindow(50, 150, '📝 AR Заметки', { type: 'notes' }, 320, 280);
-                createARWindow(-220, 120, '🌐 Wikipedia', { type: 'browser' }, 340, 300);
-                createARWindow(250, -150, '🎬 Видеоплеер', { type: 'video' }, 330, 290);
-            }, 1000);
+                createARWindow(-200, -100, '🌐 Apple Vision Pro', { type: 'browser' }, 380, 340);
+                createARWindow(220, -80, '🎬 4K Демо видео', { type: 'video' }, 360, 320);
+                createARWindow(50, 180, '📝 AR Заметки', { type: 'notes' }, 340, 300);
+                createARWindow(-250, 150, '🌐 Wikipedia', { type: 'browser' }, 360, 320);
+                createARWindow(280, -150, '🎬 Трейлер', { type: 'video' }, 350, 310);
+                createARWindow(-80, -200, '📝 Быстрые заметки', { type: 'notes' }, 320, 280);
+            }, 800);
             
             // Проверка ориентации
             function checkOrientation() {
