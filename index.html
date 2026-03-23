@@ -3,382 +3,555 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>VR Игра с управлением от PS4 | Космический сборщик</title>
+    <title>SPLIT VR - Два игрока | Два PS4 джойстика</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Orbitron', 'Segoe UI', monospace;
+            background: #000;
         }
-        #info {
+        
+        /* Разделенный экран */
+        .split-container {
+            display: flex;
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        .player-side {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            border-right: 3px solid rgba(0, 255, 255, 0.5);
+        }
+        
+        .player-side:last-child {
+            border-right: none;
+        }
+        
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+        }
+        
+        /* UI для каждого игрока */
+        .ui-overlay {
             position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        .player1-ui, .player2-ui {
+            position: absolute;
+            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.5));
+            backdrop-filter: blur(5px);
+            border-radius: 12px;
+            padding: 8px 15px;
+            font-family: monospace;
+            font-weight: bold;
+            border-left: 4px solid;
+            pointer-events: none;
+            z-index: 20;
+        }
+        
+        .player1-ui {
             top: 20px;
             left: 20px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 10px 15px;
-            border-radius: 8px;
-            pointer-events: none;
-            z-index: 10;
-            backdrop-filter: blur(5px);
-            font-size: 14px;
-        }
-        #controls-status {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0,0,0,0.6);
+            border-left-color: #00ff00;
             color: #0f0;
-            font-family: monospace;
-            padding: 8px 12px;
-            border-radius: 5px;
-            font-size: 12px;
-            pointer-events: none;
-            z-index: 10;
         }
-        #vr-button {
+        
+        .player2-ui {
+            top: 20px;
+            right: 20px;
+            border-left-color: #ff00ff;
+            color: #f0f;
+        }
+        
+        .score-board {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            padding: 8px 20px;
+            border-radius: 30px;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 18px;
+            color: gold;
+            z-index: 100;
+            pointer-events: none;
+            border: 1px solid gold;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+        
+        .game-status {
             position: absolute;
             bottom: 30px;
-            right: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            z-index: 100;
+            pointer-events: none;
+            font-family: monospace;
+            white-space: nowrap;
+        }
+        
+        .controls-hint {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.6);
+            padding: 5px 10px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-family: monospace;
+            color: #aaa;
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .player1-status, .player2-status {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.6);
+            padding: 5px 10px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-family: monospace;
+            pointer-events: none;
+        }
+        
+        .player1-status { color: #0f0; right: auto; left: 10px; bottom: 10px; }
+        .player2-status { color: #f0f; right: 10px; bottom: 10px; }
+        
+        @media (max-width: 768px) {
+            .score-board { font-size: 12px; padding: 4px 12px; top: 10px; }
+            .game-status { font-size: 14px; padding: 8px 16px; bottom: 20px; white-space: nowrap; }
+            .player1-ui, .player2-ui { font-size: 10px; padding: 4px 10px; }
+        }
+        
+        .winner-announce {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, gold, orange);
+            color: black;
+            padding: 20px 40px;
+            border-radius: 60px;
+            font-size: 32px;
+            font-weight: bold;
+            z-index: 200;
+            animation: pulse 0.5s ease;
+            white-space: nowrap;
+            font-family: monospace;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+        
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            80% { transform: translate(-50%, -50%) scale(1.1); }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+        
+        .restart-btn {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
             background: #ff6600;
             color: white;
             border: none;
-            padding: 15px 25px;
+            padding: 12px 30px;
             font-size: 18px;
             font-weight: bold;
             border-radius: 40px;
             cursor: pointer;
-            z-index: 20;
-            box-shadow: 0 0 15px rgba(0,0,0,0.5);
-            transition: transform 0.2s;
-            font-family: inherit;
+            z-index: 200;
+            font-family: monospace;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            transition: all 0.2s;
         }
-        #vr-button:active {
-            transform: scale(0.95);
-        }
-        @media (max-width: 600px) {
-            #info { font-size: 10px; top: 10px; left: 10px; }
-            #controls-status { font-size: 9px; }
-            #vr-button { padding: 12px 20px; font-size: 16px; bottom: 20px; right: 20px; }
-        }
-        .instruction {
-            position: absolute;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.5);
-            color: #ccc;
-            padding: 5px 10px;
-            border-radius: 5px;
-            font-size: 10px;
-            pointer-events: none;
+        
+        .restart-btn:active {
+            transform: translateX(-50%) scale(0.95);
         }
     </style>
 </head>
 <body>
-    <div id="info">
-        🎮 VR Игра | Собирай кристаллы | Джойстик PS4 подключи по Bluetooth
+    <div class="split-container" id="splitContainer">
+        <div class="player-side" id="player1Side">
+            <div class="player1-ui">
+                🎮 ИГРОК 1 (PS4) | 🎯 ОЧКИ: <span id="score1">0</span>
+            </div>
+            <div class="controls-hint">
+                🎮 Левый стик: движение | X: стрельба | R2: ускорение
+            </div>
+            <div class="player1-status" id="gamepad1Status">
+                🔌 Ожидание геймпада...
+            </div>
+        </div>
+        <div class="player-side" id="player2Side">
+            <div class="player2-ui">
+                🎮 ИГРОК 2 (PS4) | 🎯 ОЧКИ: <span id="score2">0</span>
+            </div>
+            <div class="controls-hint">
+                🎮 Левый стик: движение | X: стрельба | R2: ускорение
+            </div>
+            <div class="player2-status" id="gamepad2Status">
+                🔌 Ожидание геймпада...
+            </div>
+        </div>
     </div>
-    <div id="controls-status">
-        🔌 Геймпад: не найден...
+    
+    <div class="score-board" id="scoreBoard">
+        🏆 СЧЕТ: 0 : 0 🏆
     </div>
-    <button id="vr-button">🔘 Войти в VR</button>
-    <div class="instruction">
-        Левый стик: движение | Правый стик: поворот | Кнопка X (Квадрат) или A: рывок
+    
+    <div class="game-status" id="gameStatus">
+        🚀 КОСМИЧЕСКАЯ ДУЭЛЬ | СОБЕРИ 10 ОЧКОВ ДЛЯ ПОБЕДЫ!
     </div>
-
-    <!-- Подключаем Three.js и дополнительные библиотеки -->
+    
+    <button class="restart-btn" id="restartBtn">🔄 НОВАЯ ИГРА</button>
+    
     <script type="importmap">
         {
             "imports": {
-                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js"
             }
         }
     </script>
-
+    
     <script type="module">
         import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { VRButton } from 'three/addons/webxr/VRButton.js';
-
-        // --- Инициализация сцены ---
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x050b1a);
-        scene.fog = new THREE.FogExp2(0x050b1a, 0.008); // Туман для глубины
-
-        // Камера: будет двигаться и вращаться от геймпада
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.6, 0);
-        camera.rotation.order = 'YXZ'; // чтобы корректно работал поворот
-
-        // Рендерер с поддержкой WebXR
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.xr.enabled = true; // Включаем VR режим
-        document.body.appendChild(renderer.domElement);
         
-        // Добавляем кнопку входа в VR (Three.js стандартная)
-        document.getElementById('vr-button').onclick = () => {
-            renderer.xr.isPresenting ? renderer.xr.exitVR() : renderer.xr.requestSession();
-        };
-        // Стилизуем кнопку (скрываем старую, если она появилась, но мы используем свою)
-        // Но VRButton создает свою, поэтому лучше отключить её авто-стили, но мы оставим свою кнопку
-        // Просто добавим поддержку вызова
+        // --- Игровое состояние ---
+        let scores = [0, 0];
+        let gameActive = true;
+        let winner = null;
+        let gameTime = 0;
         
-        // Освещение
-        // Амбиентный свет
-        const ambientLight = new THREE.AmbientLight(0x404060);
-        scene.add(ambientLight);
-        // Основной направленный свет
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-        dirLight.position.set(5, 10, 7);
-        scene.add(dirLight);
-        // Динамический свет сзади
-        const backLight = new THREE.PointLight(0x4466ff, 0.5);
-        backLight.position.set(-2, 2, -3);
-        scene.add(backLight);
+        const WIN_SCORE = 10;
         
-        // Добавим звездное небо (частицы)
-        const starGeometry = new THREE.BufferGeometry();
-        const starCount = 1500;
-        const starPositions = new Float32Array(starCount * 3);
-        for (let i = 0; i < starCount; i++) {
-            starPositions[i*3] = (Math.random() - 0.5) * 2000;
-            starPositions[i*3+1] = (Math.random() - 0.5) * 500;
-            starPositions[i*3+2] = (Math.random() - 0.5) * 500 - 200;
-        }
-        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-        const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.35 });
-        const stars = new THREE.Points(starGeometry, starMaterial);
-        scene.add(stars);
-        
-        // Платформа/пол (прозрачная сетка для ориентира)
-        const gridHelper = new THREE.GridHelper(100, 20, 0x88aaff, 0x335588);
-        gridHelper.position.y = -1.2;
-        gridHelper.material.transparent = true;
-        gridHelper.material.opacity = 0.4;
-        scene.add(gridHelper);
-        
-        // --- Игровые объекты ---
-        // Коллекционируемые кристаллы
-        const crystals = [];
-        const crystalColors = [0xff44aa, 0x44ffaa, 0xffaa44, 0xaa44ff];
-        
-        function createCrystal(x, z, colorIndex) {
-            const geometry = new THREE.ConeGeometry(0.25, 0.6, 8);
-            const material = new THREE.MeshStandardMaterial({ color: crystalColors[colorIndex % crystalColors.length], emissive: 0x331133, emissiveIntensity: 0.4 });
-            const crystal = new THREE.Mesh(geometry, material);
-            crystal.position.set(x, 0.2, z);
-            crystal.userData = { collected: false, floatOffset: Math.random() * Math.PI * 2 };
-            scene.add(crystal);
-            crystals.push(crystal);
-            return crystal;
-        }
-        
-        // Создаем кристаллы вокруг
-        const positions = [
-            [-3, -2], [2, -3], [4, 1], [-1, 4], [-4, 3], [0, 5], [5, 0], [-5, -1], [3, -4], [-3, 5], [1, -4], [4, -2], [-2, -4], [0, -3]
-        ];
-        positions.forEach((pos, idx) => createCrystal(pos[0], pos[1], idx));
-        
-        // Добавим врагов (простые сферы, которых нужно избегать или они отнимают очки)
+        // --- Создание двух независимых сцен и камер ---
+        const scenes = [];
+        const cameras = [];
+        const renderers = [];
+        const players = [];
+        const projectiles = [[], []];
         const enemies = [];
-        const enemyMat = new THREE.MeshStandardMaterial({ color: 0xff3333, emissive: 0x330000 });
-        const enemyPositions = [[-2, -1], [3, 2], [-3, -2], [2, 3], [0, -2], [4, -1]];
-        enemyPositions.forEach(pos => {
-            const enemy = new THREE.Mesh(new THREE.SphereGeometry(0.5, 16, 16), enemyMat);
-            enemy.position.set(pos[0], 0.3, pos[1]);
+        
+        // Цвета для игроков
+        const playerColors = [0x00ff88, 0xff44ff];
+        const playerLightColors = [0x00ff88, 0xff44ff];
+        
+        // --- Инициализация для каждого игрока ---
+        function initPlayerScene(sideElement, playerIndex) {
+            // Создаем сцену
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x050b2a);
+            scene.fog = new THREE.FogExp2(0x050b2a, 0.015);
+            
+            // Камера (вид сверху сбоку для аркадного геймплея)
+            const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 100);
+            camera.position.set(0, 8, 12);
+            camera.lookAt(0, 0, 0);
+            
+            // Рендерер
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(sideElement.clientWidth, sideElement.clientHeight);
+            renderer.shadowMap.enabled = true;
+            sideElement.appendChild(renderer.domElement);
+            
+            // Освещение
+            const ambientLight = new THREE.AmbientLight(0x404060);
+            scene.add(ambientLight);
+            
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(5, 10, 7);
+            dirLight.castShadow = true;
+            scene.add(dirLight);
+            
+            const backLight = new THREE.PointLight(playerLightColors[playerIndex], 0.8);
+            backLight.position.set(0, 3, -5);
+            scene.add(backLight);
+            
+            // Звездное поле
+            const starGeometry = new THREE.BufferGeometry();
+            const starCount = 800;
+            const starPositions = new Float32Array(starCount * 3);
+            for (let i = 0; i < starCount; i++) {
+                starPositions[i*3] = (Math.random() - 0.5) * 200;
+                starPositions[i*3+1] = (Math.random() - 0.5) * 100;
+                starPositions[i*3+2] = (Math.random() - 0.5) * 80 - 30;
+            }
+            starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+            const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.15 });
+            const stars = new THREE.Points(starGeometry, starMaterial);
+            scene.add(stars);
+            
+            // Арена (красивое кольцо)
+            const arenaRing = new THREE.Mesh(
+                new THREE.TorusGeometry(6, 0.2, 32, 100),
+                new THREE.MeshStandardMaterial({ color: 0x44aaff, emissive: 0x004466 })
+            );
+            arenaRing.rotation.x = Math.PI / 2;
+            arenaRing.position.y = -0.5;
+            scene.add(arenaRing);
+            
+            // Пол с сеткой
+            const gridHelper = new THREE.GridHelper(20, 20, 0x44aaff, 0x335588);
+            gridHelper.position.y = -1;
+            gridHelper.material.transparent = true;
+            gridHelper.material.opacity = 0.4;
+            scene.add(gridHelper);
+            
+            // Создаем игрока (сфера)
+            const playerGeo = new THREE.SphereGeometry(0.5, 32, 32);
+            const playerMat = new THREE.MeshStandardMaterial({ color: playerColors[playerIndex], emissive: playerColors[playerIndex], emissiveIntensity: 0.3 });
+            const playerMesh = new THREE.Mesh(playerGeo, playerMat);
+            playerMesh.castShadow = true;
+            playerMesh.userData = { 
+                index: playerIndex,
+                position: new THREE.Vector3(0, 0, 0),
+                cooldown: 0,
+                speedBoost: false
+            };
+            scene.add(playerMesh);
+            
+            // Добавляем светящийся ореол
+            const glowGeo = new THREE.SphereGeometry(0.7, 16, 16);
+            const glowMat = new THREE.MeshBasicMaterial({ color: playerColors[playerIndex], transparent: true, opacity: 0.2 });
+            const glow = new THREE.Mesh(glowGeo, glowMat);
+            playerMesh.add(glow);
+            
+            // Создаем врагов (общие для обоих игроков, но каждый видит своих)
+            if (playerIndex === 0) {
+                createEnemies(scene);
+            }
+            
+            return { scene, camera, renderer, playerMesh, stars, backLight };
+        }
+        
+        function createEnemies(scene) {
+            // Создаем врагов (красные сферы)
+            const enemyMat = new THREE.MeshStandardMaterial({ color: 0xff3366, emissive: 0x441122 });
+            const positions = [
+                [-3, 0], [3, 0], [0, 2], [0, -2], [-2, 2], [2, -2], [-2.5, -1.5], [2.5, 1.5], [-1, 2.5], [1, -2.5]
+            ];
+            
+            for (let i = 0; i < positions.length; i++) {
+                const enemy = new THREE.Mesh(new THREE.SphereGeometry(0.45, 24, 24), enemyMat);
+                enemy.position.set(positions[i][0], 0, positions[i][1]);
+                enemy.userData = { 
+                    id: i,
+                    originalX: positions[i][0],
+                    originalZ: positions[i][1],
+                    health: 3,
+                    floatOffset: Math.random() * Math.PI * 2
+                };
+                scene.add(enemy);
+                enemies.push(enemy);
+            }
+        }
+        
+        // --- Управление геймпадами ---
+        let gamepads = [null, null];
+        let axes = [[0,0,0,0], [0,0,0,0]];
+        let shooting = [false, false];
+        let boosting = [false, false];
+        
+        function updateGamepads() {
+            const pads = navigator.getGamepads();
+            let found = [false, false];
+            
+            for (let i = 0; i < pads.length; i++) {
+                const pad = pads[i];
+                if (!pad) continue;
+                
+                // Определяем игрока по индексу или по ID
+                let playerIdx = -1;
+                if (gamepads[0] === pad) playerIdx = 0;
+                else if (gamepads[1] === pad) playerIdx = 1;
+                else if (gamepads[0] === null && !found[0]) playerIdx = 0;
+                else if (gamepads[1] === null && !found[1]) playerIdx = 1;
+                
+                if (playerIdx !== -1) {
+                    gamepads[playerIdx] = pad;
+                    found[playerIdx] = true;
+                    
+                    // Читаем оси
+                    if (pad.axes.length >= 4) {
+                        axes[playerIdx][0] = pad.axes[0]; // левый X
+                        axes[playerIdx][1] = pad.axes[1]; // левый Y
+                    }
+                    
+                    // Стрельба (кнопка X = индекс 0 или 2)
+                    if (pad.buttons.length > 0) {
+                        shooting[playerIdx] = pad.buttons[0]?.pressed || pad.buttons[2]?.pressed || false;
+                    }
+                    
+                    // Ускорение (R2 = индекс 7)
+                    if (pad.buttons.length > 7) {
+                        boosting[playerIdx] = pad.buttons[7]?.pressed || false;
+                    }
+                }
+            }
+            
+            // Обновляем UI статус
+            for (let i = 0; i < 2; i++) {
+                const statusEl = document.getElementById(`gamepad${i+1}Status`);
+                if (gamepads[i]) {
+                    statusEl.innerHTML = `✅ PS4 подключен | 🎮`;
+                    statusEl.style.color = i === 0 ? '#0f0' : '#f0f';
+                } else {
+                    statusEl.innerHTML = `⏳ Ожидание геймпада ${i+1}...`;
+                    statusEl.style.color = '#ffaa66';
+                }
+            }
+        }
+        
+        // --- Обновление движения игроков ---
+        function updatePlayerMovement(playerMesh, playerIndex, deltaTime) {
+            if (!gameActive) return;
+            
+            const pad = gamepads[playerIndex];
+            if (!pad) return;
+            
+            let speed = boosting[playerIndex] ? 8 : 5;
+            let moveX = axes[playerIndex][0];
+            let moveZ = axes[playerIndex][1];
+            
+            // Движение
+            let newX = playerMesh.position.x + moveX * speed * deltaTime;
+            let newZ = playerMesh.position.z + moveZ * speed * deltaTime;
+            
+            // Ограничения арены (радиус 6)
+            const limit = 5.5;
+            newX = Math.max(-limit, Math.min(limit, newX));
+            newZ = Math.max(-limit, Math.min(limit, newZ));
+            
+            playerMesh.position.set(newX, 0.2, newZ);
+            
+            // Поворот в сторону движения
+            if (Math.abs(moveX) > 0.1 || Math.abs(moveZ) > 0.1) {
+                const angle = Math.atan2(moveX, moveZ);
+                playerMesh.rotation.y = angle;
+            }
+            
+            // Обновление кулдауна стрельбы
+            if (playerMesh.userData.cooldown > 0) {
+                playerMesh.userData.cooldown -= deltaTime;
+            }
+            
+            // Стрельба
+            if (shooting[playerIndex] && playerMesh.userData.cooldown <= 0 && gameActive) {
+                shoot(playerIndex, playerMesh.position.clone());
+                playerMesh.userData.cooldown = 0.3;
+            }
+        }
+        
+        // --- Стрельба ---
+        function shoot(playerIndex, pos) {
+            const scene = scenes[playerIndex];
+            const projectileGeo = new THREE.SphereGeometry(0.15, 8, 8);
+            const projectileMat = new THREE.MeshStandardMaterial({ color: playerColors[playerIndex], emissive: playerColors[playerIndex] });
+            const projectile = new THREE.Mesh(projectileGeo, projectileMat);
+            projectile.position.copy(pos);
+            projectile.position.y = 0.3;
+            projectile.userData = {
+                player: playerIndex,
+                life: 2,
+                velocity: new THREE.Vector3(0, 0, 0),
+                direction: new THREE.Vector3(0, 0, 1)
+            };
+            scene.add(projectile);
+            projectiles[playerIndex].push(projectile);
+            
+            // Звуковой эффект (визуальный)
+            const flash = new THREE.PointLight(playerColors[playerIndex], 1, 5);
+            flash.position.copy(pos);
+            scene.add(flash);
+            setTimeout(() => scene.remove(flash), 100);
+        }
+        
+        // --- Обновление снарядов и столкновения ---
+        function updateProjectiles(deltaTime) {
+            for (let p = 0; p < 2; p++) {
+                for (let i = projectiles[p].length-1; i >= 0; i--) {
+                    const proj = projectiles[p][i];
+                    proj.userData.life -= deltaTime;
+                    proj.position.z += 8 * deltaTime;
+                    
+                    if (proj.userData.life <= 0 || Math.abs(proj.position.z) > 15) {
+                        scenes[p].remove(proj);
+                        projectiles[p].splice(i,1);
+                        continue;
+                    }
+                    
+                    // Проверка попадания во врагов
+                    for (let e = 0; e < enemies.length; e++) {
+                        const enemy = enemies[e];
+                        if (!enemy.parent) continue;
+                        const dist = proj.position.distanceTo(enemy.position);
+                        if (dist < 0.6) {
+                            // Попадание
+                            scenes[p].remove(proj);
+                            projectiles[p].splice(i,1);
+                            
+                            enemy.userData.health--;
+                            
+                            // Визуальный эффект попадания
+                            createHitEffect(scenes[p], enemy.position);
+                            
+                            if (enemy.userData.health <= 0) {
+                                // Уничтожение врага
+                                scenes[p].remove(enemy);
+                                enemies.splice(e,1);
+                                
+                                // Добавляем очки обоим игрокам? Нет, только тому, кто попал
+                                scores[p]++;
+                                updateScores();
+                                
+                                // Создаем новый враг
+                                createNewEnemy(scenes[p]);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        function createNewEnemy(scene) {
+            const enemyMat = new THREE.MeshStandardMaterial({ color: 0xff3366, emissive: 0x441122 });
+            const x = (Math.random() - 0.5) * 9;
+            const z = (Math.random() - 0.5) * 9;
+            const enemy = new THREE.Mesh(new THREE.SphereGeometry(0.45, 24, 24), enemyMat);
+            enemy.position.set(x, 0, z);
+            enemy.userData = { health: 3, floatOffset: Math.random() * Math.PI * 2 };
             scene.add(enemy);
             enemies.push(enemy);
-        });
-        
-        // Счет
-        let score = 0;
-        const scoreDiv = document.createElement('div');
-        scoreDiv.style.position = 'absolute';
-        scoreDiv.style.top = '20px';
-        scoreDiv.style.right = '20px';
-        scoreDiv.style.backgroundColor = 'rgba(0,0,0,0.6)';
-        scoreDiv.style.color = 'gold';
-        scoreDiv.style.padding = '8px 16px';
-        scoreDiv.style.borderRadius = '20px';
-        scoreDiv.style.fontFamily = 'monospace';
-        scoreDiv.style.fontSize = '20px';
-        scoreDiv.style.fontWeight = 'bold';
-        scoreDiv.style.zIndex = '10';
-        scoreDiv.innerText = `✨ ${score}`;
-        document.body.appendChild(scoreDiv);
-        
-        // --- Управление с геймпада PS4 ---
-        let gamepadConnected = false;
-        let leftStickX = 0, leftStickY = 0;
-        let rightStickX = 0, rightStickY = 0;
-        let boostPressed = false;
-        
-        // Скорость движения
-        let moveSpeed = 3.5;
-        let rotationSpeed = 1.8;
-        
-        // Обновление статуса геймпада
-        const statusEl = document.getElementById('controls-status');
-        
-        function updateGamepadStatus() {
-            const gamepads = navigator.getGamepads();
-            let activePad = null;
-            for (let i = 0; i < gamepads.length; i++) {
-                const pad = gamepads[i];
-                if (pad && (pad.id.includes('PS4') || pad.id.includes('DualShock') || pad.mapping === 'standard')) {
-                    activePad = pad;
-                    break;
-                }
-            }
-            
-            if (activePad) {
-                gamepadConnected = true;
-                statusEl.innerHTML = `🎮 Геймпад: PS4 подключен | Счет: ${score}`;
-                statusEl.style.color = '#aaffaa';
-                
-                // Чтение осей: стандартный маппинг для DualShock 4 в Chrome/Android
-                // Оси: 0 - левый стик X, 1 - левый стик Y, 2 - правый стик X, 3 - правый стик Y
-                const axes = activePad.axes;
-                if (axes.length >= 4) {
-                    leftStickX = axes[0];
-                    leftStickY = axes[1];
-                    rightStickX = axes[2];
-                    rightStickY = axes[3];
-                }
-                // Кнопки: индекс 0 - X (квадрат) или A на Xbox стиле, но для PS4 X это обычно кнопка 0 или 1? Проверим: 
-                // В стандартном маппинге: 0 - X (Square?), но для буста используем кнопку 0 (крестик) или 1 (круг). Для простоты - кнопка 0
-                if (activePad.buttons.length > 0) {
-                    boostPressed = activePad.buttons[0]?.pressed || activePad.buttons[2]?.pressed || false;
-                }
-                
-                // Дополнительно: если хотим рывок при нажатии R2? Можно расширить
-                if (activePad.buttons[7]?.pressed) { // R2 обычно индекс 7
-                    moveSpeed = 7.0;
-                } else {
-                    moveSpeed = 3.5;
-                }
-            } else {
-                gamepadConnected = false;
-                statusEl.innerHTML = `⚠️ Геймпад PS4 не найден. Подключите по Bluetooth и нажмите любую кнопку.`;
-                statusEl.style.color = '#ffaa66';
-                leftStickX = leftStickY = rightStickX = rightStickY = 0;
-            }
         }
         
-        // --- Логика движения и поворота камеры ---
-        // Вектор движения в плоскости XZ
-        function updateMovement(deltaTime) {
-            if (!deltaTime || deltaTime > 0.033) deltaTime = 0.016;
-            
-            // Движение относительно направления камеры (вид от первого лица)
-            const forward = new THREE.Vector3();
-            const right = new THREE.Vector3();
-            camera.getWorldDirection(forward);
-            forward.y = 0;
-            forward.normalize();
-            right.crossVectors(new THREE.Vector3(0, 1, 0), forward);
-            right.normalize();
-            
-            let move = new THREE.Vector3(0, 0, 0);
-            // Левый стик: вперед/назад (Y), влево/вправо (X)
-            // Инвертируем Y, так как в геймпаде вверх = -1
-            const stickForward = -leftStickY;
-            const stickRight = leftStickX;
-            
-            move.x = stickRight * moveSpeed * deltaTime;
-            move.z = stickForward * moveSpeed * deltaTime;
-            
-            // Преобразуем в мировые координаты
-            const worldMove = new THREE.Vector3(0, 0, 0);
-            worldMove.addScaledVector(right, move.x);
-            worldMove.addScaledVector(forward, move.z);
-            
-            // Обновляем позицию камеры
-            let newPos = camera.position.clone().add(worldMove);
-            // Ограничиваем перемещение в зоне от -12 до 12 по X и Z
-            newPos.x = Math.max(-12, Math.min(12, newPos.x));
-            newPos.z = Math.max(-12, Math.min(12, newPos.z));
-            camera.position.copy(newPos);
-            
-            // Поворот камеры правым стиком (Yaw и Pitch)
-            // Yaw (поворот влево-вправо) - правый стик X
-            // Pitch (наклон вверх-вниз) - правый стик Y, с ограничением
-            const yawDelta = -rightStickX * rotationSpeed * deltaTime;
-            const pitchDelta = -rightStickY * rotationSpeed * deltaTime;
-            
-            camera.rotation.y += yawDelta;
-            // Ограничиваем наклон камеры, чтобы не переворачиваться
-            let newPitch = camera.rotation.x + pitchDelta;
-            newPitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, newPitch));
-            camera.rotation.x = newPitch;
-        }
-        
-        // --- Сбор кристаллов и столкновения ---
-        function checkCollectibles() {
-            const camPos = camera.position;
-            for (let i = 0; i < crystals.length; i++) {
-                const c = crystals[i];
-                if (c.userData.collected) continue;
-                const dist = camPos.distanceTo(c.position);
-                if (dist < 1.2) {
-                    c.userData.collected = true;
-                    scene.remove(c);
-                    score++;
-                    scoreDiv.innerText = `✨ ${score}`;
-                    // Визуальный фидбек: частицы
-                    createPickupEffect(c.position);
-                }
-            }
-        }
-        
-        function checkEnemies() {
-            const camPos = camera.position;
-            for (let i = 0; i < enemies.length; i++) {
-                const e = enemies[i];
-                const dist = camPos.distanceTo(e.position);
-                if (dist < 0.9) {
-                    // Штраф: отнимаем одно очко, отбрасываем назад
-                    score = Math.max(0, score - 1);
-                    scoreDiv.innerText = `✨ ${score}`;
-                    // Отброс назад
-                    const pushDir = camPos.clone().sub(e.position).normalize();
-                    camera.position.add(pushDir.multiplyScalar(1.5));
-                    // Визуальный эффект
-                    createHitEffect(e.position);
-                    // Небольшая задержка, чтобы избежать множественных штрафов за раз
-                    e.userData.lastHit = Date.now();
-                }
-            }
-        }
-        
-        // Простые эффекты частиц
-        function createPickupEffect(pos) {
-            const geom = new THREE.SphereGeometry(0.1, 4, 4);
-            const material = new THREE.MeshStandardMaterial({ color: 0xffaa66, emissive: 0xff4400 });
-            for (let i = 0; i < 6; i++) {
-                const particle = new THREE.Mesh(geom, material);
-                particle.position.copy(pos);
-                scene.add(particle);
-                const vel = new THREE.Vector3((Math.random() - 0.5) * 2, Math.random() * 1.5, (Math.random() - 0.5) * 2);
-                let life = 0.5;
-                const interval = setInterval(() => {
-                    if (!particle.parent) return clearInterval(interval);
-                    particle.position.add(vel.clone().multiplyScalar(0.05));
-                    life -= 0.03;
-                    if (life <= 0) {
-                        scene.remove(particle);
-                        clearInterval(interval);
-                    }
-                }, 30);
-            }
-        }
-        
-        function createHitEffect(pos) {
-            const ringGeom = new THREE.RingGeometry(0.2, 0.6, 8);
-            const ringMat = new THREE.MeshBasicMaterial({ color: 0xff3333, side: THREE.DoubleSide, transparent: true });
-            const ring = new THREE.Mesh(ringGeom, ringMat);
+        function createHitEffect(scene, pos) {
+            const ringGeo = new THREE.RingGeometry(0.3, 0.8, 8);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xff6600, side: THREE.DoubleSide, transparent: true });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
             ring.position.copy(pos);
             scene.add(ring);
             let scale = 1;
@@ -390,103 +563,181 @@
                     scene.remove(ring);
                     clearInterval(animate);
                 }
-            }, 50);
+            }, 30);
         }
         
-        // Анимация парящих кристаллов
-        let timeAcc = 0;
-        function animateCrystals(delta) {
-            timeAcc += delta;
-            crystals.forEach(c => {
-                if (!c.userData.collected) {
-                    c.position.y = 0.2 + Math.sin(timeAcc * 3 + c.userData.floatOffset) * 0.15;
-                    c.rotation.y += 0.02;
-                    c.rotation.x = Math.sin(timeAcc) * 0.2;
+        // --- Проверка столкновений игроков с врагами ---
+        function checkCollisions() {
+            for (let p = 0; p < 2; p++) {
+                if (!gameActive) continue;
+                const player = players[p];
+                if (!player) continue;
+                
+                for (let e = 0; e < enemies.length; e++) {
+                    const enemy = enemies[e];
+                    if (!enemy.parent) continue;
+                    const dist = player.position.distanceTo(enemy.position);
+                    if (dist < 0.8) {
+                        // Столкновение - отбрасываем игрока
+                        const dir = player.position.clone().sub(enemy.position).normalize();
+                        player.position.add(dir.multiplyScalar(1.5));
+                        
+                        // Ограничиваем
+                        const limit = 5.5;
+                        player.position.x = Math.max(-limit, Math.min(limit, player.position.x));
+                        player.position.z = Math.max(-limit, Math.min(limit, player.position.z));
+                        
+                        // Визуальный эффект
+                        createHitEffect(scenes[p], player.position);
+                    }
+                }
+            }
+        }
+        
+        // --- Анимация врагов ---
+        let time = 0;
+        function animateEnemies(delta) {
+            time += delta;
+            enemies.forEach(enemy => {
+                if (enemy.parent) {
+                    enemy.position.y = Math.sin(time * 3 + enemy.userData.floatOffset) * 0.2;
+                    enemy.rotation.y += 0.05;
                 }
             });
         }
         
-        // --- VR сессия и основной цикл ---
-        renderer.xr.addEventListener('sessionstart', () => {
-            console.log('VR session started');
-            // В VR режиме управление остается таким же
-        });
-        
-        let lastTime = performance.now();
-        
-        function animate() {
-            const now = performance.now();
-            let delta = Math.min(0.033, (now - lastTime) / 1000);
-            lastTime = now;
+        // --- Обновление счета и проверка победы ---
+        function updateScores() {
+            document.getElementById('score1').innerText = scores[0];
+            document.getElementById('score2').innerText = scores[1];
+            document.getElementById('scoreBoard').innerHTML = `🏆 СЧЕТ: ${scores[0]} : ${scores[1]} 🏆`;
             
-            // Обновляем статус геймпада и читаем оси
-            updateGamepadStatus();
-            
-            if (gamepadConnected) {
-                updateMovement(delta);
+            if (gameActive) {
+                if (scores[0] >= WIN_SCORE) {
+                    gameActive = false;
+                    winner = 1;
+                    showWinner("🏆 ПОБЕДИЛ ИГРОК 1! 🏆");
+                } else if (scores[1] >= WIN_SCORE) {
+                    gameActive = false;
+                    winner = 2;
+                    showWinner("🏆 ПОБЕДИЛ ИГРОК 2! 🏆");
+                }
             }
-            
-            // Логика игры
-            checkCollectibles();
-            checkEnemies();
-            animateCrystals(delta);
-            
-            // Вращаем звезды слегка для эффекта
-            stars.rotation.y += 0.0005;
-            
-            // Обновляем статус счет на геймпад виджете
-            if (gamepadConnected) {
-                statusEl.innerHTML = `🎮 PS4 | Счет: ${score} | Лев.стик: ${leftStickX.toFixed(2)},${leftStickY.toFixed(2)}`;
-            }
-            
-            // Рендерим сцену через WebXR
-            renderer.render(scene, camera);
-            
-            requestAnimationFrame(animate);
         }
         
-        // Запускаем цикл
-        animate();
+        function showWinner(text) {
+            const winnerDiv = document.createElement('div');
+            winnerDiv.className = 'winner-announce';
+            winnerDiv.innerText = text;
+            document.body.appendChild(winnerDiv);
+            document.getElementById('gameStatus').innerHTML = `🎉 ${text} 🎉`;
+            setTimeout(() => {
+                winnerDiv.remove();
+            }, 3000);
+        }
         
-        // События для определения подключения геймпада (для активации Gamepad API)
+        function restartGame() {
+            scores = [0, 0];
+            gameActive = true;
+            winner = null;
+            updateScores();
+            document.getElementById('gameStatus').innerHTML = `🚀 КОСМИЧЕСКАЯ ДУЭЛЬ | СОБЕРИ ${WIN_SCORE} ОЧКОВ ДЛЯ ПОБЕДЫ!`;
+            
+            // Перезапуск позиций игроков
+            players[0].position.set(0, 0.2, 0);
+            players[1].position.set(0, 0.2, 0);
+            
+            // Очистка врагов и пересоздание
+            for (let scene of scenes) {
+                enemies.forEach(e => { if(e.parent) scene.remove(e); });
+            }
+            enemies.length = 0;
+            createEnemies(scenes[0]);
+            
+            // Очистка снарядов
+            for (let p = 0; p < 2; p++) {
+                projectiles[p].forEach(proj => scenes[p].remove(proj));
+                projectiles[p] = [];
+            }
+        }
+        
+        // --- Основной цикл ---
+        const containers = document.querySelectorAll('.player-side');
+        
+        async function init() {
+            for (let i = 0; i < 2; i++) {
+                const { scene, camera, renderer, playerMesh } = initPlayerScene(containers[i], i);
+                scenes.push(scene);
+                cameras.push(camera);
+                renderers.push(renderer);
+                players.push(playerMesh);
+            }
+            
+            // Запуск анимации
+            let lastTime = performance.now();
+            
+            function animate() {
+                const now = performance.now();
+                let delta = Math.min(0.033, (now - lastTime) / 1000);
+                lastTime = now;
+                
+                updateGamepads();
+                
+                // Обновление движения игроков
+                for (let i = 0; i < 2; i++) {
+                    updatePlayerMovement(players[i], i, delta);
+                }
+                
+                updateProjectiles(delta);
+                checkCollisions();
+                animateEnemies(delta);
+                
+                // Обновление камер (следуют за игроками)
+                for (let i = 0; i < 2; i++) {
+                    const camera = cameras[i];
+                    const player = players[i];
+                    // Камера следует за игроком
+                    camera.position.x = player.position.x * 0.3;
+                    camera.position.z = 12;
+                    camera.lookAt(player.position);
+                    
+                    // Рендеринг
+                    const container = containers[i];
+                    const width = container.clientWidth;
+                    const height = container.clientHeight;
+                    renderers[i].setSize(width, height);
+                    renderers[i].render(scenes[i], camera);
+                }
+                
+                requestAnimationFrame(animate);
+            }
+            
+            animate();
+        }
+        
+        // Обработка ресайза
+        window.addEventListener('resize', () => {
+            for (let i = 0; i < 2; i++) {
+                const container = containers[i];
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                cameras[i].aspect = width / height;
+                cameras[i].updateProjectionMatrix();
+                renderers[i].setSize(width, height);
+            }
+        });
+        
+        // Кнопка рестарта
+        document.getElementById('restartBtn').onclick = () => {
+            restartGame();
+        };
+        
+        // События геймпада
         window.addEventListener("gamepadconnected", (e) => {
-            console.log("Gamepad connected:", e.gamepad);
-            statusEl.innerHTML = `✅ PS4 подключен! Играйте стиками.`;
-            statusEl.style.color = '#aaffaa';
-        });
-        window.addEventListener("gamepaddisconnected", () => {
-            statusEl.innerHTML = `❌ Геймпад отключен. Подключите снова.`;
-            statusEl.style.color = '#ff8888';
-            gamepadConnected = false;
+            console.log("Геймпад подключен:", e.gamepad.id);
         });
         
-        // Обработка изменения размера окна
-        window.addEventListener('resize', onWindowResize, false);
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-        
-        // Небольшая инструкция в консоль
-        console.log('Игра запущена. Подключите DualShock 4 через Bluetooth. Для входа в VR нажмите кнопку на экране.');
-        
-        // Добавим небольшой индикатор центра для удобства прицеливания в VR (необязательно)
-        const centerDot = document.createElement('div');
-        centerDot.style.position = 'absolute';
-        centerDot.style.width = '4px';
-        centerDot.style.height = '4px';
-        centerDot.style.backgroundColor = 'white';
-        centerDot.style.borderRadius = '50%';
-        centerDot.style.top = '50%';
-        centerDot.style.left = '50%';
-        centerDot.style.transform = 'translate(-50%, -50%)';
-        centerDot.style.zIndex = '100';
-        centerDot.style.pointerEvents = 'none';
-        centerDot.style.opacity = '0.7';
-        document.body.appendChild(centerDot);
-        
-        // Скрываем точку в VR? Она останется, но не мешает.
+        init();
     </script>
 </body>
 </html>
