@@ -3,42 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VisionOS V6 MAX AR</title>
+<title>AR Google App 3D</title>
 <style>
   body { margin:0; overflow:hidden; font-family:sans-serif; }
   video#camera { position:absolute; width:100%; height:100%; object-fit:cover; z-index:-3; }
-  canvas#handCanvas { position:absolute; top:0; left:0; width:100%; height:100%; z-index:-2; }
-  #cursor { position:absolute; width:20px; height:20px; border-radius:50%; background:cyan; pointer-events:none; z-index:10; }
-  #slider { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); z-index:20; width:80%; }
+  #slider { position:absolute; bottom:20px; left:50%; transform:translateX(-50%); z-index:10; width:80%; }
+  iframe#googleApp { position:absolute; width:600px; height:400px; border:none; left:50%; top:50%; transform:translate(-50%,-50%); z-index:5; box-shadow:0 0 20px rgba(0,255,255,0.5); }
 </style>
 </head>
 <body>
 
 <video id="camera" autoplay playsinline></video>
-<canvas id="handCanvas"></canvas>
-<div id="cursor"></div>
 <input type="range" id="slider" min="-5" max="5" step="0.01" value="0">
+<iframe id="googleApp" src="https://www.google.com"></iframe>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-
 <script>
-// ====================== 1. AR фон ======================
+// ======= 1. AR фон =======
 const video = document.getElementById("camera");
 navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" } })
   .then(stream => video.srcObject = stream);
 
-// ====================== 2. Canvas для руки ======================
-const canvas = document.getElementById("handCanvas");
-const ctx = canvas.getContext("2d");
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-window.addEventListener("resize", () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
-
-const cursor = document.getElementById("cursor");
-
-// ====================== 3. Three.js 3D сцена ======================
+// ======= 2. Three.js сцена =======
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 100);
 camera.position.z = 2;
@@ -47,88 +33,43 @@ const renderer = new THREE.WebGLRenderer({ alpha:true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// Свет
-scene.add(new THREE.AmbientLight(0xffffff, 1));
+// Свет (для будущих объектов)
+scene.add(new THREE.AmbientLight(0xffffff,1));
 
-// ====================== 4. Окна-приложения ======================
-function createAppWindow(color, url, x, y, z){
-  const geometry = new THREE.PlaneGeometry(1, 0.6);
-  const texture = new THREE.VideoTexture(document.createElement('video'));
-  const material = new THREE.MeshBasicMaterial({ color: color, transparent:true, opacity:0.3 });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.set(x,y,z);
-  scene.add(mesh);
+// ======= 3. Создаём “3D плоскость” для Google iframe =======
+const geometry = new THREE.PlaneGeometry(1.5,1);
+const material = new THREE.MeshBasicMaterial({ color:0xffffff, transparent:true, opacity:0 });
+const plane = new THREE.Mesh(geometry, material);
+plane.position.set(0,0,-2); // закрепляем в сцене
+scene.add(plane);
 
-  // iframe overlay
-  const iframe = document.createElement("iframe");
-  iframe.src = url;
-  iframe.width = 400;
-  iframe.height = 240;
-  iframe.style.position = "absolute";
-  iframe.style.left = "50%";
-  iframe.style.top = "50%";
-  iframe.style.transform = `translate(-50%, -50%)`;
-  iframe.style.zIndex = 5;
-  iframe.style.border = "2px solid rgba(255,255,255,0.3)";
-  document.body.appendChild(iframe);
+const googleIframe = document.getElementById("googleApp");
 
-  mesh.userData.iframe = iframe;
-  return mesh;
-}
-
-const window1 = createAppWindow(0xff5555, "https://www.youtube.com", -0.8, 0, -2);
-const window2 = createAppWindow(0x5555ff, "https://www.wikipedia.org", 0.8, 0, -2);
-
-// ====================== 5. MediaPipe Hands ======================
-const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
-hands.setOptions({ maxNumHands:1, minDetectionConfidence:0.6, minTrackingConfidence:0.6 });
-
-hands.onResults(results => {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  if(!results.multiHandLandmarks.length) return;
-
-  const lm = results.multiHandLandmarks[0];
-
-  // Курсор
-  const x = lm[8].x * window.innerWidth;
-  const y = lm[8].y * window.innerHeight;
-  cursor.style.left = x+"px";
-  cursor.style.top = y+"px";
-
-  // Pinch для выбора
-  const dx = lm[4].x-lm[8].x;
-  const dy = lm[4].y-lm[8].y;
-  const dist = Math.sqrt(dx*dx+dy*dy);
-  if(dist<0.07){
-    // Проверка попадания в iframe
-    [window1, window2].forEach(w=>{
-      const rect = w.userData.iframe.getBoundingClientRect();
-      if(x>rect.left && x<rect.right && y>rect.top && y<rect.bottom){
-        w.userData.iframe.style.border = "3px solid cyan";
-      } else {
-        w.userData.iframe.style.border = "2px solid rgba(255,255,255,0.3)";
-      }
-    });
-  }
-});
-
-// Камера MediaPipe
-const camMP = new Camera(video, { onFrame: async()=>await hands.send({image:video}), width:640, height:480 });
-camMP.start();
-
-// ====================== 6. Плавное движение камеры ======================
+// ======= 4. Ползунок движения камеры =======
 const slider = document.getElementById("slider");
-slider.addEventListener("input", e=>{
+slider.addEventListener("input", e => {
   camera.position.z = 2 + parseFloat(e.target.value);
 });
 
-// ====================== 7. Анимация ======================
-function animate(){
+// ======= 5. Обновление позиции iframe под 3D объект =======
+function updateIframePosition() {
+  const vector = plane.position.clone();
+  vector.project(camera);
+
+  const x = (vector.x + 1) / 2 * window.innerWidth;
+  const y = (-vector.y + 1) / 2 * window.innerHeight;
+
+  googleIframe.style.left = x + "px";
+  googleIframe.style.top = y + "px";
+}
+
+// ======= 6. Анимация =======
+function animate() {
   requestAnimationFrame(animate);
+  updateIframePosition();
   renderer.render(scene, camera);
 }
 animate();
-
 </script>
 </body>
 </html>
