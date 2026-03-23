@@ -1,1052 +1,133 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>SpatialOS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vision Pro Web Demo</title>
+
 <style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:-apple-system,'SF Pro Display','Helvetica Neue',sans-serif;color:#fff;user-select:none}
-
-/* ═══ ЗАДНЯЯ КАМЕРА — полный экран, БЕЗ поворота ═══ */
-#cam{
-  position:fixed;inset:0;
-  width:100%;height:100%;
-  object-fit:cover;
-  z-index:0;
-  /* НЕ трансформируем — телефон уже горизонтально */
-}
-#bg{position:fixed;inset:0;z-index:0;background:radial-gradient(ellipse at 30% 40%,rgba(5,20,60,.95),transparent 55%),radial-gradient(ellipse at 75% 65%,rgba(3,15,45,.8),transparent 50%),linear-gradient(170deg,#020508,#04080f,#020406)}
-#vig{position:fixed;inset:0;z-index:1;pointer-events:none;background:radial-gradient(ellipse 90% 85% at center,transparent 32%,rgba(0,0,0,.22) 60%,rgba(0,0,0,.72) 100%)}
-#dim{position:fixed;inset:0;z-index:2;pointer-events:none;background:rgba(0,0,0,0);transition:background .5s}
-
-/* ═══ СКЕЛЕТ РУКИ — поверх всего ═══ */
-#handCanvas{
-  position:fixed;inset:0;
-  width:100%;height:100%;
-  z-index:80;
-  pointer-events:none;
-  transform:scaleX(-1); /* зеркало фронталки */
+body {
+  margin: 0;
+  overflow: hidden;
+  background: black;
+  font-family: Arial;
 }
 
-/* ═══ КУРСОР РУКИ ═══ */
-#cursor{
-  position:fixed;z-index:90;
-  width:22px;height:22px;border-radius:50%;
-  background:rgba(255,255,255,.55);
-  box-shadow:0 0 18px rgba(255,255,255,.5),0 0 40px rgba(255,255,255,.2);
-  transform:translate(-50%,-50%);
-  pointer-events:none;display:none;
-  transition:width .12s,height .12s,background .12s,box-shadow .12s;
-}
-#cursor.pinch{
-  width:12px;height:12px;
-  background:rgba(61,142,255,.95);
-  box-shadow:0 0 20px rgba(61,142,255,.9),0 0 50px rgba(61,142,255,.4);
+video {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1;
 }
 
-/* ═══ ЖЕСТ ИНДИКАТОР ═══ */
-#gestureHint{
-  position:fixed;bottom:90px;left:50%;transform:translateX(-50%);
-  z-index:95;padding:8px 20px;border-radius:22px;
-  background:rgba(0,0,0,.6);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  font-size:15px;letter-spacing:.3px;
-  opacity:0;transition:opacity .25s;pointer-events:none;
-}
-#gestureHint.show{opacity:1}
-
-/* ═══ МИР — большой контейнер, двигается через transform ═══ */
-#world{
-  position:fixed;
-  /* мир в 5 раз шире и 3 раза выше экрана */
-  width:500vw;height:300vh;
-  /* центр мира = центр экрана при нулевом угле */
-  top:50%;left:50%;
-  transform:translate(-50%,-50%) translate(0px,0px);
-  z-index:10;
-  will-change:transform;
-  pointer-events:none;
-}
-#world .w{pointer-events:all}
-
-/* ═══ LIQUID GLASS ═══ */
-.w{position:absolute;border-radius:22px}
-.wb{
-  position:relative;border-radius:22px;overflow:hidden;
-  background:rgba(255,255,255,.085);
-  backdrop-filter:blur(55px) saturate(220%) brightness(1.12);
-  -webkit-backdrop-filter:blur(55px) saturate(220%) brightness(1.12);
-  box-shadow:0 20px 70px rgba(0,0,0,.55),0 5px 22px rgba(0,0,0,.38);
-  padding:18px 20px;
-}
-.wb::before{
-  content:'';position:absolute;inset:0;border-radius:22px;
-  border:1.5px solid transparent;
-  background:linear-gradient(145deg,rgba(255,255,255,.7) 0%,rgba(255,255,255,.12) 20%,rgba(255,255,255,.02) 44%,rgba(255,255,255,.08) 68%,rgba(255,255,255,.52) 100%) border-box;
-  -webkit-mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);
-  mask:linear-gradient(#fff 0 0) padding-box,linear-gradient(#fff 0 0);
-  -webkit-mask-composite:destination-out;mask-composite:exclude;pointer-events:none;
-}
-.wb::after{content:'';position:absolute;top:0;left:9%;right:9%;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.92) 35%,#fff 50%,rgba(255,255,255,.92) 65%,transparent);pointer-events:none}
-.ll{position:absolute;left:-1.5px;top:8%;bottom:8%;width:3px;border-radius:2px;filter:blur(.7px);pointer-events:none;background:linear-gradient(180deg,transparent,rgba(255,255,255,.55) 25%,#fff 50%,rgba(255,255,255,.55) 75%,transparent);animation:ll 4s ease-in-out infinite}
-.lr{position:absolute;right:-1px;top:16%;bottom:16%;width:2px;border-radius:2px;filter:blur(.6px);pointer-events:none;background:linear-gradient(180deg,transparent,rgba(255,255,255,.4) 50%,transparent);animation:lr 5.5s ease-in-out infinite}
-.lb{position:absolute;bottom:-1px;left:22%;right:22%;height:2px;border-radius:50%;filter:blur(1px);pointer-events:none;background:linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent)}
-.ltl{position:absolute;top:1px;left:5px;width:20px;height:4px;border-radius:50%;background:rgba(255,255,255,.6);filter:blur(2px);pointer-events:none}
-@keyframes ll{0%,100%{top:8%;bottom:8%;opacity:.85}50%{top:4%;bottom:4%;opacity:1}}
-@keyframes lr{0%,100%{top:16%;bottom:16%;opacity:.65}50%{top:10%;bottom:22%;opacity:.9}}
-
-/* ─── ЧАСЫ ─── */
-#wclock{text-align:center}
-#wclock .wb{padding:24px 55px;min-width:210px}
-.ct{font-size:76px;font-weight:200;letter-spacing:-5px;line-height:1;background:linear-gradient(180deg,#fff 20%,rgba(255,255,255,.5) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.cd{font-size:14px;font-weight:300;color:rgba(255,255,255,.42);margin-top:8px}
-
-/* ─── ПОГОДА ─── */
-.wi{font-size:34px;margin-bottom:7px}.wc{font-size:12px;color:rgba(255,255,255,.4);font-weight:300}
-.wt{font-size:48px;font-weight:200;letter-spacing:-3px;line-height:1.05}
-.wd{font-size:12px;color:rgba(255,255,255,.38);margin-top:5px}
-
-/* ─── КОНТРОЛЫ ─── */
-.cl{font-size:11px;color:rgba(255,255,255,.38);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
-.cr{margin-bottom:13px}.cr:last-child{margin-bottom:0}
-.cn{font-size:12px;color:rgba(255,255,255,.42);margin-bottom:6px;display:flex;justify-content:space-between}
-input[type=range]{width:100%;-webkit-appearance:none;height:4px;border-radius:2px;background:rgba(255,255,255,.14);outline:none;cursor:pointer}
-input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.55)}
-
-/* ─── ПРИЛОЖЕНИЯ ─── */
-.ag-title{font-size:11px;color:rgba(255,255,255,.38);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
-.ag{display:grid;grid-template-columns:repeat(5,62px);gap:12px}
-.ap{width:62px;height:62px;border-radius:17px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;cursor:pointer;font-size:26px;position:relative;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);transition:transform .2s cubic-bezier(.34,1.56,.64,1)}
-.ap:active{transform:scale(.82)!important}
-.ap-lbl{font-size:8.5px;color:rgba(255,255,255,.45)}
-.badge{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;border-radius:9px;background:#ff3b30;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px}
-
-/* ─── МУЗЫКА ─── */
-.mh{display:flex;gap:12px;align-items:center;margin-bottom:13px}
-.ma{width:48px;height:48px;border-radius:13px;flex-shrink:0;background:linear-gradient(135deg,#12285c,#3d8eff,#12573a);display:flex;align-items:center;justify-content:center;font-size:21px;box-shadow:0 4px 18px rgba(61,142,255,.4)}
-.mt{font-size:14px;font-weight:500}.ma2{font-size:12px;color:rgba(255,255,255,.4);margin-top:3px}
-.prg{height:3px;background:rgba(255,255,255,.1);border-radius:2px;margin-bottom:13px;overflow:hidden}
-.pf{height:100%;width:38%;background:linear-gradient(90deg,#3d8eff,#7bb8ff);border-radius:2px}
-.mb{display:flex;align-items:center;justify-content:center;gap:26px}
-.mb button{background:none;border:none;color:#fff;font-size:20px;cursor:pointer;opacity:.72;padding:4px;transition:opacity .15s,transform .1s}
-.mb button:active{transform:scale(.8);opacity:.35}
-.pb{width:42px;height:42px;border-radius:50%!important;background:rgba(255,255,255,.13)!important;display:flex;align-items:center;justify-content:center;font-size:17px!important;opacity:1!important}
-
-/* ─── СИСТЕМНЫЙ ─── */
-.sr{display:flex;align-items:center;gap:8px;margin-bottom:9px;font-size:12px}
-.sr:last-child{margin-bottom:0}
-.sl{color:rgba(255,255,255,.4);min-width:58px}
-.sb{flex:1;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}
-.sbf{height:100%;border-radius:2px}
-
-/* ─── SPATIAL NOTES ─── */
-#wnotes .wb{width:240px}
-.note-title{font-size:13px;font-weight:500;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
-.note-add{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.12);border:none;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.note-item{background:rgba(255,255,255,.06);border-radius:12px;padding:10px 12px;margin-bottom:8px;font-size:12px;border:1px solid rgba(255,255,255,.08);cursor:pointer;transition:background .15s}
-.note-item:last-child{margin-bottom:0}
-.note-item:active{background:rgba(255,255,255,.03)}
-.note-anchor{font-size:10px;color:rgba(255,255,255,.35);margin-top:4px}
-.note-text{color:rgba(255,255,255,.85);line-height:1.5}
-
-/* ─── FOCUS MODE ─── */
-#wfocus .wb{min-width:170px}
-.focus-title{font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
-.focus-btn{
-  width:100%;padding:11px 14px;border-radius:14px;border:none;
-  background:rgba(255,255,255,.08);color:#fff;font-size:13px;cursor:pointer;
-  font-family:-apple-system,sans-serif;margin-bottom:8px;text-align:left;
-  border:1px solid rgba(255,255,255,.1);transition:background .15s,border-color .2s;
-  display:flex;align-items:center;gap:10px;
-}
-.focus-btn:last-child{margin-bottom:0}
-.focus-btn.active{background:rgba(61,142,255,.18);border-color:rgba(61,142,255,.4)}
-.focus-btn:active{transform:scale(.97)}
-
-/* ─── SPATIAL AUDIO VISUALIZER ─── */
-#waudio .wb{min-width:220px;padding:18px 20px}
-.audio-title{font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px}
-#audioCanvas{display:block;border-radius:10px;background:rgba(0,0,0,.2)}
-
-/* ─── IMMERSIVE ENV ─── */
-#wenv .wb{min-width:175px}
-.env-title{font-size:12px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
-.env-btn{
-  width:100%;padding:10px 12px;border-radius:12px;border:none;
-  background:rgba(255,255,255,.07);color:#fff;font-size:13px;cursor:pointer;
-  font-family:-apple-system,sans-serif;margin-bottom:7px;text-align:left;
-  border:1px solid rgba(255,255,255,.09);transition:background .15s;
-  display:flex;align-items:center;gap:10px;
-}
-.env-btn:last-child{margin-bottom:0}
-.env-btn.active{background:rgba(61,142,255,.18);border-color:rgba(61,142,255,.4)}
-.env-btn:active{transform:scale(.97)}
-
-/* ─── IMMERSIVE OVERLAY ─── */
-#envOverlay{
-  position:fixed;inset:0;z-index:3;pointer-events:none;
-  opacity:0;transition:opacity 1s;
+.window {
+  position: absolute;
+  width: 180px;
+  height: 100px;
+  background: rgba(255,255,255,0.1);
+  backdrop-filter: blur(15px);
+  border-radius: 20px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  transition: transform 0.1s;
 }
 
-/* ─── СТАТУСБАР ─── */
-#statusbar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:100;white-space:nowrap}
-#statusbar .wb{display:flex;align-items:center;gap:12px;padding:6px 20px;border-radius:38px;font-size:12px;font-weight:300}
-
-/* ─── HOME BAR ─── */
-#homebar{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:100;white-space:nowrap}
-#homebar .wb{display:flex;align-items:center;gap:9px;padding:10px 15px;border-radius:34px}
-.hb{width:52px;height:52px;border-radius:15px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);transition:transform .2s cubic-bezier(.34,1.56,.64,1);font-size:24px;backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
-.hb:active{transform:scale(.82)!important}
-.hb-sep{width:1px;height:36px;background:rgba(255,255,255,.1);margin:0 2px}
-.hb-home{width:56px;height:56px;border-radius:50%!important;background:rgba(255,255,255,.11)!important;border:1.5px solid rgba(255,255,255,.22)!important}
-.hb-dot{width:7px;height:7px;border-radius:50%;background:#3d8eff;box-shadow:0 0 10px rgba(61,142,255,.9);animation:blink 2s ease-in-out infinite}
-.hb-lbl{font-size:8px;color:rgba(255,255,255,.38)}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
-
-/* ─── УВЕДОМЛЕНИЕ ─── */
-#wnotif{opacity:0;pointer-events:none;transition:opacity .4s;z-index:50;white-space:nowrap}
-#wnotif.show{opacity:1;pointer-events:all}
-#wnotif .wb{display:flex;align-items:center;gap:13px;padding:12px 18px;border-radius:20px}
-.ni{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#30d158,#1a8a38);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
-
-/* ─── SPATIAL NOTE EDITOR ─── */
-#noteEditor{
-  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);
-  opacity:0;pointer-events:none;z-index:200;transition:all .3s cubic-bezier(.16,1,.3,1);
+.window.active {
+  transform: scale(1.2);
 }
-#noteEditor.show{opacity:1;pointer-events:all;transform:translate(-50%,-50%) scale(1)}
-#noteEditor .wb{padding:22px 24px;min-width:260px}
-#noteEditor textarea{
-  width:100%;min-height:80px;background:rgba(255,255,255,.06);
-  border:1px solid rgba(255,255,255,.12);border-radius:12px;
-  color:#fff;font-size:14px;padding:10px 12px;resize:none;outline:none;
-  font-family:-apple-system,sans-serif;line-height:1.5;
-  margin-bottom:10px;
-}
-#noteEditor .ne-row{display:flex;gap:8px}
-#noteEditor .ne-btn{
-  flex:1;padding:10px;border-radius:12px;border:none;
-  background:rgba(255,255,255,.09);color:#fff;font-size:13px;cursor:pointer;
-  font-family:-apple-system,sans-serif;border:1px solid rgba(255,255,255,.1);
-}
-#noteEditor .ne-save{background:rgba(61,142,255,.25);border-color:rgba(61,142,255,.4)}
-#noteEditor .ne-btn:active{transform:scale(.96)}
-
-/* ─── МЕНЮ ПРИЛОЖЕНИЯ ─── */
-#appmenu{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.9);opacity:0;pointer-events:none;z-index:200;transition:all .3s cubic-bezier(.16,1,.3,1)}
-#appmenu.show{opacity:1;pointer-events:all;transform:translate(-50%,-50%) scale(1)}
-#appmenu .wb{padding:22px 26px;min-width:250px}
-.aclose{position:absolute;top:13px;right:13px;width:27px;height:27px;border-radius:50%;background:rgba(255,255,255,.1);border:none;color:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.abtn{width:100%;padding:11px 14px;border-radius:13px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.08);color:#fff;font-size:13px;cursor:pointer;font-family:-apple-system,sans-serif;margin-bottom:7px;text-align:left;transition:background .15s}
-.abtn:last-child{margin-bottom:0}
-.abtn:active{background:rgba(255,255,255,.04)}
-
-/* ─── CALIBRATION HINT ─── */
-#calibHint{
-  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-  z-index:300;text-align:center;
-  opacity:0;pointer-events:none;transition:opacity .3s;
-}
-#calibHint.show{opacity:1}
-#calibHint .inner{background:rgba(0,0,0,.75);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-radius:20px;padding:24px 32px;border:1px solid rgba(255,255,255,.15)}
-#calibHint h3{font-size:18px;font-weight:400;margin-bottom:8px}
-#calibHint p{font-size:13px;color:rgba(255,255,255,.45)}
-
-/* ─── ПРИЦЕЛ ─── */
-#reticle{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;z-index:15;pointer-events:none}
-#reticle::before,#reticle::after{content:'';position:absolute;background:rgba(255,255,255,.2)}
-#reticle::before{top:50%;left:0;right:0;height:1px;transform:translateY(-50%)}
-#reticle::after{left:50%;top:0;bottom:0;width:1px;transform:translateX(-50%)}
-
-/* ─── DEBUG ─── */
-#dbg{position:fixed;top:12px;left:12px;z-index:999;font-size:9.5px;color:rgba(255,255,255,.3);line-height:1.65;pointer-events:none;font-family:monospace}
-
-/* ─── СТАРТОВЫЙ ЭКРАН ─── */
-#splash{position:fixed;inset:0;z-index:900;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:15px;background:rgba(0,0,0,.94);backdrop-filter:blur(24px)}
-.logo{font-size:56px;animation:float 3s ease-in-out infinite}
-#splash h1{font-size:26px;font-weight:300;letter-spacing:-.5px}
-#splash .sub{font-size:13px;color:rgba(255,255,255,.4);text-align:center;max-width:340px;line-height:1.75}
-.chips{display:flex;gap:7px;flex-wrap:wrap;justify-content:center}
-.chip{padding:5px 13px;border-radius:16px;font-size:11px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14)}
-#splash button{padding:14px 46px;border-radius:30px;border:none;background:linear-gradient(135deg,#2060d8,#3d8eff);color:#fff;font-size:16px;font-weight:500;cursor:pointer;font-family:-apple-system,sans-serif;box-shadow:0 4px 26px rgba(61,142,255,.5);transition:transform .15s;margin-top:5px}
-#splash button:active{transform:scale(.95)}
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
 </style>
 </head>
+
 <body>
 
-<!-- ЗАДНЯЯ КАМЕРА — мир -->
-<video id="cam" autoplay playsinline muted></video>
-<div id="bg"></div>
-<div id="vig"></div>
-<div id="dim"></div>
-<div id="envOverlay"></div>
+<video id="camera" autoplay playsinline></video>
 
-<!-- СКЕЛЕТ РУКИ — поверх всего -->
-<canvas id="handCanvas"></canvas>
+<div class="window" id="w1" style="top:30%; left:20%">YouTube</div>
+<div class="window" id="w2" style="top:50%; left:50%">Browser</div>
+<div class="window" id="w3" style="top:70%; left:30%">Settings</div>
 
-<!-- КУРСОР И ЖЕСТ -->
-<div id="cursor"></div>
-<div id="gestureHint"></div>
-<div id="reticle"></div>
-
-<!-- DEBUG -->
-<div id="dbg">
-  AZ:<span id="daz">0</span>° EL:<span id="del">0</span>°<br>
-  Cam:<span id="dcam">—</span> Hand:<span id="dhand">—</span><br>
-  Pinch:<span id="dpinch">—</span>
-</div>
-
-<!-- СТАРТОВЫЙ ЭКРАН -->
-<div id="splash">
-  <div class="logo">🥽</div>
-  <h1>SpatialOS</h1>
-  <p class="sub">Держи телефон горизонтально перед глазами.<br>Окна стоят в комнате — поворачивайся и смотри на них.</p>
-  <div class="chips">
-    <div class="chip">📱 Горизонтально</div>
-    <div class="chip">🌍 Окна в комнате</div>
-    <div class="chip">🤚 Скелет руки</div>
-    <div class="chip">📝 Spatial Notes</div>
-    <div class="chip">🎭 Focus режимы</div>
-    <div class="chip">🎵 Spatial Audio</div>
-    <div class="chip">🌲 Окружения</div>
-  </div>
-  <button onclick="launch()">▶ Запустить</button>
-</div>
-
-<!-- СТАТУСБАР (прибит к экрану) -->
-<div id="statusbar">
-  <div class="wb">
-    <span style="font-weight:500;font-size:13px" id="sbt">00:00</span>
-    <span style="opacity:.22">│</span>
-    <span style="font-size:11px;opacity:.6">📶</span>
-    <span style="opacity:.22">│</span>
-    <span style="font-size:11px;opacity:.6">🔋<span id="batpct"> 72%</span></span>
-    <span style="opacity:.22">│</span>
-    <span style="font-size:11px;color:#30d158" id="handstatus">🤚 —</span>
-    <span style="opacity:.22">│</span>
-    <span style="font-size:11px;opacity:.45" id="focusLabel">☀️ Обычный</span>
-  </div>
-  <div class="ll"></div><div class="lr"></div><div class="ltl"></div>
-</div>
-
-<!-- МИР — окна здесь стоят неподвижно -->
-<div id="world">
-
-  <!-- ЧАСЫ -->
-  <div class="w" id="wclock">
-    <div class="wb">
-      <div class="ct" id="ct">00:00</div>
-      <div class="cd" id="cd">Загрузка...</div>
-    </div>
-    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
-  </div>
-
-  <!-- ПОГОДА -->
-  <div class="w" id="wweather">
-    <div class="wb">
-      <div class="wi">⛅</div>
-      <div class="wc">Москва</div>
-      <div class="wt" id="wtmp">+8°</div>
-      <div class="wd">Облачно · 12 км/ч</div>
-    </div>
-    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
-  </div>
-
-  <!-- КОНТРОЛЫ (Digital Crown аналог) -->
-  <div class="w" id="wctrl">
-    <div class="wb" style="width:155px">
-      <div class="cl">Среда</div>
-      <div class="cr">
-        <div class="cn"><span>🌍 Мир</span><span id="dv">0%</span></div>
-        <input type="range" min="0" max="95" value="0" id="ds">
-      </div>
-      <div class="cr">
-        <div class="cn"><span>☀️ Яркость</span><span id="bv">100%</span></div>
-        <input type="range" min="30" max="100" value="100" id="bs">
-      </div>
-    </div>
-    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
-  </div>
-
-  <!-- ПРИЛОЖЕНИЯ -->
-  <div class="w" id="wapps">
-    <div class="wb" style="padding:18px 20px">
-      <div class="ag-title">Приложения</div>
-      <div class="ag">
-        <div class="ap" onclick="openApp('Safari','🌐','Браузер')">🌐<div class="ap-lbl">Safari</div></div>
-        <div class="ap" onclick="openApp('Фото','🖼️','Галерея')">🖼️<div class="ap-lbl">Фото</div></div>
-        <div class="ap" onclick="openApp('Почта','📧','Входящие')">📧<div class="ap-lbl">Почта</div><div class="badge">5</div></div>
-        <div class="ap" onclick="openApp('Карты','🗺️','Навигация')">🗺️<div class="ap-lbl">Карты</div></div>
-        <div class="ap" onclick="openApp('Настройки','⚙️','Система')">⚙️<div class="ap-lbl">Настройки</div></div>
-        <div class="ap" onclick="openApp('Чаты','💬','Сообщения')">💬<div class="ap-lbl">Чаты</div><div class="badge">3</div></div>
-        <div class="ap" onclick="openApp('Музыка','🎵','Плеер')">🎵<div class="ap-lbl">Музыка</div></div>
-        <div class="ap" onclick="openApp('Видео','🎬','Кино')">🎬<div class="ap-lbl">Видео</div></div>
-        <div class="ap" onclick="openApp('Игры','🎮','Игры')">🎮<div class="ap-lbl">Игры</div></div>
-        <div class="ap" onclick="openApp('Здоровье','❤️','Здоровье')">❤️<div class="ap-lbl">Здоровье</div></div>
-      </div>
-    </div>
-    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
-  </div>
-
-  <!-- МУЗЫКА -->
-  <div class="w" id="wmusic">
-    <div class="wb" style="min-width:215px">
-      <div class="mh">
-        <div class="ma">🎵</div>
-        <div><div class="mt">Midnight City</div><div class="ma2">M83</div></div>
-      </div>
-      <div class="prg"><div class="pf"></div></div>
-      <div class="mb">
-        <button>⏮</button>
-        <button class="pb" id="pb" onclick="togglePlay()">⏸</button>
-        <button>⏭</button>
-      </div>
-    </div>
-    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
-  </div>
-
-  <!-- СИСТЕМНЫЙ -->
-  <div class="w" id="wsys">
-    <div class="wb">
-      <div class="sr"><span class="sl">Батарея</span><div class="sb"><div class="sbf" id="batbar" style="width:72%;background:linear-gradient(90deg,#30d158,#34d270)"></div></div><span style="font-size:10px" id="batval">72%</span></div>
-      <div class="sr"><span class="sl">WiFi</span><div class="sb"><div class="sbf" style="width:88%;background:linear-gradient(90deg,#3d8eff,#7bb8ff)"></div></div><span style="font-size:10px">115M</span></div>
-      <div class="sr"><span class="sl">Камера</span><span style="font-size:11px;color:#30d158" id="cs">⏳</span></div>
-      <div class="sr"><span class="sl">Рука</span><span style="font-size:10px;color:rgba(255,255,255,.4)" id="gst">—</span></div>
-    </div>
-    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
-  </div>
-
-  <!-- SPATIAL NOTES -->
-  <div class="w" id="wnotes">
-    <div class="wb">
-      <div class="note-title">
-        📝 Spatial Notes
-        <button class="note-add" onclick="openNoteEditor()">+</button>
-      </div>
-      <div id="notesList">
-        <div class="note-item">
-          <div class="note-text">Купить продукты 🛒</div>
-          <div class="note-anchor">📍 Кухня</div>
-        </div>
-        <div class="note-item">
-          <div class="note-text">Позвонить маме 📞</div>
-          <div class="note-anchor">📍 Гостиная</div>
-        </div>
-      </div>
-    </div>
-    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
-  </div>
-
-  <!-- FOCUS MODE -->
-  <div class="w" id="wfocus">
-    <div class="wb">
-      <div class="focus-title">Focus Mode</div>
-      <button class="focus-btn active" id="f0" onclick="setFocus(0)">☀️ Обычный</button>
-      <button class="focus-btn" id="f1" onclick="setFocus(1)">💼 Работа</button>
-      <button class="focus-btn" id="f2" onclick="setFocus(2)">🎮 Отдых</button>
-      <button class="focus-btn" id="f3" onclick="setFocus(3)">🌙 Сон</button>
-    </div>
-    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
-  </div>
-
-  <!-- SPATIAL AUDIO VISUALIZER -->
-  <div class="w" id="waudio">
-    <div class="wb">
-      <div class="audio-title">🎵 Spatial Audio</div>
-      <canvas id="audioCanvas" width="200" height="60"></canvas>
-    </div>
-    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
-  </div>
-
-  <!-- IMMERSIVE ENVIRONMENTS -->
-  <div class="w" id="wenv">
-    <div class="wb">
-      <div class="env-title">🌲 Окружение</div>
-      <button class="env-btn active" id="env0" onclick="setEnv(0)">🏠 Реальный мир</button>
-      <button class="env-btn" id="env1" onclick="setEnv(1)">🌲 Лес</button>
-      <button class="env-btn" id="env2" onclick="setEnv(2)">🌌 Космос</button>
-      <button class="env-btn" id="env3" onclick="setEnv(3)">🏖️ Пляж</button>
-      <button class="env-btn" id="env4" onclick="setEnv(4)">🏔️ Горы</button>
-    </div>
-    <div class="ll"></div><div class="lr"></div><div class="lb"></div><div class="ltl"></div>
-  </div>
-
-  <!-- УВЕДОМЛЕНИЕ -->
-  <div class="w" id="wnotif">
-    <div class="wb">
-      <div class="ni" id="ni">💬</div>
-      <div>
-        <div style="font-size:13px;font-weight:500" id="ntitle">Уведомление</div>
-        <div style="font-size:11px;color:rgba(255,255,255,.42);margin-top:2px" id="nmsg">Текст</div>
-      </div>
-    </div>
-    <div class="ll"></div><div class="lr"></div><div class="ltl"></div>
-  </div>
-
-</div><!-- /world -->
-
-<!-- HOME BAR (прибита к экрану) -->
-<div id="homebar">
-  <div class="wb">
-    <div class="hb" onclick="notify('📝','Notes','Нажми + чтобы добавить')">📝<div class="hb-lbl">Notes</div></div>
-    <div class="hb" onclick="recalib()">🧭<div class="hb-lbl">Центр</div></div>
-    <div class="hb-sep"></div>
-    <div class="hb hb-home" onclick="goHome()"><div class="hb-dot"></div></div>
-    <div class="hb-sep"></div>
-    <div class="hb" id="cambtn" onclick="toggleCam()">👁️<div class="hb-lbl" id="camlbl">Камера</div></div>
-    <div class="hb" onclick="notify('🔔','Центр уведомлений','3 новых')">🔔<div class="hb-lbl">Центр</div></div>
-  </div>
-  <div class="ll"></div><div class="lr"></div><div class="ltl"></div>
-</div>
-
-<!-- CALIBRATION HINT -->
-<div id="calibHint">
-  <div class="inner">
-    <h3>🧭 Калибровка</h3>
-    <p>Смотри прямо перед собой</p>
-  </div>
-</div>
-
-<!-- NOTE EDITOR -->
-<div id="noteEditor">
-  <div class="wb">
-    <div style="font-size:15px;font-weight:500;margin-bottom:12px">📝 Новая заметка</div>
-    <textarea id="noteText" placeholder="Текст заметки..."></textarea>
-    <div class="ne-row">
-      <button class="ne-btn" onclick="closeNoteEditor()">Отмена</button>
-      <button class="ne-btn ne-save" onclick="saveNote()">💾 Сохранить</button>
-    </div>
-  </div>
-  <div class="ll"></div><div class="lr"></div><div class="ltl"></div>
-</div>
-
-<!-- МЕНЮ ПРИЛОЖЕНИЯ -->
-<div id="appmenu">
-  <div class="wb">
-    <button class="aclose" onclick="closeApp()">✕</button>
-    <div style="font-size:34px;margin-bottom:8px" id="aicon">🌐</div>
-    <div style="font-size:18px;font-weight:400;margin-bottom:5px" id="atitle">Safari</div>
-    <div style="font-size:12px;color:rgba(255,255,255,.42);margin-bottom:18px" id="adesc">Браузер</div>
-    <button class="abtn">▶ Открыть</button>
-    <button class="abtn">📌 Закрепить в пространстве</button>
-    <button class="abtn" onclick="closeApp()">✕ Закрыть</button>
-  </div>
-  <div class="ll"></div><div class="lr"></div><div class="ltl"></div>
-</div>
-
-<!-- MediaPipe -->
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
-// ═══════════════════════════════════════════════════
-//  WORLD-LOCKED ENGINE
-//  Окна НЕ двигаются. Мир двигается в обратную сторону.
-// ═══════════════════════════════════════════════════
+// 📷 Включаем камеру
+const video = document.getElementById("camera");
 
-// Позиции окон (градусы от центра взгляда при запуске)
-const WIN_POS = {
-  wclock:   {az:  0,  el: 12 },
-  wweather: {az: 52,  el:  8 },
-  wctrl:    {az:-52,  el:  8 },
-  wapps:    {az:  0,  el:-18 },
-  wmusic:   {az:-50,  el:-20 },
-  wsys:     {az: 50,  el:-20 },
-  wnotes:   {az:-55,  el: 10 },
-  wfocus:   {az: 58,  el: 10 },
-  waudio:   {az:-28,  el: 22 },
-  wenv:     {az: 28,  el: 22 },
-  wnotif:   {az:  0,  el: 34 },
-};
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => video.srcObject = stream);
 
-const PX_PER_DEG = 22;
-const W = window.innerWidth;
-const H = window.innerHeight;
-const WW = W * 5;
-const WH = H * 3;
-
-// Текущий угол + сглаженный
-let viewAz = 0, viewEl = 0;
-let smAz = 0, smEl = 0;
-let calibAz = null, calibEl = null;
-let gyroReady = false;
-
-// Разместить окна в мире
-function layoutWindows() {
-  for (const [id, p] of Object.entries(WIN_POS)) {
-    const el = document.getElementById(id);
-    if (!el) continue;
-    // Абсолютная позиция в мировом canvas
-    const wx = WW/2 + p.az * PX_PER_DEG;
-    const wy = WH/2 - p.el * PX_PER_DEG;
-    el.style.left = wx + 'px';
-    el.style.top  = wy + 'px';
-    el.style.transform = 'translate(-50%,-50%)';
+// ✋ MediaPipe руки
+const hands = new Hands({
+  locateFile: (file) => {
+    return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
   }
-}
-
-// Обновить мир под текущий взгляд
-function updateWorld() {
-  // Мир двигается ПРОТИВ направления взгляда
-  // Взгляд вправо → мир едет влево
-  const offX = -smAz * PX_PER_DEG;
-  const offY =  smEl * PX_PER_DEG;
-
-  const world = document.getElementById('world');
-  // base: translate(-50%,-50%) + смещение
-  world.style.transform = `translate(calc(-50% + ${offX}px), calc(-50% + ${offY}px))`;
-
-  // Видимость — дальние окна тускнеют
-  for (const [id, p] of Object.entries(WIN_POS)) {
-    const el = document.getElementById(id);
-    if (!el) continue;
-    const dAz = p.az - smAz;
-    const dEl = p.el - smEl;
-    const dist = Math.sqrt(dAz*dAz + dEl*dEl);
-    el.style.opacity = Math.max(0, 1 - dist/80);
-    const sc = Math.max(0.72, 1 - dist/320);
-    el.style.transform = `translate(-50%,-50%) scale(${sc})`;
-  }
-
-  document.getElementById('daz').textContent = Math.round(smAz);
-  document.getElementById('del').textContent = Math.round(smEl);
-}
-
-// ═══ ГИРОСКОП ═══
-// Телефон горизонтально, экраном к лицу:
-//   gamma = поворот влево/вправо (-90..90)
-//   beta  = наклон вверх/вниз (около 0 в горизонтали)
-//   alpha = компасный азимут (0..360)
-function onOrient(e) {
-  const rawAz = e.gamma || 0;
-  const rawEl = e.beta  || 0;
-
-  if (calibAz === null) {
-    calibAz = rawAz;
-    calibEl = rawEl;
-  }
-
-  viewAz = (rawAz - calibAz) * 1.5;
-  viewEl = -(rawEl - calibEl) * 1.5;
-  gyroReady = true;
-}
-
-function startGyro() {
-  if (typeof DeviceOrientationEvent !== 'undefined' &&
-      typeof DeviceOrientationEvent.requestPermission === 'function') {
-    DeviceOrientationEvent.requestPermission()
-      .then(s => { if (s === 'granted') window.addEventListener('deviceorientation', onOrient, true); });
-  } else {
-    window.addEventListener('deviceorientation', onOrient, true);
-  }
-}
-
-function recalib() {
-  calibAz = null; calibEl = null;
-  const h = document.getElementById('calibHint');
-  h.classList.add('show');
-  setTimeout(() => h.classList.remove('show'), 1500);
-}
-
-// Главный цикл
-function loop() {
-  smAz += (viewAz - smAz) * 0.055;
-  smEl += (viewEl - smEl) * 0.055;
-  updateWorld();
-  requestAnimationFrame(loop);
-}
-
-// ═══ ЗАДНЯЯ КАМЕРА ═══
-let camOn = true;
-async function startBackCam() {
-  try {
-    let stream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { exact: 'environment' }, width:{ideal:1920}, height:{ideal:1080} },
-        audio: false
-      });
-    } catch {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }, audio: false
-      });
-    }
-    const v = document.getElementById('cam');
-    v.srcObject = stream;
-    await new Promise(r => v.onloadedmetadata = r);
-    await v.play();
-    document.getElementById('bg').style.opacity = '0';
-    document.getElementById('cs').textContent = '● Онлайн';
-    document.getElementById('dcam').textContent = 'OK';
-  } catch(e) {
-    document.getElementById('cs').textContent = '❌ ' + (e.name||'Ошибка');
-    document.getElementById('dcam').textContent = 'ERR';
-  }
-}
-
-function toggleCam() {
-  camOn = !camOn;
-  document.getElementById('cam').style.opacity = camOn ? '1' : '0';
-  document.getElementById('camlbl').textContent = camOn ? 'Камера' : 'Выкл';
-}
-
-// ═══ СКЕЛЕТ РУКИ — MediaPipe ═══
-const HAND_CONNECTIONS = [
-  [0,1],[1,2],[2,3],[3,4],       // большой
-  [0,5],[5,6],[6,7],[7,8],       // указательный
-  [0,9],[9,10],[10,11],[11,12],  // средний
-  [0,13],[13,14],[14,15],[15,16],// безымянный
-  [0,17],[17,18],[18,19],[19,20],// мизинец
-  [5,9],[9,13],[13,17]           // ладонь
-];
-
-const hCanvas = document.getElementById('handCanvas');
-const hCtx = hCanvas.getContext('2d');
-
-function resizeHandCanvas() {
-  hCanvas.width  = window.innerWidth;
-  hCanvas.height = window.innerHeight;
-}
-resizeHandCanvas();
-window.addEventListener('resize', resizeHandCanvas);
-
-let lastPinch = false;
-let pinchCD = 0;
-let frontStream = null;
-
-async function startHandTracking() {
-  try {
-    frontStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width:{ideal:480}, height:{ideal:360} },
-      audio: false
-    });
-
-    // Скрытое видео для MediaPipe
-    const fv = document.createElement('video');
-    fv.srcObject = frontStream;
-    fv.autoplay = true;
-    fv.playsInline = true;
-    fv.muted = true;
-    fv.style.cssText = 'position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;z-index:-1';
-    document.body.appendChild(fv);
-    await fv.play();
-
-    const hands = new Hands({
-      locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
-    });
-    hands.setOptions({
-      maxNumHands: 1,
-      modelComplexity: 0,
-      minDetectionConfidence: 0.65,
-      minTrackingConfidence: 0.5
-    });
-    hands.onResults(onHands);
-
-    const cam = new Camera(fv, {
-      onFrame: async () => { await hands.send({ image: fv }); },
-      width: 480, height: 360
-    });
-    cam.start();
-
-    document.getElementById('dhand').textContent = 'OK';
-  } catch(e) {
-    document.getElementById('dhand').textContent = 'ERR:' + (e.name||'?');
-    document.getElementById('gst').textContent = 'Нет доступа';
-  }
-}
-
-function onHands(results) {
-  // Очищаем canvas
-  hCtx.clearRect(0, 0, hCanvas.width, hCanvas.height);
-
-  if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
-    document.getElementById('cursor').style.display = 'none';
-    document.getElementById('handstatus').textContent = '🤚 —';
-    document.getElementById('gst').textContent = '—';
-    return;
-  }
-
-  const lm = results.multiHandLandmarks[0];
-  const W = hCanvas.width;
-  const H = hCanvas.height;
-
-  // Координаты в пикселях (зеркало фронталки через CSS scaleX(-1))
-  // x инвертируем чтобы компенсировать CSS зеркало
-  const pts = lm.map(l => ({ x: (1 - l.x) * W, y: l.y * H }));
-
-  // ── РИСУЕМ КОСТИ ──
-  hCtx.lineCap = 'round';
-  for (const [a, b] of HAND_CONNECTIONS) {
-    const pa = pts[a], pb = pts[b];
-    // Цвет: фаланги разных пальцев — разные цвета
-    let color = 'rgba(255,255,255,0.55)';
-    if (a>=1&&a<=4||b>=1&&b<=4)  color = 'rgba(255,180,60,0.8)';   // большой — оранжевый
-    if (a>=5&&a<=8||b>=5&&b<=8)  color = 'rgba(60,200,255,0.8)';   // указательный — голубой
-    if (a>=9&&a<=12||b>=9&&b<=12) color = 'rgba(100,255,150,0.8)'; // средний — зелёный
-    if (a>=13&&a<=16||b>=13&&b<=16) color = 'rgba(220,100,255,0.8)'; // безымянный — фиолет
-    if (a>=17&&a<=20||b>=17&&b<=20) color = 'rgba(255,100,120,0.8)'; // мизинец — красный
-
-    hCtx.beginPath();
-    hCtx.strokeStyle = color;
-    hCtx.lineWidth = 3;
-    hCtx.moveTo(pa.x, pa.y);
-    hCtx.lineTo(pb.x, pb.y);
-    hCtx.stroke();
-  }
-
-  // ── РИСУЕМ СУСТАВЫ ──
-  for (let i = 0; i < pts.length; i++) {
-    const p = pts[i];
-    const isKnuckle = [0,1,5,9,13,17].includes(i);
-    hCtx.beginPath();
-    hCtx.arc(p.x, p.y, isKnuckle ? 5 : 3.5, 0, Math.PI*2);
-    hCtx.fillStyle = i === 0 ? 'rgba(255,255,255,.9)' :
-                     i === 8 ? 'rgba(60,200,255,1)' :
-                     i === 4 ? 'rgba(255,180,60,1)' : 'rgba(255,255,255,.75)';
-    hCtx.fill();
-
-    // Светящийся ободок на кончике указательного
-    if (i === 8) {
-      hCtx.beginPath();
-      hCtx.arc(p.x, p.y, 8, 0, Math.PI*2);
-      hCtx.strokeStyle = 'rgba(60,200,255,0.5)';
-      hCtx.lineWidth = 2;
-      hCtx.stroke();
-    }
-  }
-
-  // ── КУРСОР (кончик указательного) ──
-  const ix = pts[8].x, iy = pts[8].y;
-  const cur = document.getElementById('cursor');
-  cur.style.display = 'block';
-  cur.style.left = ix + 'px';
-  cur.style.top  = iy + 'px';
-
-  // ── ЩИПОК (большой + указательный) ──
-  const tx = pts[4].x, ty = pts[4].y;
-  const pinchDist = Math.sqrt((ix-tx)**2 + (iy-ty)**2);
-  const isPinch = pinchDist < W * 0.06;
-
-  // Линия щипка
-  hCtx.beginPath();
-  hCtx.strokeStyle = isPinch ? 'rgba(61,142,255,0.9)' : 'rgba(255,255,255,0.25)';
-  hCtx.lineWidth = isPinch ? 2.5 : 1.5;
-  hCtx.setLineDash(isPinch ? [] : [4,4]);
-  hCtx.moveTo(pts[4].x, pts[4].y);
-  hCtx.lineTo(pts[8].x, pts[8].y);
-  hCtx.stroke();
-  hCtx.setLineDash([]);
-
-  cur.className = isPinch ? 'pinch' : '';
-
-  // Триггер щипка
-  const now = Date.now();
-  if (isPinch && !lastPinch && now > pinchCD) {
-    pinchCD = now + 700;
-    triggerPinch(ix, iy);
-  }
-  lastPinch = isPinch;
-
-  // Считаем открытые пальцы
-  const wrist = pts[0];
-  const up = [8,12,16,20].filter(i => pts[i].y < wrist.y - H*0.06).length;
-
-  let gesture = '🤚 Рука';
-  if (isPinch) gesture = '🤏 Щипок';
-  else if (up >= 4) gesture = '✋ Ладонь';
-  else if (up === 2) gesture = '✌️ Два пальца';
-
-  document.getElementById('handstatus').textContent = gesture;
-  document.getElementById('gst').textContent = isPinch ? `Щипок ${Math.round(pinchDist)}px` : `${up} пальц.`;
-  document.getElementById('dpinch').textContent = Math.round(pinchDist);
-}
-
-function triggerPinch(x, y) {
-  // Нажать элемент под курсором
-  document.getElementById('cursor').style.display = 'none';
-  const el = document.elementFromPoint(x, y);
-  document.getElementById('cursor').style.display = 'block';
-  if (el && el.tagName !== 'CANVAS') el.click();
-
-  // Анимация
-  hCtx.beginPath();
-  hCtx.arc(x, y, 30, 0, Math.PI*2);
-  hCtx.strokeStyle = 'rgba(61,142,255,0.8)';
-  hCtx.lineWidth = 2;
-  hCtx.stroke();
-
-  showGesture('🤏 Нажатие!');
-}
-
-function showGesture(txt) {
-  const g = document.getElementById('gestureHint');
-  g.textContent = txt;
-  g.classList.add('show');
-  clearTimeout(showGesture._t);
-  showGesture._t = setTimeout(() => g.classList.remove('show'), 900);
-}
-
-// ═══ SPATIAL AUDIO VISUALIZER ═══
-const audioCtx2d = document.getElementById('audioCanvas').getContext('2d');
-let audioPhase = 0;
-
-function drawAudio() {
-  const c = document.getElementById('audioCanvas');
-  const ctx = audioCtx2d;
-  ctx.clearRect(0,0,c.width,c.height);
-  audioPhase += 0.04;
-
-  const bars = 28;
-  const bw = c.width / bars;
-  for (let i = 0; i < bars; i++) {
-    const h = (Math.sin(audioPhase + i*0.35)*0.4 + 0.55) * c.height * 0.85;
-    const hue = 200 + i*4;
-    ctx.fillStyle = `hsla(${hue},80%,65%,0.85)`;
-    const x = i * bw + bw*.15;
-    const y = (c.height - h)/2;
-    ctx.beginPath();
-    ctx.roundRect(x, y, bw*.7, h, 2);
-    ctx.fill();
-  }
-  requestAnimationFrame(drawAudio);
-}
-
-// ═══ FOCUS MODES ═══
-const FOCUS = [
-  { label:'☀️ Обычный', dim:0,  bright:100, color:null },
-  { label:'💼 Работа',  dim:10, bright:90,  color:'rgba(0,20,60,.15)' },
-  { label:'🎮 Отдых',   dim:0,  bright:100, color:'rgba(20,0,50,.2)' },
-  { label:'🌙 Сон',     dim:70, bright:60,  color:'rgba(30,10,0,.4)' },
-];
-
-function setFocus(i) {
-  const f = FOCUS[i];
-  document.querySelectorAll('.focus-btn').forEach((b,j) => b.classList.toggle('active', j===i));
-  document.getElementById('ds').value = f.dim;
-  document.getElementById('dim').style.background = `rgba(0,0,0,${f.dim/100})`;
-  document.getElementById('dv').textContent = f.dim+'%';
-  document.getElementById('bs').value = f.bright;
-  document.getElementById('cam').style.filter = `brightness(${f.bright/100})`;
-  document.getElementById('bv').textContent = f.bright+'%';
-  document.getElementById('focusLabel').textContent = f.label;
-  document.getElementById('envOverlay').style.background = f.color||'transparent';
-  document.getElementById('envOverlay').style.opacity = f.color ? '1':'0';
-  notify(f.label, 'Focus Mode', 'Режим изменён');
-}
-
-// ═══ IMMERSIVE ENVIRONMENTS ═══
-const ENVS = [
-  { bg: null, dim: 0 },
-  { bg: 'linear-gradient(180deg,rgba(10,40,20,.7) 0%,rgba(5,25,10,.5) 100%)', dim: 0 },
-  { bg: 'radial-gradient(ellipse at center,rgba(5,5,40,.85) 0%,rgba(2,2,20,.9) 100%)', dim: 30 },
-  { bg: 'linear-gradient(180deg,rgba(30,60,80,.5) 0%,rgba(60,40,20,.6) 100%)', dim: 0 },
-  { bg: 'linear-gradient(180deg,rgba(20,35,60,.6) 0%,rgba(50,60,70,.5) 100%)', dim: 0 },
-];
-
-function setEnv(i) {
-  document.querySelectorAll('.env-btn').forEach((b,j) => b.classList.toggle('active', j===i));
-  const ov = document.getElementById('envOverlay');
-  if (ENVS[i].bg) {
-    ov.style.background = ENVS[i].bg;
-    ov.style.opacity = '1';
-    document.getElementById('cam').style.opacity = i===0 ? '1' : '0.3';
-  } else {
-    ov.style.opacity = '0';
-    document.getElementById('cam').style.opacity = '1';
-  }
-  const names = ['Реальный мир','Лес 🌲','Космос 🌌','Пляж 🏖️','Горы 🏔️'];
-  notify('🌍', 'Окружение', names[i]);
-}
-
-// ═══ SPATIAL NOTES ═══
-function openNoteEditor() { document.getElementById('noteEditor').classList.add('show'); }
-function closeNoteEditor() { document.getElementById('noteEditor').classList.remove('show'); }
-
-function saveNote() {
-  const txt = document.getElementById('noteText').value.trim();
-  if (!txt) return;
-  const list = document.getElementById('notesList');
-  const item = document.createElement('div');
-  item.className = 'note-item';
-  item.innerHTML = `<div class="note-text">${txt}</div><div class="note-anchor">📍 Здесь (${new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})})</div>`;
-  list.insertBefore(item, list.firstChild);
-  document.getElementById('noteText').value = '';
-  closeNoteEditor();
-  notify('📝','Заметка сохранена', txt.substring(0,30));
-}
-
-// ═══ ЗАПУСК ═══
-async function launch() {
-  document.getElementById('splash').style.display = 'none';
-
-  // Раскладываем окна по миру
-  layoutWindows();
-
-  // Параллельно: камера + трекинг рук
-  await Promise.all([startBackCam(), startHandTracking()]);
-
-  startGyro();
-  loop();
-  drawAudio();
-
-  setTimeout(() => notify('🥽','SpatialOS','Поворачивай телефон — окна в комнате!'), 1500);
-  setTimeout(() => notify('🤚','Жесты','Щипок = нажать · Открытая ладонь = меню'), 5000);
-}
-
-// ═══ ВРЕМЯ ═══
-function tick() {
-  const n = new Date();
-  const t = `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
-  document.getElementById('ct').textContent = t;
-  document.getElementById('sbt').textContent = t;
-  const D = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
-  const M = ['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
-  document.getElementById('cd').textContent = `${D[n.getDay()]}, ${n.getDate()} ${M[n.getMonth()]}`;
-}
-tick(); setInterval(tick, 1000);
-
-// ═══ КОНТРОЛЫ ═══
-document.getElementById('ds').addEventListener('input', function() {
-  document.getElementById('dim').style.background = `rgba(0,0,0,${this.value/100})`;
-  document.getElementById('dv').textContent = this.value + '%';
-});
-document.getElementById('bs').addEventListener('input', function() {
-  document.getElementById('cam').style.filter = `brightness(${this.value/100})`;
-  document.getElementById('bv').textContent = this.value + '%';
 });
 
-// ═══ ОСТАЛЬНОЕ ═══
-let playing = true;
-function togglePlay() { playing = !playing; document.getElementById('pb').textContent = playing ? '⏸':'▶️'; }
+hands.setOptions({
+  maxNumHands: 1,
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7
+});
 
-function notify(icon, title, msg) {
-  document.getElementById('ni').textContent = icon||'🔔';
-  document.getElementById('ntitle').textContent = title||'';
-  document.getElementById('nmsg').textContent = msg||'';
-  const n = document.getElementById('wnotif');
-  n.classList.add('show');
-  clearTimeout(notify._t);
-  notify._t = setTimeout(() => n.classList.remove('show'), 3200);
-}
+// 🪟 окна
+const windows = document.querySelectorAll(".window");
 
-function openApp(n,i,d) {
-  document.getElementById('atitle').textContent = n;
-  document.getElementById('aicon').textContent = i;
-  document.getElementById('adesc').textContent = d;
-  document.getElementById('appmenu').classList.add('show');
-}
-function closeApp() { document.getElementById('appmenu').classList.remove('show'); }
-function goHome() { closeApp(); closeNoteEditor(); }
+let pinch = false;
 
-if (navigator.getBattery) {
-  navigator.getBattery().then(b => {
-    const p = Math.round(b.level*100);
-    document.getElementById('batpct').textContent = ' '+p+'%';
-    document.getElementById('batval').textContent = p+'%';
-    document.getElementById('batbar').style.width = p+'%';
-  });
-}
+hands.onResults(results => {
+  if (!results.multiHandLandmarks.length) return;
+
+  const landmarks = results.multiHandLandmarks[0];
+
+  // большой палец (4) и указательный (8)
+  const dx = landmarks[4].x - landmarks[8].x;
+  const dy = landmarks[4].y - landmarks[8].y;
+
+  const distance = Math.sqrt(dx*dx + dy*dy);
+
+  if (distance < 0.05) {
+    pinch = true;
+
+    const x = landmarks[8].x * window.innerWidth;
+    const y = landmarks[8].y * window.innerHeight;
+
+    windows.forEach(w => {
+      const rect = w.getBoundingClientRect();
+
+      if (
+        x > rect.left &&
+        x < rect.right &&
+        y > rect.top &&
+        y < rect.bottom
+      ) {
+        w.style.left = (x - 80) + "px";
+        w.style.top = (y - 50) + "px";
+        w.classList.add("active");
+      } else {
+        w.classList.remove("active");
+      }
+    });
+
+  } else {
+    pinch = false;
+    windows.forEach(w => w.classList.remove("active"));
+  }
+});
+
+// 📷 захват кадров
+const camera = new Camera(video, {
+  onFrame: async () => {
+    await hands.send({image: video});
+  },
+  width: 640,
+  height: 480
+});
+
+camera.start();
 </script>
+
 </body>
 </html>
