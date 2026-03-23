@@ -1,241 +1,122 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vision MAX</title>
-
+<title>VisionOS 3D WebAR V5 MAX</title>
 <style>
-body { margin:0; overflow:hidden; background:black; font-family:sans-serif; }
-
-video {
-  position:absolute;
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  z-index:-3;
-}
-
-canvas {
-  position:absolute;
-  top:0;
-  left:0;
-  z-index:-2;
-}
-
-.cursor {
-  position:absolute;
-  width:18px;
-  height:18px;
-  border-radius:50%;
-  background:cyan;
-  pointer-events:none;
-  z-index:10;
-}
-
-.window {
-  position:absolute;
-  width:220px;
-  height:130px;
-  background:rgba(255,255,255,0.12);
-  backdrop-filter:blur(25px);
-  border-radius:20px;
-  color:white;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  transition:transform 0.1s;
-}
-
-.app {
-  position:absolute;
-  width:110px;
-  height:110px;
-  border-radius:25px;
-  background:rgba(255,255,255,0.15);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  color:white;
-}
+  body { margin:0; overflow:hidden; background:black; }
+  video { position:absolute; width:100%; height:100%; object-fit:cover; z-index:-2; }
+  canvas { position:absolute; top:0; left:0; z-index:-1; }
+  .cursor { position:absolute; width:20px; height:20px; border-radius:50%; background:cyan; pointer-events:none; z-index:10; }
 </style>
 </head>
-
 <body>
 
 <video id="video" autoplay playsinline></video>
 <canvas id="canvas"></canvas>
-
 <div class="cursor" id="cursor"></div>
 
-<!-- HOME -->
-<div class="app" style="top:40%; left:30%" data-app="a1">App1</div>
-<div class="app" style="top:40%; left:55%" data-app="a2">App2</div>
-
-<!-- WINDOWS -->
-<div class="window" id="a1" style="display:none">APP 1</div>
-<div class="window" id="a2" style="display:none">APP 2</div>
-
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.158.0/examples/js/controls/OrbitControls.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
 <script>
-// 📷 камера
+// ====== 1. Камера ======
 const video = document.getElementById("video");
-navigator.mediaDevices.getUserMedia({
-  video:{ facingMode:"environment" }
-}).then(s=>video.srcObject=s);
+navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment" }})
+  .then(s=>video.srcObject=s);
 
-
-// 🎨 canvas
+// ====== 2. Canvas / Cursor ======
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
-
-function resize(){
-  canvas.width=innerWidth;
-  canvas.height=innerHeight;
-}
-resize();
-onresize=resize;
-
-
-// ✋ MediaPipe
-const hands = new Hands({
-  locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
-});
-
-hands.setOptions({
-  maxNumHands:1,
-  minDetectionConfidence:0.6,
-  minTrackingConfidence:0.6
-});
-
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 const cursor = document.getElementById("cursor");
 
-let pinch=false;
-let grabbed=null;
+// ====== 3. Three.js сцена ======
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.01, 1000);
+camera.position.z = 5;
 
+const renderer = new THREE.WebGLRenderer({ alpha:true });
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
 
-// 🎯 обработка руки
-hands.onResults(r=>{
+// Свет
+const light = new THREE.AmbientLight(0xffffff,1);
+scene.add(light);
+
+// ====== 4. Окна 3D ======
+function createWindow(color,text,x,y,z){
+  const geometry = new THREE.BoxGeometry(1,0.6,0.05);
+  const material = new THREE.MeshStandardMaterial({ color:color, transparent:true, opacity:0.25 });
+  const mesh = new THREE.Mesh(geometry,material);
+  mesh.position.set(x,y,z);
+  scene.add(mesh);
+  return mesh;
+}
+
+const window1 = createWindow(0xff5555,"App1",-1,0, -2);
+const window2 = createWindow(0x5555ff,"App2",1,0, -2);
+
+// ====== 5. MediaPipe Hands ======
+const hands = new Hands({ locateFile: f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+hands.setOptions({ maxNumHands:1, minDetectionConfidence:0.6, minTrackingConfidence:0.6 });
+
+hands.onResults(results=>{
   ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(!results.multiHandLandmarks.length) return;
+  const lm = results.multiHandLandmarks[0];
 
-  if(!r.multiHandLandmarks.length) return;
+  // Курсор (кончик указательного)
+  const x = lm[8].x*innerWidth;
+  const y = lm[8].y*innerHeight;
+  cursor.style.left = x+"px";
+  cursor.style.top = y+"px";
 
-  const lm=r.multiHandLandmarks[0];
-
-  const x=lm[8].x*innerWidth;
-  const y=lm[8].y*innerHeight;
-
-  cursor.style.left=x+"px";
-  cursor.style.top=y+"px";
-
-  const dx=lm[4].x-lm[8].x;
-  const dy=lm[4].y-lm[8].y;
-  const dist=Math.sqrt(dx*dx+dy*dy);
-
-  if(dist<0.07){
-    cursor.style.background="red";
-
-    if(!pinch){
-      pinch=true;
-      handleClick(x,y);
-      grabbed = getWindow(x,y);
-    }
-
-    if(grabbed){
-      grabbed.style.left=(x-100)+"px";
-      grabbed.style.top=(y-60)+"px";
-    }
-
-  }else{
-    pinch=false;
-    grabbed=null;
-    cursor.style.background="cyan";
-  }
-
-  drawHand(lm);
-});
-
-
-// 🪟 найти окно
-function getWindow(x,y){
-  const all=document.querySelectorAll(".window");
-  for(let w of all){
-    const r=w.getBoundingClientRect();
-    if(x>r.left && x<r.right && y>r.top && y<r.bottom){
-      return w;
-    }
-  }
-  return null;
-}
-
-
-// 📱 открыть приложение
-function handleClick(x,y){
-  document.querySelectorAll(".app").forEach(a=>{
-    const r=a.getBoundingClientRect();
-    if(x>r.left && x<r.right && y>r.top && y<r.bottom){
-      const w=document.getElementById(a.dataset.app);
-      w.style.display="flex";
-      w.style.left="40%";
-      w.style.top="30%";
-      beep();
-    }
-  });
-}
-
-
-// 🔊 звук
-function beep(){
-  const ctxA=new (window.AudioContext||window.webkitAudioContext)();
-  const osc=ctxA.createOscillator();
-  osc.connect(ctxA.destination);
-  osc.start();
-  osc.stop(ctxA.currentTime+0.1);
-}
-
-
-// ✋ рисование руки
-function drawHand(lm){
-  ctx.strokeStyle="lime";
-  ctx.lineWidth=3;
-
-  const c=[
-    [0,1],[1,2],[2,3],[3,4],
-    [0,5],[5,6],[6,7],[7,8],
-    [0,9],[9,10],[10,11],[11,12],
-    [0,13],[13,14],[14,15],[15,16],
-    [0,17],[17,18],[18,19],[19,20]
-  ];
-
-  c.forEach(([a,b])=>{
+  // Рисуем кости
+  ctx.strokeStyle="lime"; ctx.lineWidth=3;
+  const connections=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[0,9],[9,10],[10,11],[11,12],[0,13],[13,14],[14,15],[15,16],[0,17],[17,18],[18,19],[19,20]];
+  connections.forEach(([a,b])=>{
     ctx.beginPath();
     ctx.moveTo(lm[a].x*innerWidth,lm[a].y*innerHeight);
     ctx.lineTo(lm[b].x*innerWidth,lm[b].y*innerHeight);
     ctx.stroke();
   });
-}
 
-
-// 📷 камера для MediaPipe
-const cam=new Camera(video,{
-  onFrame:async()=>await hands.send({image:video}),
-  width:640,
-  height:480
+  // Pinch
+  const dx = lm[4].x-lm[8].x;
+  const dy = lm[4].y-lm[8].y;
+  const dist = Math.sqrt(dx*dx+dy*dy);
+  if(dist<0.07){
+    // Grab окно
+    window1.position.x = (lm[8].x-0.5)*5;
+    window1.position.y = -(lm[8].y-0.5)*5;
+    window2.position.x = (lm[12].x-0.5)*5;
+    window2.position.y = -(lm[12].y-0.5)*5;
+  }
 });
+
+// ====== 6. Камера MediaPipe ======
+const cam = new Camera(video,{ onFrame: async ()=>await hands.send({image:video}), width:640, height:480 });
 cam.start();
 
-
-// 📐 гироскоп = псевдо AR закрепление
-window.addEventListener("deviceorientation",e=>{
-  const x=e.gamma||0;
-  const y=e.beta||0;
-
-  document.querySelectorAll(".window").forEach((w,i)=>{
-    w.style.transform=`translate(${x*i}px, ${y*i}px)`;
-  });
+// ====== 7. Псевдо AR закрепление (гироскоп) ======
+window.addEventListener("deviceorientation", e=>{
+  const x = e.gamma||0;
+  const y = e.beta||0;
+  window1.rotation.y = x/50; window1.rotation.x = y/50;
+  window2.rotation.y = -x/50; window2.rotation.x = -y/50;
 });
-</script>
 
+// ====== 8. Анимация Three.js ======
+function animate(){
+  requestAnimationFrame(animate);
+  renderer.render(scene,camera);
+}
+animate();
+</script>
 </body>
 </html>
