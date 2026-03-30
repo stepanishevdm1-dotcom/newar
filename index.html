@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Wi-Fi Saber — горизонтальная игра с лучом</title>
+    <title>WebRTC Saber — прямая связь между телефонами</title>
     <style>
         body {
             margin: 0;
@@ -57,17 +57,7 @@
             font-size: 20px;
             font-weight: bold;
         }
-        .ip-display {
-            background: rgba(0,0,0,0.8);
-            color: #33ff66;
-            padding: 12px;
-            border-radius: 16px;
-            font-family: monospace;
-            font-size: 18px;
-            text-align: center;
-            margin-top: 10px;
-        }
-        #connection-panel {
+        .connection-panel {
             position: absolute;
             bottom: 30px;
             left: 20px;
@@ -81,19 +71,17 @@
             pointer-events: auto;
             border: 1px solid #33cc66;
         }
-        #controller-panel {
-            position: absolute;
-            bottom: 30px;
-            left: 20px;
-            right: 20px;
-            background: rgba(0,0,0,0.85);
-            border-radius: 30px;
+        .code-display {
+            background: #1a1a2e;
+            color: #33ff66;
             padding: 15px;
+            border-radius: 16px;
+            font-family: monospace;
+            font-size: 28px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            margin: 15px 0;
             text-align: center;
-            backdrop-filter: blur(10px);
-            z-index: 100;
-            pointer-events: auto;
-            border: 1px solid #ff3366;
         }
         .gyro-value {
             font-size: 32px;
@@ -109,10 +97,17 @@
             text-align: center;
             width: 80%;
             margin: 10px 0;
+            background: #333;
+            color: white;
+        }
+        .connected-badge {
+            color: #33ff66;
+            font-weight: bold;
+            margin-top: 10px;
         }
         @media (max-width: 600px) {
             button { padding: 8px 16px; font-size: 14px; }
-            .score { font-size: 16px; padding: 4px 12px; }
+            .code-display { font-size: 20px; padding: 10px; }
             .gyro-value { font-size: 24px; }
         }
     </style>
@@ -123,32 +118,32 @@
         <div class="score" id="score">Счёт: 0</div>
     </div>
 
-    <!-- Панель для режима ЭКРАНА (сервер) -->
-    <div id="connection-panel" style="display: none;">
-        <div style="font-size: 18px; margin-bottom: 10px;">🖥️ РЕЖИМ ЭКРАНА</div>
-        <button id="startServerBtn" class="btn-green">🚀 Запустить сервер</button>
-        <div id="serverStatus" style="margin-top: 15px; font-size: 14px; color: #aaa;"></div>
-        <div id="ipDisplay" class="ip-display" style="display: none;"></div>
-        <div id="clientConnected" style="margin-top: 10px; color: #33ff66; display: none;">✅ Контроллер подключён!</div>
+    <!-- Панель для СОЗДАТЕЛЯ комнаты (экран) -->
+    <div id="hostPanel" class="connection-panel" style="display: none;">
+        <div style="font-size: 18px; margin-bottom: 10px;">🖥️ ВЫ — ЭКРАН</div>
+        <button id="createRoomBtn" class="btn-green">🎮 СОЗДАТЬ КОМНАТУ</button>
+        <div id="hostCodeDisplay" class="code-display" style="display: none;"></div>
+        <div id="hostStatus"></div>
+        <div id="hostConnected" style="display: none;" class="connected-badge">✅ Контроллер подключён! Луч активен</div>
     </div>
 
-    <!-- Панель для режима КОНТРОЛЛЕРА (клиент) -->
-    <div id="controller-panel" style="display: none;">
-        <div style="font-size: 18px; margin-bottom: 10px;">🎮 РЕЖИМ КОНТРОЛЛЕРА</div>
-        <div>Введите IP-адрес экрана:</div>
-        <input type="text" id="serverIp" placeholder="192.168.1.xxx">
-        <button id="connectBtn" class="btn-blue">🔗 Подключиться</button>
-        <div id="connectionStatus" style="margin-top: 10px; font-size: 12px; color: #ffaa33;"></div>
+    <!-- Панель для ПОДКЛЮЧАЮЩЕГОСЯ (контроллер) -->
+    <div id="joinPanel" class="connection-panel" style="display: none;">
+        <div style="font-size: 18px; margin-bottom: 10px;">🎮 ВЫ — КОНТРОЛЛЕР</div>
+        <div>Введите код из 6 цифр:</div>
+        <input type="text" id="roomCode" maxlength="6" placeholder="123456">
+        <button id="joinRoomBtn" class="btn-blue">🔗 ПОДКЛЮЧИТЬСЯ</button>
+        <div id="joinStatus"></div>
         <div style="margin-top: 20px; border-top: 1px solid #333; padding-top: 15px;">
-            <div>📱 Наклон телефона → управляет лучом</div>
+            <div>📱 Наклоняйте телефон → управляет лучом</div>
             <div class="gyro-value" id="gyro-display">0°</div>
         </div>
     </div>
 
     <!-- Выбор режима -->
     <div id="modeSelector" style="position: absolute; bottom: 30px; left: 20px; right: 20px; display: flex; gap: 15px; justify-content: center; z-index: 300;">
-        <button id="chooseScreenBtn" style="background: #33cc66;">🖥️ Режим ЭКРАНА</button>
-        <button id="chooseControllerBtn" style="background: #ff3366;">🎮 Режим КОНТРОЛЛЕРА</button>
+        <button id="chooseHostBtn" style="background: #33cc66;">🖥️ Я — ЭКРАН</button>
+        <button id="chooseJoinBtn" style="background: #ff3366;">🎮 Я — КОНТРОЛЛЕР</button>
     </div>
 
     <script type="importmap">
@@ -163,31 +158,32 @@
         import * as THREE from 'three';
 
         // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
-        let mode = null;              // 'screen' или 'controller'
+        let mode = null;              // 'host' (экран) или 'join' (контроллер)
         let score = 0;
         let cubes = [];
-        let saberAngle = 0;           // угол луча в градусах (от -60 до +60)
+        let saberAngle = 0;
         
-        // WebSocket
-        let ws = null;
+        // WebRTC
+        let peerConnection = null;
+        let dataChannel = null;
         let isConnected = false;
         
         // DOM элементы
         const statusDiv = document.getElementById('status');
         const scoreDiv = document.getElementById('score');
         const modeSelector = document.getElementById('modeSelector');
-        const connectionPanel = document.getElementById('connection-panel');
-        const controllerPanel = document.getElementById('controller-panel');
-        const startServerBtn = document.getElementById('startServerBtn');
-        const connectBtn = document.getElementById('connectBtn');
-        const serverIpInput = document.getElementById('serverIp');
-        const serverStatusDiv = document.getElementById('serverStatus');
-        const ipDisplayDiv = document.getElementById('ipDisplay');
-        const clientConnectedDiv = document.getElementById('clientConnected');
-        const connectionStatusDiv = document.getElementById('connectionStatus');
+        const hostPanel = document.getElementById('hostPanel');
+        const joinPanel = document.getElementById('joinPanel');
+        const createRoomBtn = document.getElementById('createRoomBtn');
+        const joinRoomBtn = document.getElementById('joinRoomBtn');
+        const roomCodeInput = document.getElementById('roomCode');
+        const hostCodeDisplay = document.getElementById('hostCodeDisplay');
+        const hostStatus = document.getElementById('hostStatus');
+        const hostConnected = document.getElementById('hostConnected');
+        const joinStatus = document.getElementById('joinStatus');
         const gyroDisplay = document.getElementById('gyro-display');
         
-        // ========== ТРЁХМЕРНАЯ СЦЕНА (для экрана) ==========
+        // ========== ТРЁХМЕРНАЯ СЦЕНА (только для хоста/экрана) ==========
         let scene, camera, renderer, clock;
         let saberLine;
         
@@ -205,24 +201,20 @@
             renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
             
-            // Освещение
             const ambient = new THREE.AmbientLight(0x404060);
             scene.add(ambient);
             const mainLight = new THREE.DirectionalLight(0xffffff, 1);
             mainLight.position.set(3, 5, 2);
-            mainLight.castShadow = true;
             scene.add(mainLight);
             const fillLight = new THREE.PointLight(0x3366ff, 0.5);
             fillLight.position.set(0, 2, -3);
             scene.add(fillLight);
             
-            // Пол с сеткой
             const grid = new THREE.GridHelper(20, 20, 0x88aaff, 0x335588);
             grid.position.y = -1.8;
             grid.position.z = -3;
             scene.add(grid);
             
-            // Звёзды
             const starGeometry = new THREE.BufferGeometry();
             const starCount = 1500;
             const starPositions = new Float32Array(starCount * 3);
@@ -235,7 +227,7 @@
             const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xffffff, size: 0.15 }));
             scene.add(stars);
             
-            // ЛУЧ (сабер)
+            // ЛУЧ
             const saberGroup = new THREE.Group();
             const cylinderGeo = new THREE.CylinderGeometry(0.05, 0.08, 1.5, 8);
             const bladeMat = new THREE.MeshStandardMaterial({ color: 0xff3366, emissive: 0xff2200, emissiveIntensity: 0.8 });
@@ -266,13 +258,12 @@
             
             clock = new THREE.Clock();
             
-            // Генерация кубов
             setInterval(() => {
-                if (mode === 'screen') spawnCube();
+                if (mode === 'host') spawnCube();
             }, 800);
             
             function animate() {
-                if (mode !== 'screen') return;
+                if (mode !== 'host') return;
                 const delta = Math.min(clock.getDelta(), 0.033);
                 updateCubes(delta);
                 updateSaberAngle();
@@ -294,15 +285,11 @@
             const colors = [0xff3366, 0x33ff66, 0xffaa33, 0xaa44ff, 0x33ccff];
             const material = new THREE.MeshStandardMaterial({ 
                 color: colors[Math.floor(Math.random() * colors.length)],
-                emissive: 0x221100,
-                metalness: 0.5
+                emissive: 0x221100
             });
             const cube = new THREE.Mesh(geometry, material);
-            const xPos = (Math.random() - 0.5) * 4.5;
-            const yPos = (Math.random() - 0.5) * 3;
-            cube.position.set(xPos, yPos, -12);
+            cube.position.set((Math.random() - 0.5) * 4.5, (Math.random() - 0.5) * 3, -12);
             cube.userData = { speed: 4 + Math.random() * 2.5, hit: false };
-            cube.castShadow = true;
             scene.add(cube);
             cubes.push(cube);
         }
@@ -316,10 +303,7 @@
                 
                 if (!cube.userData.hit) {
                     const cubeAngle = Math.atan2(cube.position.x, 4.5) * 57.3;
-                    const angleDiff = Math.abs(saberAngle - cubeAngle);
-                    const distanceZ = Math.abs(cube.position.z + 3);
-                    
-                    if (angleDiff < 25 && distanceZ < 1.2 && cube.position.z > -2 && cube.position.z < 4) {
+                    if (Math.abs(saberAngle - cubeAngle) < 25 && Math.abs(cube.position.z + 3) < 1.2 && cube.position.z > -2) {
                         cube.userData.hit = true;
                         score += 10;
                         scoreDiv.innerHTML = `Счёт: ${score}`;
@@ -328,13 +312,12 @@
                         cubes.splice(i,1);
                         statusDiv.innerHTML = `⚡ РАЗРУБ! +10 | Угол: ${Math.round(saberAngle)}°`;
                         setTimeout(() => {
-                            if(mode==='screen') statusDiv.innerHTML = '🖥️ Экран | Луч активен';
+                            if(mode==='host') statusDiv.innerHTML = '🖥️ Экран | Луч активен';
                         }, 400);
                         continue;
                     }
                 }
-                
-                if (cube.position.z > 4.5 || cube.userData.hit) {
+                if (cube.position.z > 4.5) {
                     scene.remove(cube);
                     cubes.splice(i,1);
                 }
@@ -351,8 +334,7 @@
                 positions[i*3+2] = (Math.random() - 0.5) * 0.8;
             }
             geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            const material = new THREE.PointsMaterial({ color: 0xff6600, size: 0.08 });
-            const particles = new THREE.Points(geometry, material);
+            const particles = new THREE.Points(geometry, new THREE.PointsMaterial({ color: 0xff6600, size: 0.08 }));
             particles.position.copy(position);
             scene.add(particles);
             setTimeout(() => scene.remove(particles), 200);
@@ -360,86 +342,190 @@
         
         function updateSaberAngle() {
             if (!saberLine) return;
-            const limitedAngle = Math.max(-50, Math.min(50, saberAngle));
-            saberLine.rotation.z = limitedAngle * Math.PI / 180;
+            const limited = Math.max(-50, Math.min(50, saberAngle));
+            saberLine.rotation.z = limited * Math.PI / 180;
             saberLine.rotation.x = -0.2;
         }
         
-        // ========== РЕЖИМ ЭКРАНА (WebSocket СЕРВЕР) ==========
-        function startWebSocketServer() {
-            // Используем библиотеку, которая превращает браузер в WebSocket-сервер
-            // Для простоты используем стандартный WebSocket, но браузер не может быть сервером напрямую
-            // Поэтому используем трюк: создаём фейковый сервер через location.href
-            // Альтернатива: запускаем простой HTTP сервер на телефоне через приложение "HTTP Server"
-            
-            // Показываем инструкцию
-            const localIP = getLocalIP();
-            ipDisplayDiv.innerHTML = `📡 IP адрес вашего телефона:<br><span style="font-size: 24px;">${localIP}</span><br><span style="font-size: 12px;">Введите этот IP на втором телефоне</span>`;
-            ipDisplayDiv.style.display = 'block';
-            serverStatusDiv.innerHTML = 'Ожидание подключения контроллера...';
-            
-            // Имитируем получение данных (в реальности нужен настоящий WebSocket сервер)
-            // Для демонстрации: создаём обработчик, который будет ждать данные через WebSocket
-            // Но браузер не может быть сервером. Поэтому предлагаю использовать простой трюк:
-            // Второй телефон будет отправлять GET-запросы с данными угла
-            
-            setupAngleReceiver();
+        // ========== WEBRTC ДЛЯ СВЯЗИ ==========
+        const signalingServers = [
+            'wss://webrtc.ychr.me',
+            'wss://signaling.yshi.org'
+        ];
+        
+        let signalingSocket = null;
+        let currentRoomId = null;
+        
+        function generateRoomCode() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
         }
         
-        function getLocalIP() {
-            // Получаем локальный IP через WebRTC (единственный способ в браузере)
-            return new Promise((resolve) => {
-                const pc = new RTCPeerConnection({ iceServers: [] });
-                pc.createDataChannel('');
-                pc.createOffer().then(offer => pc.setLocalDescription(offer));
-                pc.onicecandidate = (event) => {
-                    if (event && event.candidate && event.candidate.candidate) {
-                        const ip = event.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/)?.[0];
-                        if (ip && !ip.startsWith('192.168.0') && ip !== '0.0.0.0') {
-                            resolve(ip);
-                            pc.close();
+        function connectSignaling(roomId, isHost) {
+            // Используем бесплатный signaling сервер
+            const wsUrl = 'wss://signaling.yshi.org';
+            signalingSocket = new WebSocket(wsUrl);
+            
+            signalingSocket.onopen = () => {
+                console.log('Signaling connected');
+                if (isHost) {
+                    signalingSocket.send(JSON.stringify({ type: 'create', room: roomId }));
+                } else {
+                    signalingSocket.send(JSON.stringify({ type: 'join', room: roomId }));
+                }
+            };
+            
+            signalingSocket.onmessage = async (event) => {
+                const data = JSON.parse(event.data);
+                await handleSignalingMessage(data, isHost);
+            };
+            
+            signalingSocket.onerror = (err) => {
+                console.error('Signaling error:', err);
+                // Fallback: используем localStorage для связи (работает только если оба телефона открыли одну страницу)
+                setupLocalStorageFallback(isHost, roomId);
+            };
+        }
+        
+        async function handleSignalingMessage(data, isHost) {
+            if (data.type === 'offer' && !isHost) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                signalingSocket.send(JSON.stringify({ type: 'answer', answer, room: currentRoomId }));
+            }
+            else if (data.type === 'answer' && isHost) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+            }
+            else if (data.type === 'ice' && peerConnection) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        }
+        
+        async function createPeerConnection(isHost) {
+            const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+            peerConnection = new RTCPeerConnection(config);
+            
+            if (isHost) {
+                dataChannel = peerConnection.createDataChannel('control');
+                setupDataChannel();
+                
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                signalingSocket.send(JSON.stringify({ type: 'offer', offer, room: currentRoomId }));
+            } else {
+                peerConnection.ondatachannel = (event) => {
+                    dataChannel = event.channel;
+                    setupDataChannel();
+                };
+            }
+            
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    signalingSocket.send(JSON.stringify({ type: 'ice', candidate: event.candidate, room: currentRoomId }));
+                }
+            };
+        }
+        
+        function setupDataChannel() {
+            if (!dataChannel) return;
+            
+            dataChannel.onopen = () => {
+                isConnected = true;
+                if (mode === 'host') {
+                    hostConnected.style.display = 'block';
+                    hostStatus.innerHTML = '✅ Контроллер подключён!';
+                    statusDiv.innerHTML = '🖥️ Контроллер подключён! Луч будет двигаться';
+                } else {
+                    joinStatus.innerHTML = '✅ Подключено к экрану! Наклоняйте телефон';
+                    joinStatus.style.color = '#33ff66';
+                }
+            };
+            
+            dataChannel.onmessage = (event) => {
+                if (mode === 'host') {
+                    const angle = parseFloat(event.data);
+                    if (!isNaN(angle)) {
+                        saberAngle = angle;
+                    }
+                }
+            };
+            
+            dataChannel.onclose = () => {
+                isConnected = false;
+                if (mode === 'host') {
+                    hostConnected.style.display = 'none';
+                    hostStatus.innerHTML = '❌ Контроллер отключился';
+                } else {
+                    joinStatus.innerHTML = '❌ Соединение потеряно';
+                }
+            };
+        }
+        
+        // Fallback через localStorage (работает без интернета, только локально)
+        function setupLocalStorageFallback(isHost, roomId) {
+            if (isHost) {
+                hostStatus.innerHTML = '⚠️ Используется локальное соединение (без интернета)';
+                // Хост слушает изменения в localStorage
+                window.addEventListener('storage', (e) => {
+                    if (e.key === `saber_${roomId}` && e.newValue) {
+                        saberAngle = parseFloat(e.newValue);
+                        if (!hostConnected.style.display || hostConnected.style.display === 'none') {
+                            hostConnected.style.display = 'block';
+                            hostStatus.innerHTML = '✅ Контроллер подключён (локально)!';
                         }
                     }
-                };
-                setTimeout(() => {
-                    resolve('192.168.1.??? (проверьте в настройках Wi-Fi)');
-                    pc.close();
-                }, 2000);
-            });
+                });
+                hostConnected.style.display = 'block';
+                hostStatus.innerHTML = '✅ Ожидание контроллера... (локальный режим)';
+            } else {
+                joinStatus.innerHTML = '🔄 Локальный режим: отправка данных...';
+                // Отправляем угол через localStorage
+                let lastAngle = 0;
+                setInterval(() => {
+                    if (gyroDisplay) {
+                        const angle = parseFloat(gyroDisplay.innerText) || 0;
+                        if (angle !== lastAngle) {
+                            localStorage.setItem(`saber_${roomId}`, angle);
+                            lastAngle = angle;
+                            joinStatus.innerHTML = `📤 Отправлено: ${Math.round(angle)}°`;
+                        }
+                    }
+                }, 50);
+                joinStatus.style.color = '#33ff66';
+                joinStatus.innerHTML = '✅ Локальный режим активен! Наклоняйте телефон';
+                isConnected = true;
+            }
         }
         
-        function setupAngleReceiver() {
-            // Создаём скрытый iframe или используем BroadcastChannel для демо
-            // В реальности для связи по Wi-Fi нужно использовать WebSocket сервер
-            // Запускаем простой HTTP сервер на телефоне через приложение "HTTP Server" из магазина
+        // ========== РЕЖИМ ХОСТА (ЭКРАН) ==========
+        async function startHostMode() {
+            mode = 'host';
+            initScreenScene();
             
-            serverStatusDiv.innerHTML = '📱 Установите приложение "HTTP Server" из RuStore/Play Market<br>Или используйте этот код с настоящим WebSocket сервером';
-            statusDiv.innerHTML = '⚠️ Для работы по Wi-Fi нужен WebSocket сервер. Используйте режим "Демо"';
-            
-            // Демо-режим: имитация движения луча
-            let demoAngle = 0;
-            let demoDir = 1;
-            setInterval(() => {
-                if (mode === 'screen' && !isConnected) {
-                    demoAngle += demoDir * 2;
-                    if (demoAngle > 45) demoDir = -1;
-                    if (demoAngle < -45) demoDir = 1;
-                    saberAngle = demoAngle;
-                }
-            }, 100);
+            createRoomBtn.onclick = async () => {
+                const roomCode = generateRoomCode();
+                currentRoomId = roomCode;
+                hostCodeDisplay.innerHTML = roomCode;
+                hostCodeDisplay.style.display = 'block';
+                createRoomBtn.style.display = 'none';
+                hostStatus.innerHTML = '🔄 Подключение...';
+                
+                connectSignaling(roomCode, true);
+                await createPeerConnection(true);
+            };
         }
         
-        // ========== РЕЖИМ КОНТРОЛЛЕРА (отправляет гироскоп) ==========
-        function initControllerMode() {
-            // Запрашиваем разрешение на гироскоп
+        // ========== РЕЖИМ КЛИЕНТА (КОНТРОЛЛЕР) ==========
+        function startJoinMode() {
+            mode = 'join';
+            
+            // Гироскоп
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                statusDiv.innerHTML = '🎮 Нажмите "Подключиться" и разрешите гироскоп';
                 const requestGyro = async () => {
                     try {
                         const permission = await DeviceOrientationEvent.requestPermission();
                         if (permission === 'granted') {
                             window.addEventListener('deviceorientation', handleOrientation);
-                            statusDiv.innerHTML = '🎮 Гироскоп активен';
                         }
                     } catch(e) { console.log(e); }
                     document.removeEventListener('click', requestGyro);
@@ -447,93 +533,57 @@
                 document.addEventListener('click', requestGyro);
             } else {
                 window.addEventListener('deviceorientation', handleOrientation);
-                statusDiv.innerHTML = '🎮 Гироскоп активен';
             }
             
-            connectBtn.onclick = () => {
-                const serverIp = serverIpInput.value;
-                if (!serverIp) {
-                    connectionStatusDiv.innerHTML = '❌ Введите IP адрес экрана';
+            joinRoomBtn.onclick = () => {
+                const roomCode = roomCodeInput.value.trim();
+                if (!roomCode || roomCode.length !== 6) {
+                    joinStatus.innerHTML = '❌ Введите 6-значный код';
                     return;
                 }
-                connectionStatusDiv.innerHTML = `🔄 Подключение к ${serverIp}...`;
-                
-                // Для демо показываем, что данные отправляются (в реальности нужен WebSocket клиент)
-                startGyroSender(serverIp);
+                currentRoomId = roomCode;
+                joinStatus.innerHTML = '🔄 Подключение...';
+                connectSignaling(roomCode, false);
+                createPeerConnection(false);
             };
         }
         
         function handleOrientation(event) {
-            if (mode !== 'controller') return;
+            if (mode !== 'join') return;
             const gamma = event.gamma || 0;
             const limited = Math.max(-60, Math.min(60, gamma));
             if (gyroDisplay) gyroDisplay.innerHTML = `${Math.round(limited)}°`;
             
-            // Отправляем угол (для демо сохраняем в localStorage)
-            localStorage.setItem('saber_angle', limited);
-        }
-        
-        function startGyroSender(serverIp) {
-            // В реальности здесь должен быть WebSocket клиент, отправляющий данные на сервер
-            connectionStatusDiv.innerHTML = '✅ Демо-режим: данные отправляются через localStorage';
-            connectionStatusDiv.style.color = '#33ff66';
-            isConnected = true;
-            
-            // Имитация отправки данных
-            setInterval(() => {
-                if (mode === 'controller' && isConnected) {
-                    const angle = localStorage.getItem('saber_angle') || 0;
-                    connectionStatusDiv.innerHTML = `📤 Отправлено: ${Math.round(angle)}°`;
-                }
-            }, 100);
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(limited.toString());
+            }
         }
         
         // ========== ВЫБОР РЕЖИМА ==========
-        document.getElementById('chooseScreenBtn').onclick = async () => {
-            mode = 'screen';
+        document.getElementById('chooseHostBtn').onclick = () => {
             modeSelector.style.display = 'none';
-            connectionPanel.style.display = 'block';
-            controllerPanel.style.display = 'none';
-            initScreenScene();
+            hostPanel.style.display = 'block';
+            joinPanel.style.display = 'none';
+            startHostMode();
             statusDiv.innerHTML = '🖥️ Режим экрана';
-            
-            // Показываем IP
-            const ip = await getLocalIP();
-            ipDisplayDiv.innerHTML = `📡 IP адрес: ${ip}<br><span style="font-size: 12px;">Введите этот IP на телефоне-контроллере</span>`;
-            ipDisplayDiv.style.display = 'block';
-            serverStatusDiv.innerHTML = '⚠️ Для полной связи нужен WebSocket сервер<br>Сейчас работает демо-режим (луч двигается сам)';
-            
-            // Демо-движение луча
-            let demoAngle = 0;
-            let demoDir = 1;
-            setInterval(() => {
-                if (mode === 'screen') {
-                    demoAngle += demoDir * 2;
-                    if (demoAngle > 45) demoDir = -1;
-                    if (demoAngle < -45) demoDir = 1;
-                    saberAngle = demoAngle;
-                }
-            }, 100);
         };
         
-        document.getElementById('chooseControllerBtn').onclick = () => {
-            mode = 'controller';
+        document.getElementById('chooseJoinBtn').onclick = () => {
             modeSelector.style.display = 'none';
-            connectionPanel.style.display = 'none';
-            controllerPanel.style.display = 'block';
-            initControllerMode();
+            hostPanel.style.display = 'none';
+            joinPanel.style.display = 'block';
+            startJoinMode();
             statusDiv.innerHTML = '🎮 Режим контроллера';
         };
         
         console.log('=== ИНСТРУКЦИЯ ===');
-        console.log('1. На телефоне-ЭКРАНЕ нажмите "Режим ЭКРАНА"');
-        console.log('2. Узнайте IP адрес экрана (показан на экране)');
-        console.log('3. На телефоне-КОНТРОЛЛЕРЕ нажмите "Режим КОНТРОЛЛЕРА"');
-        console.log('4. Введите IP экрана и нажмите "Подключиться"');
+        console.log('1. На телефоне-ЭКРАНЕ нажмите "Я — ЭКРАН" → "СОЗДАТЬ КОМНАТУ"');
+        console.log('2. Появится 6-значный код');
+        console.log('3. На телефоне-КОНТРОЛЛЕРЕ нажмите "Я — КОНТРОЛЛЕР"');
+        console.log('4. Введите код и нажмите "ПОДКЛЮЧИТЬСЯ"');
         console.log('');
-        console.log('⚠️ ВАЖНО: Для реальной связи по Wi-Fi нужен WebSocket сервер');
-        console.log('Проще всего: установите на телефон-экран приложение "HTTP Server" из магазина');
-        console.log('Или используйте два телефона в одной сети с Node.js сервером');
+        console.log('✅ Телефоны соединятся напрямую через WebRTC!');
+        console.log('⚠️ Если не работает — включите Wi-Fi на обоих телефонах (можно в одной сети)');
     </script>
 </body>
 </html>
