@@ -3,86 +3,102 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Bluetooth VR Saber</title>
+    <title>Bluetooth Saber — горизонтальная игра с лучом</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
         }
-        #mode-panel {
+        #ui {
             position: absolute;
             top: 20px;
             left: 20px;
-            background: rgba(0,0,0,0.7);
-            color: white;
-            padding: 12px 20px;
-            border-radius: 30px;
-            backdrop-filter: blur(5px);
+            right: 20px;
             z-index: 100;
             display: flex;
-            gap: 12px;
-            pointer-events: auto;
-            font-size: 14px;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: space-between;
+            pointer-events: none;
         }
         button {
+            pointer-events: auto;
             background: #ff3366;
             border: none;
             color: white;
-            padding: 8px 16px;
+            padding: 12px 24px;
             border-radius: 40px;
             font-weight: bold;
+            font-size: 16px;
             cursor: pointer;
             transition: 0.2s;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
         button:active { transform: scale(0.96); }
         .btn-green { background: #33cc66; }
+        .btn-blue { background: #3399ff; }
         .status {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0,0,0,0.6);
+            background: rgba(0,0,0,0.7);
             color: #0f0;
-            padding: 6px 12px;
+            padding: 8px 16px;
             border-radius: 20px;
             font-family: monospace;
             font-size: 12px;
-            z-index: 100;
-            pointer-events: none;
+            backdrop-filter: blur(4px);
         }
-        #controller-screen {
+        .score {
+            background: rgba(0,0,0,0.7);
+            color: #ffaa33;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-family: monospace;
+            font-size: 20px;
+            font-weight: bold;
+        }
+        #controller-panel {
             position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 20px;
+            bottom: 30px;
+            left: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.85);
             border-radius: 30px;
+            padding: 15px;
             text-align: center;
-            pointer-events: none;
-            z-index: 200;
-            font-size: 1.2rem;
-            white-space: nowrap;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            pointer-events: auto;
+            border: 1px solid #ff3366;
+        }
+        .mode-badge {
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .gyro-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #ffaa33;
         }
         @media (max-width: 600px) {
-            #mode-panel { top: 10px; left: 10px; padding: 6px 12px; }
-            button { padding: 5px 10px; font-size: 12px; }
+            button { padding: 8px 16px; font-size: 14px; }
+            .score { font-size: 16px; padding: 4px 12px; }
         }
     </style>
 </head>
 <body>
-    <div id="mode-panel">
-        <button id="screenModeBtn" class="btn-green">🎮 Режим экрана</button>
-        <button id="controllerModeBtn">🕹️ Режим контроллера</button>
+    <div id="ui">
+        <div class="status" id="status">⚡ Выберите режим</div>
+        <div class="score" id="score">Счёт: 0</div>
     </div>
-    <div id="status" class="status">⚡ Ожидание режима</div>
-    <div id="controller-screen" style="display:none;">
-        📱 Режим КОНТРОЛЛЕРА<br>
-        Наклоняйте телефон → рубим кубы
+    <div id="controller-panel" style="display: none;">
+        <div class="mode-badge">🎮 РЕЖИМ КОНТРОЛЛЕРА</div>
+        <div>Наклон телефона → управляет лучом</div>
+        <div class="gyro-value" id="gyro-display">0°</div>
+        <button id="connectBtn" style="margin-top: 10px; background: #3399ff;">🔗 Подключить Bluetooth</button>
+        <div style="font-size: 11px; margin-top: 8px; color: #aaa;">После подключения второй телефон увидит луч</div>
     </div>
 
-    <!-- Three.js библиотеки -->
     <script type="importmap">
         {
             "imports": {
@@ -94,42 +110,39 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- Глобальное состояние ---
-        let mode = null;           // 'screen' или 'controller'
-        let cubeList = [];         // массив активных кубов { mesh, speed, hit }
-        let lastTilt = { gamma: 0, beta: 0 };
-        let sliceThreshold = 35;    // градусы наклона для "удара"
-        let lastSliceTime = 0;
-        const sliceCooldown = 180;  // мс между ударами
+        // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
+        let mode = null;              // 'screen' или 'controller'
+        let score = 0;
+        let cubes = [];
+        let saberAngle = 0;           // угол луча в градусах (от -60 до +60)
         
-        // --- Настройки сцены (только для экрана) ---
-        let scene, camera, renderer, clock;
-        let animationId = null;
-        
-        // --- Коммуникация (эмуляция Bluetooth через BroadcastChannel, легко заменить на реальный BLE) ---
-        let channel = null;
-        let isConnected = false;
+        // Bluetooth
+        let bluetoothServer = null;
+        let bluetoothCharacteristic = null;
+        let isBluetoothConnected = false;
         
         // DOM элементы
-        const screenBtn = document.getElementById('screenModeBtn');
-        const controllerBtn = document.getElementById('controllerModeBtn');
         const statusDiv = document.getElementById('status');
-        const controllerScreenDiv = document.getElementById('controller-screen');
+        const scoreDiv = document.getElementById('score');
+        const controllerPanel = document.getElementById('controller-panel');
+        const gyroDisplay = document.getElementById('gyro-display');
+        const connectBtn = document.getElementById('connectBtn');
         
-        // --- Функции для режима ЭКРАНА ---
-        function initScreen() {
-            // Убираем подсказку контроллера
-            controllerScreenDiv.style.display = 'none';
-            
+        // ========== ТРЁХМЕРНАЯ СЦЕНА (для экрана) ==========
+        let scene, camera, renderer, clock;
+        let saberLine;               // линия луча
+        let saberGlow;              // свечение луча
+        
+        function initScreenScene() {
             // Сцена
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x050b1a);
-            scene.fog = new THREE.FogExp2(0x050b1a, 0.008);
+            scene.fog = new THREE.FogExp2(0x050b1a, 0.005);
             
-            // Камера (вид от первого лица)
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 1.5, 5);
-            camera.lookAt(0, 0, -10);
+            // Камера — фиксированная, горизонтальная, без поворота от головы
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 2, 8);
+            camera.lookAt(0, 0, -5);
             
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
@@ -137,271 +150,355 @@
             document.body.appendChild(renderer.domElement);
             
             // Освещение
-            const ambientLight = new THREE.AmbientLight(0x404060);
-            scene.add(ambientLight);
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-            dirLight.position.set(2, 5, 3);
-            scene.add(dirLight);
-            const backLight = new THREE.PointLight(0x3366ff, 0.5);
-            backLight.position.set(0, 2, -4);
-            scene.add(backLight);
+            const ambient = new THREE.AmbientLight(0x404060);
+            scene.add(ambient);
+            const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+            mainLight.position.set(3, 5, 2);
+            mainLight.castShadow = true;
+            scene.add(mainLight);
+            const fillLight = new THREE.PointLight(0x3366ff, 0.5);
+            fillLight.position.set(0, 2, -3);
+            scene.add(fillLight);
             
-            // Пол / линии для ощущения скорости
-            const gridHelper = new THREE.GridHelper(30, 20, 0x88aaff, 0x335588);
-            gridHelper.position.y = -1.5;
-            gridHelper.position.z = -5;
-            scene.add(gridHelper);
+            // Пол с сеткой
+            const grid = new THREE.GridHelper(20, 20, 0x88aaff, 0x335588);
+            grid.position.y = -1.8;
+            grid.position.z = -3;
+            scene.add(grid);
             
-            // Вспомогательные звезды
+            // Звёзды на заднем плане
             const starGeometry = new THREE.BufferGeometry();
-            const starCount = 800;
+            const starCount = 1500;
             const starPositions = new Float32Array(starCount * 3);
             for (let i = 0; i < starCount; i++) {
-                starPositions[i*3] = (Math.random() - 0.5) * 200;
-                starPositions[i*3+1] = (Math.random() - 0.5) * 100;
-                starPositions[i*3+2] = (Math.random() - 0.5) * 80 - 40;
+                starPositions[i*3] = (Math.random() - 0.5) * 150;
+                starPositions[i*3+1] = (Math.random() - 0.5) * 80;
+                starPositions[i*3+2] = (Math.random() - 0.5) * 60 - 30;
             }
             starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-            const starMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 0.2 });
-            const stars = new THREE.Points(starGeometry, starMaterial);
+            const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xffffff, size: 0.15 }));
             scene.add(stars);
+            
+            // === ЛУЧ (САБЕР) ===
+            // Создаём группу для луча, чтобы вращать её
+            const saberGroup = new THREE.Group();
+            
+            // Основная линия луча (цилиндр)
+            const cylinderGeo = new THREE.CylinderGeometry(0.05, 0.08, 1.5, 8);
+            const bladeMat = new THREE.MeshStandardMaterial({ color: 0xff3366, emissive: 0xff2200, emissiveIntensity: 0.8 });
+            const blade = new THREE.Mesh(cylinderGeo, bladeMat);
+            blade.position.y = 0.75;
+            saberGroup.add(blade);
+            
+            // Свечение (точки)
+            const glowMat = new THREE.PointsMaterial({ color: 0xff6644, size: 0.08 });
+            const glowCount = 30;
+            const glowPositions = [];
+            for (let i = 0; i < glowCount; i++) {
+                glowPositions.push((Math.random() - 0.5) * 0.2, i * 0.05, (Math.random() - 0.5) * 0.15);
+            }
+            const glowGeo = new THREE.BufferGeometry();
+            glowGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(glowPositions), 3));
+            const glowPoints = new THREE.Points(glowGeo, glowMat);
+            saberGroup.add(glowPoints);
+            
+            // Рукоять
+            const handleGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.4, 8);
+            const handleMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.7 });
+            const handle = new THREE.Mesh(handleGeo, handleMat);
+            handle.position.y = -0.2;
+            saberGroup.add(handle);
+            
+            saberGroup.position.set(0, 0.5, 4.5);
+            scene.add(saberGroup);
+            
+            saberLine = saberGroup;
             
             clock = new THREE.Clock();
             
             // Генерация кубов
             setInterval(() => {
-                if (mode !== 'screen') return;
-                spawnCube();
-            }, 700);
+                if (mode === 'screen') spawnCube();
+            }, 800);
             
             // Анимация
             function animate() {
                 if (mode !== 'screen') return;
-                const delta = clock.getDelta();
+                const delta = Math.min(clock.getDelta(), 0.033);
                 updateCubes(delta);
+                updateSaberAngle();    // обновляем угол луча
                 renderer.render(scene, camera);
                 requestAnimationFrame(animate);
             }
             animate();
             
-            window.addEventListener('resize', onWindowResize, false);
-            function onWindowResize() {
+            window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
-            }
-            
-            statusDiv.innerHTML = '🖥️ Режим экрана | Ожидание контроллера...';
+            });
         }
         
         function spawnCube() {
-            const size = 0.7 + Math.random() * 0.3;
+            const size = 0.6 + Math.random() * 0.3;
             const geometry = new THREE.BoxGeometry(size, size, size);
             const colors = [0xff3366, 0x33ff66, 0xffaa33, 0xaa44ff, 0x33ccff];
-            const material = new THREE.MeshStandardMaterial({ color: colors[Math.floor(Math.random() * colors.length)], emissive: 0x331100, metalness: 0.7 });
+            const material = new THREE.MeshStandardMaterial({ 
+                color: colors[Math.floor(Math.random() * colors.length)],
+                emissive: 0x221100,
+                metalness: 0.5
+            });
             const cube = new THREE.Mesh(geometry, material);
             
-            // Позиция: случайная по X, летит на нас
-            const xPos = (Math.random() - 0.5) * 3.5;
-            cube.position.set(xPos, (Math.random() - 0.5) * 2.5, -12);
-            cube.userData = { speed: 4.5 + Math.random() * 2.5, hit: false };
+            // Позиция: случайная по X и Y, летит на камеру
+            const xPos = (Math.random() - 0.5) * 4.5;
+            const yPos = (Math.random() - 0.5) * 3;
+            cube.position.set(xPos, yPos, -12);
+            cube.userData = { speed: 4 + Math.random() * 2.5, hit: false };
+            cube.castShadow = true;
             scene.add(cube);
-            cubeList.push(cube);
+            cubes.push(cube);
         }
         
         function updateCubes(delta) {
-            for (let i = cubeList.length-1; i >= 0; i--) {
-                const cube = cubeList[i];
-                if (!cube) continue;
-                // движение вперёд
+            for (let i = cubes.length-1; i >= 0; i--) {
+                const cube = cubes[i];
                 cube.position.z += cube.userData.speed * delta;
-                // легкое вращение
-                cube.rotation.x += 0.02;
-                cube.rotation.y += 0.03;
+                cube.rotation.x += 0.03;
+                cube.rotation.y += 0.04;
                 
-                // если ушёл за камеру или уже разрублен
-                if (cube.position.z > 3.5 || cube.userData.hit) {
-                    scene.remove(cube);
-                    cubeList.splice(i,1);
-                }
-            }
-            
-            // обрабатываем удар по ближайшему кубу по направлению взмаха
-            if (mode === 'screen' && lastTilt && (Date.now() - lastSliceTime) > sliceCooldown) {
-                const absGamma = Math.abs(lastTilt.gamma);
-                const absBeta = Math.abs(lastTilt.beta);
-                // Если резкий наклон (как рубка)
-                if (absGamma > sliceThreshold || absBeta > sliceThreshold) {
-                    // Найти ближайший куб по центру экрана (X, Y)
-                    let closest = null;
-                    let minDist = 1.2;
-                    for (let cube of cubeList) {
-                        if (cube.userData.hit) continue;
-                        const distX = Math.abs(cube.position.x);
-                        const distY = Math.abs(cube.position.y);
-                        const distZ = Math.abs(cube.position.z + 3);
-                        if (distX < 1.3 && distY < 1.3 && distZ < 1.5) {
-                            const scoreDist = Math.abs(distX) + Math.abs(distY);
-                            if (scoreDist < minDist) {
-                                minDist = scoreDist;
-                                closest = cube;
-                            }
-                        }
-                    }
-                    if (closest) {
-                        closest.userData.hit = true;
-                        // эффект разрушения
-                        const particles = new THREE.Points(
-                            new THREE.BufferGeometry(),
-                            new THREE.PointsMaterial({ color: 0xff6600, size: 0.1 })
-                        );
-                        const posArray = [];
-                        for (let i=0;i<30;i++) {
-                            posArray.push((Math.random()-0.5)*0.8, (Math.random()-0.5)*0.8, (Math.random()-0.5)*0.8);
-                        }
-                        particles.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(posArray), 3));
-                        particles.position.copy(closest.position);
-                        scene.add(particles);
-                        setTimeout(() => scene.remove(particles), 200);
-                        scene.remove(closest);
-                        const index = cubeList.indexOf(closest);
-                        if (index !== -1) cubeList.splice(index,1);
+                // Проверка столкновения с лучом (по углу)
+                if (!cube.userData.hit) {
+                    const cubeAngle = Math.atan2(cube.position.x, 4.5) * 57.3; // примерный угол куба от центра
+                    const angleDiff = Math.abs(saberAngle - cubeAngle);
+                    const distanceZ = Math.abs(cube.position.z + 3);
+                    
+                    if (angleDiff < 25 && distanceZ < 1.2 && cube.position.z > -2 && cube.position.z < 4) {
+                        // РАЗРУБИЛИ!
+                        cube.userData.hit = true;
+                        score += 10;
+                        scoreDiv.innerHTML = `Счёт: ${score}`;
                         
-                        statusDiv.innerHTML = `⚡ РАЗРУБИЛ!  (наклон ${Math.round(absGamma)}°)`;
+                        // Эффект разрушения
+                        createExplosion(cube.position);
+                        scene.remove(cube);
+                        cubes.splice(i,1);
+                        
+                        statusDiv.innerHTML = `⚡ РАЗРУБ! +10 | Угол: ${Math.round(saberAngle)}°`;
                         setTimeout(() => {
-                            if(mode==='screen') statusDiv.innerHTML = '🖥️ Экран | Контроллер активен';
-                        }, 500);
-                        lastSliceTime = Date.now();
+                            if(mode==='screen') statusDiv.innerHTML = '🖥️ Экран | Луч активен';
+                        }, 400);
+                        continue;
                     }
                 }
-            }
-        }
-        
-        // --- Функции для режима КОНТРОЛЛЕРА (отправляет наклон через Bluetooth эмуляцию) ---
-        function initController() {
-            controllerScreenDiv.style.display = 'block';
-            statusDiv.innerHTML = '🎮 Контроллер | Инициализация гироскопа...';
-            
-            // запрашиваем доступ к ориентации устройства
-            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                // iOS требует разрешения
-                statusDiv.innerHTML = '🎮 Нажмите на экран для запроса разрешения на гироскоп';
-                const requestPermissionHandler = () => {
-                    DeviceOrientationEvent.requestPermission()
-                        .then(permissionState => {
-                            if (permissionState === 'granted') {
-                                window.addEventListener('deviceorientation', handleOrientation);
-                                statusDiv.innerHTML = '🎮 Контроллер | Гироскоп активен | Отправка наклона...';
-                            }
-                        })
-                        .catch(console.error);
-                    document.removeEventListener('click', requestPermissionHandler);
-                };
-                document.addEventListener('click', requestPermissionHandler);
-            } else {
-                // Android и другие
-                window.addEventListener('deviceorientation', handleOrientation);
-                statusDiv.innerHTML = '🎮 Контроллер | Передаю наклон через Bluetooth (эмуляция)';
-            }
-            
-            // Создаём канал для "Bluetooth" - эмуляция через BroadcastChannel (работает между вкладками/телефонами в одной сети через один и тот же файл)
-            // В реальном мире здесь был бы Bluetooth GATT сервер, но для демо используем BroadcastChannel + localStorage событие
-            // Чтобы связать два телефона, нужно, чтобы оба открыли этот HTML. Контроллер будет отправлять сообщения в канал "saber_channel"
-            channel = new BroadcastChannel('saber_bt_channel');
-            
-            // Отправляем тестовое сообщение о подключении
-            setInterval(() => {
-                if (mode === 'controller' && lastTilt) {
-                    const msg = {
-                        type: 'tilt',
-                        gamma: lastTilt.gamma,
-                        beta: lastTilt.beta,
-                        alpha: lastTilt.alpha,
-                        timestamp: Date.now()
-                    };
-                    channel.postMessage(msg);
-                    // визуальная индикация
-                    statusDiv.innerHTML = `🎮 Отправлено: наклон ${Math.round(lastTilt.gamma)}°`;
+                
+                // Удаляем кубы, ушедшие за камеру
+                if (cube.position.z > 4.5 || cube.userData.hit) {
+                    scene.remove(cube);
+                    cubes.splice(i,1);
                 }
-            }, 50);  // 20fps передачи
-            
-            channel.onmessage = (e) => {
-                if (e.data && e.data.type === 'pong') {
-                    isConnected = true;
-                    statusDiv.innerHTML = '🎮 Связь по Bluetooth (канал) установлена';
-                }
-            };
-            // подтверждение связи
-            setTimeout(() => {
-                channel.postMessage({ type: 'ping' });
-            }, 500);
-        }
-        
-        function handleOrientation(event) {
-            if (mode !== 'controller') return;
-            // gamma: наклон влево/вправо, beta: вперёд/назад
-            let gamma = event.gamma || 0;
-            let beta = event.beta || 0;
-            // ограничим для чувствительности
-            lastTilt = { gamma: gamma, beta: beta, alpha: event.alpha };
-            
-            // Обновляем отображение на экране контроллера
-            const angleIndicator = document.getElementById('controller-screen');
-            if (angleIndicator) {
-                angleIndicator.innerHTML = `🎮 КОНТРОЛЛЕР<br>Наклон: ${Math.round(gamma)}°<br>👆 РУБИТЕ движением!`;
             }
         }
         
-        // --- Приём сообщений на экране ---
-        function startScreenReceiver() {
-            if (channel) channel.close();
-            channel = new BroadcastChannel('saber_bt_channel');
-            channel.onmessage = (e) => {
-                if (mode !== 'screen') return;
-                if (e.data && e.data.type === 'tilt') {
-                    // получаем данные наклона с контроллера
-                    lastTilt = { gamma: e.data.gamma, beta: e.data.beta };
-                    // небольшая индикация приёма
-                    statusDiv.innerHTML = `🖥️ Принят наклон: ${Math.round(e.data.gamma)}°`;
-                    setTimeout(() => {
-                        if(mode==='screen') statusDiv.innerHTML = '🖥️ Экран | Контроллер активен';
-                    }, 300);
-                } else if (e.data && e.data.type === 'ping') {
-                    channel.postMessage({ type: 'pong' });
-                }
-            };
+        function createExplosion(position) {
+            const particleCount = 40;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            for (let i = 0; i < particleCount; i++) {
+                positions[i*3] = (Math.random() - 0.5) * 0.8;
+                positions[i*3+1] = (Math.random() - 0.5) * 0.8;
+                positions[i*3+2] = (Math.random() - 0.5) * 0.8;
+            }
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const material = new THREE.PointsMaterial({ color: 0xff6600, size: 0.08 });
+            const particles = new THREE.Points(geometry, material);
+            particles.position.copy(position);
+            scene.add(particles);
+            setTimeout(() => scene.remove(particles), 200);
         }
         
-        // --- Переключение режимов ---
-        screenBtn.addEventListener('click', () => {
-            if (mode === 'screen') return;
-            // очищаем предыдущую сцену если была
-            if (renderer && renderer.domElement) {
-                renderer.domElement.remove();
-            }
-            mode = 'screen';
-            cubeList = [];
-            lastTilt = { gamma: 0, beta: 0 };
-            initScreen();
-            startScreenReceiver();
-            statusDiv.innerHTML = '🖥️ Экран | Ждём сигнала от контроллера...';
-        });
+        function updateSaberAngle() {
+            if (!saberLine) return;
+            // Ограничиваем угол от -50 до +50 градусов
+            const limitedAngle = Math.max(-50, Math.min(50, saberAngle));
+            // Вращаем луч по оси Z (влево-вправо) и немного по X для наклона вперёд
+            saberLine.rotation.z = limitedAngle * Math.PI / 180;
+            saberLine.rotation.x = -0.2; // небольшой наклон вперёд
+        }
         
-        controllerBtn.addEventListener('click', () => {
-            if (mode === 'controller') return;
+        // ========== BLUETOOTH СЕРВЕР (для режима контроллера) ==========
+        async function startBluetoothServer() {
+            try {
+                statusDiv.innerHTML = '🔵 Запрос Bluetooth...';
+                // Запрашиваем устройство с нужным сервисом
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: false,
+                    filters: [{ namePrefix: 'Saber' }],
+                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+                });
+                
+                statusDiv.innerHTML = `🔵 Подключение к ${device.name}...`;
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+                const characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+                
+                bluetoothCharacteristic = characteristic;
+                isBluetoothConnected = true;
+                
+                // Подписываемся на уведомления
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', handleBluetoothData);
+                
+                statusDiv.innerHTML = '✅ Bluetooth подключён! Наклоняйте телефон';
+                return true;
+            } catch (error) {
+                console.error('Bluetooth error:', error);
+                statusDiv.innerHTML = `❌ Ошибка: ${error.message}`;
+                return false;
+            }
+        }
+        
+        function handleBluetoothData(event) {
+            const value = event.target.value;
+            if (!value) return;
+            // Получаем угол (0-180) из одного байта
+            const angleByte = value.getUint8(0);
+            // Преобразуем 0-180 в -60..+60 градусов
+            const angle = (angleByte / 180) * 120 - 60;
+            saberAngle = angle;
+            
+            // Обновляем отображение на контроллере (если в режиме контроллера)
+            if (mode === 'controller' && gyroDisplay) {
+                gyroDisplay.innerHTML = `${Math.round(angle)}°`;
+            }
+        }
+        
+        // ========== РЕЖИМ КОНТРОЛЛЕРА (отправляет гироскоп через Bluetooth) ==========
+        let gyroInterval = null;
+        
+        async function initControllerMode() {
             mode = 'controller';
-            // если экранная сцена была - очистим
-            if (renderer && renderer.domElement) {
-                renderer.domElement.remove();
+            controllerPanel.style.display = 'block';
+            statusDiv.innerHTML = '🎮 Контроллер | Ожидание Bluetooth...';
+            
+            // Запрашиваем разрешение на гироскоп
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                // iOS
+                statusDiv.innerHTML = '🎮 Нажмите "Подключить Bluetooth" и разрешите гироскоп';
+                const requestGyro = async () => {
+                    const permission = await DeviceOrientationEvent.requestPermission();
+                    if (permission === 'granted') {
+                        window.addEventListener('deviceorientation', (e) => {
+                            if (mode === 'controller') {
+                                const gamma = e.gamma || 0;
+                                const limited = Math.max(-60, Math.min(60, gamma));
+                                sendGyroAngle(limited);
+                                if (gyroDisplay) gyroDisplay.innerHTML = `${Math.round(limited)}°`;
+                            }
+                        });
+                    }
+                    document.removeEventListener('click', requestGyro);
+                };
+                document.addEventListener('click', requestGyro);
+            } else {
+                // Android
+                window.addEventListener('deviceorientation', (e) => {
+                    if (mode === 'controller') {
+                        const gamma = e.gamma || 0;
+                        const limited = Math.max(-60, Math.min(60, gamma));
+                        sendGyroAngle(limited);
+                        if (gyroDisplay) gyroDisplay.innerHTML = `${Math.round(limited)}°`;
+                    }
+                });
             }
-            initController();
-        });
+            
+            connectBtn.onclick = async () => {
+                await startBluetoothServer();
+            };
+        }
         
-        // Стартовое состояние - предложим выбрать режим
-        statusDiv.innerHTML = '📱 Выберите режим: экран или контроллер';
+        function sendGyroAngle(angle) {
+            if (!isBluetoothConnected || !bluetoothCharacteristic) return;
+            // Преобразуем угол (-60..60) в байт (0-180)
+            const byteValue = Math.floor(((angle + 60) / 120) * 180);
+            const data = new Uint8Array([byteValue]);
+            bluetoothCharacteristic.writeValue(data).catch(e => console.log('write error', e));
+        }
         
-        // маленький help
-        console.log('Приложение готово. Для реального Bluetooth потребуется BLE периферия, но связка через BroadcastChannel работает между двумя телефонами в одной сети, открывшими эту же страницу.');
+        // ========== РЕЖИМ ЭКРАНА ==========
+        function initScreenMode() {
+            mode = 'screen';
+            controllerPanel.style.display = 'none';
+            statusDiv.innerHTML = '🖥️ Экран | Ожидание Bluetooth...';
+            initScreenScene();
+            
+            // Запускаем Bluetooth-клиент для приёма данных
+            startBluetoothClient();
+        }
+        
+        async function startBluetoothClient() {
+            try {
+                statusDiv.innerHTML = '🔵 Поиск контроллера...';
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'Saber' }],
+                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+                });
+                
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+                const characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+                
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                    const value = event.target.value;
+                    if (value) {
+                        const angleByte = value.getUint8(0);
+                        const angle = (angleByte / 180) * 120 - 60;
+                        saberAngle = angle;
+                    }
+                });
+                
+                statusDiv.innerHTML = '✅ Контроллер подключён! Луч двигается';
+            } catch (error) {
+                statusDiv.innerHTML = `❌ Не удалось подключиться: ${error.message}`;
+            }
+        }
+        
+        // ========== ВЫБОР РЕЖИМА ==========
+        // Создаём кнопки выбора
+        const modeSelector = document.createElement('div');
+        modeSelector.style.position = 'absolute';
+        modeSelector.style.bottom = '30px';
+        modeSelector.style.left = '20px';
+        modeSelector.style.right = '20px';
+        modeSelector.style.display = 'flex';
+        modeSelector.style.gap = '15px';
+        modeSelector.style.justifyContent = 'center';
+        modeSelector.style.zIndex = '200';
+        modeSelector.innerHTML = `
+            <button id="chooseScreenBtn" style="background: #33cc66;">🖥️ Режим ЭКРАНА</button>
+            <button id="chooseControllerBtn" style="background: #ff3366;">🎮 Режим КОНТРОЛЛЕРА</button>
+        `;
+        document.body.appendChild(modeSelector);
+        
+        document.getElementById('chooseScreenBtn').onclick = () => {
+            modeSelector.style.display = 'none';
+            initScreenMode();
+        };
+        
+        document.getElementById('chooseControllerBtn').onclick = () => {
+            modeSelector.style.display = 'none';
+            initControllerMode();
+        };
+        
+        // Инструкция по настройке Bluetooth
+        console.log('=== ИНСТРУКЦИЯ ===');
+        console.log('1. На одном телефоне выберите "Режим ЭКРАНА"');
+        console.log('2. На другом телефоне выберите "Режим КОНТРОЛЛЕРА"');
+        console.log('3. На контроллере нажмите "Подключить Bluetooth"');
+        console.log('4. На экране также нажмите "Подключить" при появлении запроса');
+        console.log('ВАЖНО: Имя Bluetooth устройства должно начинаться с "Saber"');
+        console.log('Для теста без Bluetooth можно использовать любой BLE-эмулятор');
     </script>
 </body>
 </html>
