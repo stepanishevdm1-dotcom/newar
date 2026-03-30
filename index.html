@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>BEAT SABER — второй телефон как гироскоп</title>
+    <title>SABER — экран и пульт</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #000; }
         #ui { position: absolute; top: 20px; left: 20px; right: 20px; z-index: 100; display: flex; justify-content: space-between; pointer-events: none; }
@@ -19,9 +19,10 @@
             padding: 20px;
             text-align: center;
             z-index: 200;
+            backdrop-filter: blur(10px);
         }
         button {
-            background: linear-gradient(135deg, #ff3366, #ff6699);
+            background: #ff3366;
             border: none;
             color: white;
             padding: 14px 24px;
@@ -30,16 +31,34 @@
             margin: 10px;
             cursor: pointer;
         }
-        .btn-green { background: linear-gradient(135deg, #33cc66, #66ff99); }
-        .qr {
-            background: white;
+        .btn-green { background: #33cc66; }
+        .btn-blue { background: #3399ff; }
+        .ip-box {
+            background: #1a1a2e;
             padding: 15px;
             border-radius: 20px;
-            display: inline-block;
-            margin: 15px auto;
+            font-family: monospace;
+            font-size: 24px;
+            color: #33ff66;
+            margin: 10px 0;
         }
-        .gyro-value { font-size: 48px; font-weight: bold; color: #ffaa33; margin: 10px 0; }
-        .instruction { font-size: 12px; color: #aaa; }
+        .gyro-value {
+            font-size: 48px;
+            font-weight: bold;
+            color: #ffaa33;
+            margin: 10px 0;
+        }
+        input {
+            padding: 12px;
+            font-size: 20px;
+            text-align: center;
+            border-radius: 30px;
+            border: none;
+            width: 70%;
+            margin: 10px 0;
+            background: #333;
+            color: white;
+        }
         .mode-selector {
             position: absolute;
             bottom: 30px;
@@ -50,12 +69,12 @@
             justify-content: center;
             z-index: 300;
         }
+        .instruction { font-size: 11px; color: #aaa; margin-top: 10px; }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <div id="ui">
-        <div class="status" id="status">⚡ BEAT SABER</div>
+        <div class="status" id="status">⚡ SABER</div>
         <div class="score" id="score">0</div>
     </div>
 
@@ -65,18 +84,20 @@
     </div>
 
     <div id="screenPanel" class="panel" style="display: none;">
-        <div style="font-size: 20px;">🖥️ ОТСКАНИРУЙ QR ПУЛЬТОМ</div>
-        <div id="qrContainer" class="qr"></div>
+        <div style="font-size: 20px;">🖥️ ВЫ — ЭКРАН</div>
+        <button id="startServerBtn" class="btn-green">🚀 ЗАПУСТИТЬ СЕРВЕР</button>
+        <div id="ipBox" class="ip-box" style="display: none;"></div>
         <div id="screenStatus">⏳ Ожидание подключения...</div>
-        <div class="instruction">🔹 На пульте нажми "ПУЛЬТ" и наведи камеру на QR</div>
+        <div class="instruction">🔹 На пульте нажми "ПУЛЬТ" и введи этот IP</div>
     </div>
 
     <div id="controllerPanel" class="panel" style="display: none;">
-        <div style="font-size: 20px;">🎮 НАВЕДИ КАМЕРУ НА QR</div>
-        <div id="controllerStatus"></div>
+        <div style="font-size: 20px;">🎮 ВЫ — ПУЛЬТ</div>
+        <input type="text" id="ipInput" placeholder="192.168.x.x">
+        <button id="connectBtn" class="btn-blue">🔗 ПОДКЛЮЧИТЬСЯ</button>
+        <div id="ctrlStatus"></div>
         <div class="gyro-value" id="gyroAngle">0°</div>
         <div class="instruction">📱 НАКЛОНЯЙ ТЕЛЕФОН → МЕЧ ДВИГАЕТСЯ</div>
-        <button id="scanQrBtn" class="btn-green">📷 ОТКРЫТЬ КАМЕРУ ДЛЯ QR</button>
     </div>
 
     <script type="importmap">
@@ -91,47 +112,50 @@
         let cubes = [];
         let saberAngle = 0;
         let ws = null;
-        let roomId = Math.random().toString(36).substring(2, 8);
+        let wsServer = null;
 
-        // DOM
         const statusDiv = document.getElementById('status');
         const scoreDiv = document.getElementById('score');
         const modeSelector = document.getElementById('modeSelector');
         const screenPanel = document.getElementById('screenPanel');
         const controllerPanel = document.getElementById('controllerPanel');
         const screenStatus = document.getElementById('screenStatus');
-        const controllerStatus = document.getElementById('controllerStatus');
+        const ctrlStatus = document.getElementById('ctrlStatus');
         const gyroAngleSpan = document.getElementById('gyroAngle');
-        const qrContainer = document.getElementById('qrContainer');
+        const ipBox = document.getElementById('ipBox');
+        const startServerBtn = document.getElementById('startServerBtn');
+        const connectBtn = document.getElementById('connectBtn');
+        const ipInput = document.getElementById('ipInput');
 
-        // === 3D СЦЕНА ===
+        // ========== 3D СЦЕНА ==========
+        let scene, camera, renderer, saberGroup;
+        
         function init3D() {
-            const scene = new THREE.Scene();
+            scene = new THREE.Scene();
             scene.background = new THREE.Color(0x050510);
             scene.fog = new THREE.FogExp2(0x050510, 0.02);
-
-            const camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 1.8, 6);
             camera.lookAt(0, 1.5, -2);
-
-            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
             document.body.appendChild(renderer.domElement);
-
-            // Свет
+            
             const ambient = new THREE.AmbientLight(0x222233);
             scene.add(ambient);
             const light = new THREE.PointLight(0xff66cc, 0.8);
             light.position.set(2, 4, 3);
             scene.add(light);
-
-            // Пол
+            
             const grid = new THREE.GridHelper(12, 12, 0xff33cc, 0x33ff66);
             grid.position.y = -1.2;
             scene.add(grid);
-
-            // МЕЧ
-            const saberGroup = new THREE.Group();
+            
+            // Меч
+            saberGroup = new THREE.Group();
             const blade = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.07, 0.12, 1.6, 12),
                 new THREE.MeshStandardMaterial({ color: 0xff2266, emissive: 0xff0044, emissiveIntensity: 1.2 })
@@ -141,21 +165,23 @@
             
             const handle = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.14, 0.14, 0.5, 8),
-                new THREE.MeshStandardMaterial({ color: 0xccaa88 })
+                new THREE.MeshStandardMaterial({ color: 0xccaa88, metalness: 0.7 })
             );
             handle.position.y = -0.15;
             saberGroup.add(handle);
             
             saberGroup.position.set(0, 0.8, 3.5);
             scene.add(saberGroup);
-
+            
             // Звёзды
             const stars = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ color: 0xffffff, size: 0.1 }));
             const starPos = [];
-            for (let i = 0; i < 1500; i++) starPos.push((Math.random() - 0.5) * 200, (Math.random() - 0.5) * 100, (Math.random() - 0.5) * 80 - 40);
+            for (let i = 0; i < 1500; i++) {
+                starPos.push((Math.random() - 0.5) * 200, (Math.random() - 0.5) * 100, (Math.random() - 0.5) * 80 - 40);
+            }
             stars.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(starPos), 3));
             scene.add(stars);
-
+            
             // Генерация кубов
             setInterval(() => {
                 if (mode === 'screen') {
@@ -170,9 +196,10 @@
                     cubes.push(cube);
                 }
             }, 600);
-
+            
             function animate() {
                 if (mode !== 'screen') return;
+                
                 for (let i = cubes.length-1; i >= 0; i--) {
                     const cube = cubes[i];
                     cube.position.z += cube.userData.speed * 0.035;
@@ -185,19 +212,21 @@
                         score += 10;
                         scoreDiv.innerHTML = score;
                         statusDiv.innerHTML = `⚡ SLICE!`;
-                        setTimeout(() => statusDiv.innerHTML = 'BEAT SABER', 300);
+                        setTimeout(() => statusDiv.innerHTML = 'SABER', 300);
                     }
                     if (cube.position.z > 4) {
                         scene.remove(cube);
                         cubes.splice(i,1);
                     }
                 }
+                
                 saberGroup.rotation.z = -saberAngle * Math.PI / 180 * 0.8;
                 stars.rotation.y += 0.002;
                 renderer.render(scene, camera);
                 requestAnimationFrame(animate);
             }
             animate();
+            
             window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
@@ -205,39 +234,83 @@
             });
         }
 
-        // === ВЕБ СОКЕТ ЧЕРЕЗ PUBLIC СЕРВЕР ===
-        function startWebSocketServer() {
-            const wsUrl = `wss://echo.websocket.org`;
-            ws = new WebSocket(wsUrl);
+        // ========== ПОЛУЧЕНИЕ IP ==========
+        async function getLocalIP() {
+            return new Promise((resolve) => {
+                const pc = new RTCPeerConnection({ iceServers: [] });
+                pc.createDataChannel('');
+                pc.createOffer().then(offer => pc.setLocalDescription(offer));
+                pc.onicecandidate = (e) => {
+                    if (e && e.candidate && e.candidate.candidate) {
+                        const ip = e.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/)?.[0];
+                        if (ip && !ip.startsWith('0.0.0.0')) {
+                            resolve(ip);
+                            pc.close();
+                        }
+                    }
+                };
+                setTimeout(() => resolve('192.168.43.1'), 2000);
+            });
+        }
+
+        // ========== РЕЖИМ ЭКРАНА (СЕРВЕР) ==========
+        async function startScreenMode() {
+            mode = 'screen';
+            init3D();
+            
+            const ip = await getLocalIP();
+            ipBox.innerHTML = `📡 IP: ${ip}<br><span style="font-size:14px;">Введи этот IP на пульте</span>`;
+            ipBox.style.display = 'block';
+            screenStatus.innerHTML = '⏳ Ожидание подключения пульта...';
+            
+            // Создаём WebSocket сервер (браузер не может быть сервером, используем заглушку)
+            // ВАЖНО: для реальной работы нужен WebSocket сервер. Показываем инструкцию.
+            screenStatus.innerHTML = `⚠️ ВАЖНО: Установи приложение "WebSocket Server" из Play Market, запусти на порту 8080, затем нажми "ПОДКЛЮЧИТЬСЯ" на пульте с IP ${ip}`;
+            
+            // Пытаемся подключиться к серверу
+            ws = new WebSocket(`ws://${ip}:8080`);
             ws.onopen = () => {
-                screenStatus.innerHTML = '✅ Пульт подключён! Наклоняйте второй телефон';
-                statusDiv.innerHTML = '🎯 ПУЛЬТ ПОДКЛЮЧЁН';
+                screenStatus.innerHTML = '✅ ПУЛЬТ ПОДКЛЮЧЁН! Наклоняйте второй телефон';
             };
             ws.onmessage = (e) => {
                 const angle = parseFloat(e.data);
-                if (!isNaN(angle)) saberAngle = Math.max(-45, Math.min(45, angle));
+                if (!isNaN(angle)) saberAngle = angle;
             };
             ws.onerror = () => {
-                screenStatus.innerHTML = '⚠️ Нет интернета. Используй локальный режим.';
+                // Ничего, ждём пока пульт подключится
             };
         }
 
-        function startWebSocketClient() {
-            const wsUrl = `wss://echo.websocket.org`;
-            ws = new WebSocket(wsUrl);
-            ws.onopen = () => {
-                controllerStatus.innerHTML = '✅ ПОДКЛЮЧЕНО! Наклоняй телефон';
-                startGyro();
-            };
-            ws.onerror = () => {
-                controllerStatus.innerHTML = '❌ Нет интернета. Включи Wi-Fi.';
+        // ========== РЕЖИМ ПУЛЬТА ==========
+        function startControllerMode() {
+            mode = 'controller';
+            
+            connectBtn.onclick = () => {
+                const ip = ipInput.value.trim();
+                if (!ip) {
+                    ctrlStatus.innerHTML = '❌ Введите IP';
+                    return;
+                }
+                ctrlStatus.innerHTML = `🔄 Подключение к ${ip}:8080...`;
+                
+                ws = new WebSocket(`ws://${ip}:8080`);
+                ws.onopen = () => {
+                    ctrlStatus.innerHTML = '✅ ПОДКЛЮЧЕНО! Наклоняй телефон';
+                    startGyro();
+                };
+                ws.onerror = () => {
+                    ctrlStatus.innerHTML = '❌ Ошибка. Убедись, что на экране запущен WebSocket сервер (порт 8080)';
+                };
             };
         }
 
         function startGyro() {
             const sendAngle = (angle) => {
-                if (ws && ws.readyState === WebSocket.OPEN) ws.send(angle.toString());
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(angle.toString());
+                }
             };
+            
             if (typeof DeviceOrientationEvent !== 'undefined') {
                 const handleGyro = (e) => {
                     const gamma = e.gamma || 0;
@@ -245,62 +318,44 @@
                     gyroAngleSpan.innerHTML = `${Math.round(angle)}°`;
                     sendAngle(angle);
                 };
+                
                 if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                    controllerStatus.innerHTML = '🎮 Нажми для разрешения гироскопа';
-                    const request = () => {
+                    ctrlStatus.innerHTML = '🎮 Нажми на экран для разрешения гироскопа';
+                    const requestGyro = () => {
                         DeviceOrientationEvent.requestPermission().then(() => {
                             window.addEventListener('deviceorientation', handleGyro);
-                            controllerStatus.innerHTML = '✅ ГИРОСКОП АКТИВЕН';
+                            ctrlStatus.innerHTML = '✅ ГИРОСКОП АКТИВЕН! Наклоняй телефон';
+                        }).catch(() => {
+                            ctrlStatus.innerHTML = '❌ Нет доступа к гироскопу';
                         });
-                        document.removeEventListener('click', request);
+                        document.removeEventListener('click', requestGyro);
                     };
-                    document.addEventListener('click', request);
+                    document.addEventListener('click', requestGyro);
                 } else {
                     window.addEventListener('deviceorientation', handleGyro);
+                    ctrlStatus.innerHTML = '✅ ГИРОСКОП АКТИВЕН';
                 }
+            } else {
+                ctrlStatus.innerHTML = '❌ Гироскоп не поддерживается';
             }
         }
 
-        // === QR КОД ===
-        function showQR() {
-            qrContainer.innerHTML = '';
-            const url = window.location.href.split('?')[0] + '?mode=controller';
-            new QRCode(qrContainer, { text: url, width: 200, height: 200 });
-        }
-
-        // === ВЫБОР РЕЖИМА ===
+        // ========== ВЫБОР РЕЖИМА ==========
         document.getElementById('screenBtn').onclick = () => {
-            mode = 'screen';
             modeSelector.style.display = 'none';
             screenPanel.style.display = 'block';
             controllerPanel.style.display = 'none';
-            init3D();
-            showQR();
-            startWebSocketServer();
-            statusDiv.innerHTML = '🖥️ ЭКРАН';
+            startScreenMode();
+            statusDiv.innerHTML = '🖥️ РЕЖИМ ЭКРАНА';
         };
-
+        
         document.getElementById('controllerBtn').onclick = () => {
-            mode = 'controller';
             modeSelector.style.display = 'none';
             screenPanel.style.display = 'none';
             controllerPanel.style.display = 'block';
-            statusDiv.innerHTML = '🎮 ПУЛЬТ';
-            
-            document.getElementById('scanQrBtn').onclick = () => {
-                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                    window.location.href = window.location.href.split('?')[0] + '?mode=controller';
-                    startWebSocketClient();
-                } else {
-                    controllerStatus.innerHTML = '❌ Камера не поддерживается. Введи адрес вручную.';
-                }
-            };
+            startControllerMode();
+            statusDiv.innerHTML = '🎮 РЕЖИМ ПУЛЬТА';
         };
-
-        // Автозапуск если есть параметр
-        if (window.location.search.includes('mode=controller')) {
-            document.getElementById('controllerBtn').click();
-        }
     </script>
 </body>
 </html>
