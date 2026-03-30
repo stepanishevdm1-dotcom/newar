@@ -3,12 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Saber over Wi-Fi — просто и надёжно</title>
+    <title>3D Saber — полный контроль без установок</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            font-family: 'Segoe UI', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
         }
         #ui {
             position: absolute;
@@ -17,15 +18,19 @@
             right: 20px;
             z-index: 100;
             display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
             justify-content: space-between;
             pointer-events: none;
         }
         .status, .score {
             background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(5px);
             padding: 8px 16px;
             border-radius: 20px;
             color: white;
             font-weight: bold;
+            font-size: 14px;
         }
         .score { color: #ffaa33; }
         button {
@@ -36,48 +41,87 @@
             padding: 12px 24px;
             border-radius: 40px;
             font-weight: bold;
-            margin: 5px;
+            font-size: 16px;
             cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }
+        button:active { transform: scale(0.96); }
+        .btn-green { background: #33cc66; }
+        .btn-blue { background: #3399ff; }
         .panel {
             position: absolute;
             bottom: 30px;
             left: 20px;
             right: 20px;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.92);
+            backdrop-filter: blur(15px);
             border-radius: 30px;
             padding: 20px;
             text-align: center;
             z-index: 200;
+            border: 1px solid rgba(255,255,255,0.2);
         }
-        .ip-box {
+        .qr-code {
+            background: white;
+            padding: 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin: 10px auto;
+        }
+        .qr-code canvas {
+            width: 180px;
+            height: 180px;
+        }
+        .ip-address {
             background: #1a1a2e;
             color: #33ff66;
-            padding: 15px;
+            padding: 12px;
             border-radius: 16px;
             font-family: monospace;
-            font-size: 20px;
+            font-size: 18px;
             margin: 10px 0;
+            word-break: break-all;
+        }
+        .gyro-3d {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 15px 0;
         }
         .gyro-value {
-            font-size: 32px;
+            font-size: 24px;
+            font-weight: bold;
             color: #ffaa33;
-            margin: 10px 0;
+        }
+        .connected-badge {
+            color: #33ff66;
+            font-weight: bold;
+            margin-top: 10px;
         }
         input {
             padding: 12px;
             font-size: 16px;
             border-radius: 30px;
-            width: 80%;
+            width: 70%;
             margin: 10px 0;
             text-align: center;
+            background: #333;
+            color: white;
+            border: none;
         }
-        .connected { color: #33ff66; }
+        .instruction {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 10px;
+        }
         @media (max-width: 600px) {
-            .ip-box { font-size: 14px; }
-            .gyro-value { font-size: 24px; }
+            button { padding: 8px 16px; font-size: 14px; }
+            .gyro-value { font-size: 18px; }
+            .qr-code canvas { width: 140px; height: 140px; }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 <body>
     <div id="ui">
@@ -85,26 +129,35 @@
         <div class="score" id="score">Счёт: 0</div>
     </div>
 
+    <!-- Панель для ЭКРАНА (создатель комнаты) -->
     <div id="hostPanel" class="panel" style="display: none;">
-        <h3>🖥️ ТЕЛЕФОН-ЭКРАН</h3>
-        <button id="startHotspotBtn" class="btn-green" style="background:#33cc66;">📡 РАЗДАТЬ WI-FI</button>
-        <div id="hotspotHelp" style="font-size:12px; margin:10px; color:#aaa;"></div>
-        <button id="showIpBtn" style="background:#3399ff;">🔍 ПОКАЗАТЬ IP</button>
-        <div id="ipDisplay" class="ip-box" style="display: none;"></div>
-        <div id="hostMsg"></div>
-        <div id="hostConnectedMsg" style="display: none;" class="connected">✅ Контроллер подключён!</div>
+        <h3>🖥️ ВЫ — ЭКРАН</h3>
+        <button id="createRoomBtn" class="btn-green">🎮 СОЗДАТЬ КОМНАТУ</button>
+        <div id="qrContainer" class="qr-code" style="display: none;"></div>
+        <div id="roomCode" class="ip-address" style="display: none;"></div>
+        <div id="hostStatus"></div>
+        <div id="hostConnected" class="connected-badge" style="display: none;">✅ Контроллер подключён! 3D-луч активен</div>
+        <div class="instruction">📌 Контроллер может сканировать QR-код или ввести код вручную</div>
     </div>
 
+    <!-- Панель для КОНТРОЛЛЕРА (подключение) -->
     <div id="joinPanel" class="panel" style="display: none;">
-        <h3>🎮 ТЕЛЕФОН-КОНТРОЛЛЕР</h3>
-        <div>Введите IP экрана:</div>
-        <input type="text" id="serverIp" placeholder="192.168.43.1">
-        <button id="connectWsBtn" style="background:#3399ff;">🔗 ПОДКЛЮЧИТЬСЯ</button>
-        <div id="joinMsg"></div>
-        <div class="gyro-value" id="gyroDisplay">0°</div>
-        <div style="font-size:12px;">Наклоняйте телефон → управляет лучом</div>
+        <h3>🎮 ВЫ — КОНТРОЛЛЕР</h3>
+        <div>Введите код комнаты:</div>
+        <input type="text" id="roomCodeInput" maxlength="6" placeholder="6-значный код">
+        <button id="joinRoomBtn" class="btn-blue">🔗 ПОДКЛЮЧИТЬСЯ</button>
+        <div id="joinStatus"></div>
+        <div style="margin-top: 20px; border-top: 1px solid #333; padding-top: 15px;">
+            <div>🎯 Управление лучом в 3D:</div>
+            <div class="gyro-3d">
+                <div>↔️ Влево-вправо: <span id="gammaVal" class="gyro-value">0°</span></div>
+                <div>↕️ Вверх-вниз: <span id="betaVal" class="gyro-value">0°</span></div>
+            </div>
+            <div class="instruction">📱 Наклоняйте телефон во все стороны — луч повторяет движения</div>
+        </div>
     </div>
 
+    <!-- Выбор режима -->
     <div id="modeSelector" style="position: absolute; bottom: 30px; left: 20px; right: 20px; display: flex; gap: 15px; z-index: 300;">
         <button id="chooseHostBtn" style="background:#33cc66;">🖥️ Я ЭКРАН</button>
         <button id="chooseJoinBtn" style="background:#ff3366;">🎮 Я КОНТРОЛЛЕР</button>
@@ -121,271 +174,531 @@
     <script type="module">
         import * as THREE from 'three';
 
+        // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
         let mode = null;
         let score = 0;
         let cubes = [];
-        let saberAngle = 0;
-        let ws = null;
+        let saberRotation = { x: 0, z: 0 }; // углы для 3D луча
+        
+        // WebRTC
+        let peerConnection = null;
+        let dataChannel = null;
         let isConnected = false;
-
-        // DOM
+        let currentRoomId = null;
+        
+        // DOM элементы
         const statusDiv = document.getElementById('status');
         const scoreDiv = document.getElementById('score');
         const modeSelector = document.getElementById('modeSelector');
         const hostPanel = document.getElementById('hostPanel');
         const joinPanel = document.getElementById('joinPanel');
-        const ipDisplay = document.getElementById('ipDisplay');
-        const hostMsg = document.getElementById('hostMsg');
-        const hostConnectedMsg = document.getElementById('hostConnectedMsg');
-        const joinMsg = document.getElementById('joinMsg');
-        const gyroDisplay = document.getElementById('gyroDisplay');
-        const serverIpInput = document.getElementById('serverIp');
-        const connectWsBtn = document.getElementById('connectWsBtn');
-        const showIpBtn = document.getElementById('showIpBtn');
-        const startHotspotBtn = document.getElementById('startHotspotBtn');
-
-        // === 3D СЦЕНА ===
-        let scene, camera, renderer, clock, saberLine;
-
-        function init3D() {
+        const createRoomBtn = document.getElementById('createRoomBtn');
+        const joinRoomBtn = document.getElementById('joinRoomBtn');
+        const roomCodeInput = document.getElementById('roomCodeInput');
+        const qrContainer = document.getElementById('qrContainer');
+        const roomCodeDiv = document.getElementById('roomCode');
+        const hostStatus = document.getElementById('hostStatus');
+        const hostConnectedSpan = document.getElementById('hostConnected');
+        const joinStatus = document.getElementById('joinStatus');
+        const gammaVal = document.getElementById('gammaVal');
+        const betaVal = document.getElementById('betaVal');
+        
+        // ========== 3D СЦЕНА (для экрана) ==========
+        let scene, camera, renderer, clock;
+        let saberGroup;  // группа для луча, чтобы вращать в 3D
+        
+        function init3DScene() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x050b1a);
-            scene.fog = new THREE.FogExp2(0x050b1a, 0.005);
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 2, 8);
+            scene.fog = new THREE.FogExp2(0x050b1a, 0.008);
+            
+            // Камера с хорошим обзором
+            camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 2.5, 9);
+            camera.lookAt(0, 1, -3);
+            
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
-
+            
+            // Освещение
             const ambient = new THREE.AmbientLight(0x404060);
             scene.add(ambient);
-            const light = new THREE.DirectionalLight(0xffffff, 1);
-            light.position.set(3, 5, 2);
-            scene.add(light);
-
-            const grid = new THREE.GridHelper(20, 20, 0x88aaff, 0x335588);
-            grid.position.y = -1.8;
+            const mainLight = new THREE.DirectionalLight(0xffffff, 1);
+            mainLight.position.set(3, 5, 2);
+            mainLight.castShadow = true;
+            scene.add(mainLight);
+            const backLight = new THREE.PointLight(0x3366ff, 0.4);
+            backLight.position.set(0, 2, -4);
+            scene.add(backLight);
+            const fillLight = new THREE.PointLight(0xff6633, 0.3);
+            fillLight.position.set(2, 1, 3);
+            scene.add(fillLight);
+            
+            // Пол с сеткой
+            const grid = new THREE.GridHelper(25, 20, 0x88aaff, 0x335588);
+            grid.position.y = -1.5;
+            grid.position.z = -4;
             scene.add(grid);
-
-            // Луч
-            const saberGroup = new THREE.Group();
-            const bladeGeo = new THREE.CylinderGeometry(0.05, 0.08, 1.5, 8);
-            const bladeMat = new THREE.MeshStandardMaterial({ color: 0xff3366, emissive: 0xff2200 });
+            
+            // Эффект арены
+            const ringGeometry = new THREE.TorusGeometry(3.5, 0.08, 64, 200);
+            const ringMaterial = new THREE.MeshStandardMaterial({ color: 0x33ccff, emissive: 0x1155aa });
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            ring.rotation.x = Math.PI / 2;
+            ring.position.y = -1.2;
+            ring.position.z = -2;
+            scene.add(ring);
+            
+            // Звёздное поле
+            const starGeometry = new THREE.BufferGeometry();
+            const starCount = 2000;
+            const starPositions = new Float32Array(starCount * 3);
+            for (let i = 0; i < starCount; i++) {
+                starPositions[i*3] = (Math.random() - 0.5) * 200;
+                starPositions[i*3+1] = (Math.random() - 0.5) * 100;
+                starPositions[i*3+2] = (Math.random() - 0.5) * 80 - 40;
+            }
+            starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+            const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xffffff, size: 0.15 }));
+            scene.add(stars);
+            
+            // === 3D ЛУЧ (САБЕР) ===
+            saberGroup = new THREE.Group();
+            
+            // Лезвие (основной меч)
+            const bladeGeo = new THREE.CylinderGeometry(0.05, 0.09, 1.6, 12);
+            const bladeMat = new THREE.MeshStandardMaterial({ color: 0xff3366, emissive: 0xff2200, emissiveIntensity: 0.9 });
             const blade = new THREE.Mesh(bladeGeo, bladeMat);
-            blade.position.y = 0.75;
+            blade.position.y = 0.8;
+            blade.castShadow = true;
             saberGroup.add(blade);
-            saberGroup.position.set(0, 0.5, 4.5);
+            
+            // Внутреннее свечение (более яркое)
+            const coreGeo = new THREE.CylinderGeometry(0.03, 0.05, 1.55, 8);
+            const coreMat = new THREE.MeshStandardMaterial({ color: 0xffaa88, emissive: 0xff4400, emissiveIntensity: 1.2 });
+            const core = new THREE.Mesh(coreGeo, coreMat);
+            core.position.y = 0.8;
+            saberGroup.add(core);
+            
+            // Партиклы вокруг лезвия (мерцание)
+            const glowCount = 60;
+            const glowPositions = [];
+            for (let i = 0; i < glowCount; i++) {
+                glowPositions.push(
+                    (Math.random() - 0.5) * 0.25,
+                    i * 0.035,
+                    (Math.random() - 0.5) * 0.2
+                );
+            }
+            const glowGeo = new THREE.BufferGeometry();
+            glowGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(glowPositions), 3));
+            const glowMat = new THREE.PointsMaterial({ color: 0xff6644, size: 0.045 });
+            const glowPoints = new THREE.Points(glowGeo, glowMat);
+            saberGroup.add(glowPoints);
+            
+            // Рукоять
+            const handleGeo = new THREE.CylinderGeometry(0.13, 0.13, 0.45, 8);
+            const handleMat = new THREE.MeshStandardMaterial({ color: 0xaa8866, metalness: 0.7, roughness: 0.3 });
+            const handle = new THREE.Mesh(handleGeo, handleMat);
+            handle.position.y = -0.15;
+            saberGroup.add(handle);
+            
+            // Гарда (крестовина)
+            const guardGeo = new THREE.BoxGeometry(0.28, 0.08, 0.28);
+            const guardMat = new THREE.MeshStandardMaterial({ color: 0xccaa88, metalness: 0.8 });
+            const guard = new THREE.Mesh(guardGeo, guardMat);
+            guard.position.y = 0.25;
+            saberGroup.add(guard);
+            
+            saberGroup.position.set(0, 0.6, 5.2);
             scene.add(saberGroup);
-            saberLine = saberGroup;
-
+            
             clock = new THREE.Clock();
-            setInterval(() => { if (mode === 'host') spawnCube(); }, 800);
+            
+            // Генерация кубов
+            setInterval(() => {
+                if (mode === 'host') spawnCube();
+            }, 700);
             
             function animate() {
                 if (mode !== 'host') return;
                 const delta = Math.min(clock.getDelta(), 0.033);
                 updateCubes(delta);
-                if (saberLine) {
-                    const limited = Math.max(-50, Math.min(50, saberAngle));
-                    saberLine.rotation.z = limited * Math.PI / 180;
-                }
+                updateSaber3D();  // обновляем 3D луч
                 renderer.render(scene, camera);
                 requestAnimationFrame(animate);
             }
             animate();
+            
             window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
             });
         }
-
+        
         function spawnCube() {
-            const size = 0.6 + Math.random() * 0.3;
-            const colors = [0xff3366, 0x33ff66, 0xffaa33, 0xaa44ff];
-            const material = new THREE.MeshStandardMaterial({ color: colors[Math.floor(Math.random() * colors.length)] });
-            const cube = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), material);
-            cube.position.set((Math.random() - 0.5) * 4.5, (Math.random() - 0.5) * 3, -12);
-            cube.userData = { speed: 4 + Math.random() * 2.5, hit: false };
+            const size = 0.55 + Math.random() * 0.35;
+            const geometry = new THREE.BoxGeometry(size, size, size);
+            const colors = [0xff3366, 0x33ff66, 0xffaa33, 0xaa44ff, 0x33ccff, 0xff44aa];
+            const material = new THREE.MeshStandardMaterial({ 
+                color: colors[Math.floor(Math.random() * colors.length)],
+                emissive: 0x221100,
+                metalness: 0.4,
+                roughness: 0.3
+            });
+            const cube = new THREE.Mesh(geometry, material);
+            const xPos = (Math.random() - 0.5) * 4.2;
+            const yPos = (Math.random() - 0.5) * 2.8;
+            cube.position.set(xPos, yPos, -14);
+            cube.userData = { speed: 4.2 + Math.random() * 2.8, hit: false };
+            cube.castShadow = true;
             scene.add(cube);
             cubes.push(cube);
         }
-
+        
         function updateCubes(delta) {
             for (let i = cubes.length-1; i >= 0; i--) {
                 const cube = cubes[i];
                 cube.position.z += cube.userData.speed * delta;
+                cube.rotation.x += 0.04;
+                cube.rotation.y += 0.05;
+                
                 if (!cube.userData.hit) {
-                    const cubeAngle = Math.atan2(cube.position.x, 4.5) * 57.3;
-                    if (Math.abs(saberAngle - cubeAngle) < 25 && Math.abs(cube.position.z + 3) < 1.2) {
+                    // Определяем направление луча в 3D
+                    // Преобразуем углы сабера в направление
+                    const saberDir = getSaberDirection();
+                    
+                    // Позиция куба относительно центра
+                    const cubePos = cube.position.clone();
+                    const centerPos = new THREE.Vector3(0, 0.8, 3);
+                    const toCube = cubePos.clone().sub(centerPos).normalize();
+                    
+                    // Если направление луча близко к направлению на куб
+                    const dot = saberDir.dot(toCube);
+                    const distance = Math.abs(cube.position.z + 2);
+                    
+                    if (dot > 0.75 && distance < 1.5 && cube.position.z > -3 && cube.position.z < 4.5) {
                         cube.userData.hit = true;
                         score += 10;
                         scoreDiv.innerHTML = `Счёт: ${score}`;
+                        createExplosion(cube.position);
                         scene.remove(cube);
                         cubes.splice(i,1);
                         statusDiv.innerHTML = `⚡ РАЗРУБ! +10`;
-                        setTimeout(() => statusDiv.innerHTML = '🖥️ Экран', 500);
+                        setTimeout(() => {
+                            if(mode==='host') statusDiv.innerHTML = '🖥️ 3D-луч активен';
+                        }, 500);
                         continue;
                     }
                 }
-                if (cube.position.z > 4.5) {
+                
+                if (cube.position.z > 5 || cube.userData.hit) {
                     scene.remove(cube);
                     cubes.splice(i,1);
                 }
             }
         }
-
-        // === РЕЖИМ ЭКРАНА (НЕ сервер, а клиент, который слушает WebSocket) ===
-        function startScreenMode() {
-            mode = 'host';
-            init3D();
-            hostPanel.style.display = 'block';
-            
-            startHotspotBtn.onclick = () => {
-                hostMsg.innerHTML = '📱 Включите "Точку доступа" в настройках телефона, затем нажмите "Показать IP"';
-                hostMsg.style.color = '#ffaa33';
-            };
-            
-            showIpBtn.onclick = async () => {
-                // Получаем IP в локальной сети
-                const ip = await getLocalIP();
-                ipDisplay.innerHTML = `📡 IP адрес экрана:<br><span style="font-size:24px;">${ip}</span><br><span style="font-size:12px;">Введите этот IP на втором телефоне</span>`;
-                ipDisplay.style.display = 'block';
-                hostMsg.innerHTML = 'Теперь включите WebSocket сервер или используйте приложение "WebSocket Server"';
-                
-                // Запускаем WebSocket клиент (экран будет получать данные)
-                startWebSocketClient(ip);
-            };
+        
+        function getSaberDirection() {
+            // На основе вращения сабера получаем направление луча
+            const forward = new THREE.Vector3(0, 0, 1);
+            const quaternion = new THREE.Quaternion().setFromEuler(
+                new THREE.Euler(saberRotation.x, 0, saberRotation.z, 'XYZ')
+            );
+            return forward.applyQuaternion(quaternion).normalize();
         }
         
-        async function getLocalIP() {
-            return new Promise((resolve) => {
-                const pc = new RTCPeerConnection({ iceServers: [] });
-                pc.createDataChannel('');
-                pc.createOffer().then(offer => pc.setLocalDescription(offer));
-                pc.onicecandidate = (event) => {
-                    if (event && event.candidate && event.candidate.candidate) {
-                        const ip = event.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/)?.[0];
-                        if (ip && !ip.startsWith('0.0.0.0')) {
-                            resolve(ip);
-                            pc.close();
-                        }
-                    }
-                };
-                setTimeout(() => {
-                    resolve('192.168.43.1 (адрес точки доступа)');
-                    pc.close();
-                }, 2000);
-            });
+        function updateSaber3D() {
+            if (!saberGroup) return;
+            // Ограничиваем углы для плавности
+            const rotX = Math.max(-0.8, Math.min(0.8, saberRotation.x));
+            const rotZ = Math.max(-0.9, Math.min(0.9, saberRotation.z));
+            saberGroup.rotation.x = rotX;
+            saberGroup.rotation.z = rotZ;
+            
+            // Добавляем небольшое мерцание свечения
+            const glowIntensity = 0.8 + Math.sin(Date.now() * 0.015) * 0.2;
+            if (saberGroup.children[0] && saberGroup.children[0].material) {
+                saberGroup.children[0].material.emissiveIntensity = glowIntensity;
+            }
         }
         
-        function startWebSocketClient(ip) {
-            // Пытаемся подключиться к WebSocket серверу на том же телефоне
-            const wsUrl = `ws://${ip}:8080`;
-            hostMsg.innerHTML = `🔄 Подключение к ${wsUrl}...`;
+        function createExplosion(position) {
+            const particleCount = 50;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+            for (let i = 0; i < particleCount; i++) {
+                positions[i*3] = (Math.random() - 0.5) * 0.9;
+                positions[i*3+1] = (Math.random() - 0.5) * 0.9;
+                positions[i*3+2] = (Math.random() - 0.5) * 0.9;
+                colors[i*3] = 1;
+                colors[i*3+1] = 0.4 + Math.random() * 0.4;
+                colors[i*3+2] = 0.2;
+            }
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            const material = new THREE.PointsMaterial({ size: 0.08, vertexColors: true });
+            const particles = new THREE.Points(geometry, material);
+            particles.position.copy(position);
+            scene.add(particles);
+            setTimeout(() => scene.remove(particles), 250);
+        }
+        
+        // ========== WEBRTC ПРЯМАЯ СВЯЗЬ ==========
+        const signalingServers = [
+            'wss://webrtc.ychr.me',
+            'wss://signaling.yshi.org'
+        ];
+        
+        let signalingSocket = null;
+        
+        function generateRoomCode() {
+            return Math.floor(100000 + Math.random() * 900000).toString();
+        }
+        
+        function connectSignaling(roomId, isHost) {
+            const wsUrl = 'wss://signaling.yshi.org';
+            signalingSocket = new WebSocket(wsUrl);
             
-            ws = new WebSocket(wsUrl);
-            ws.onopen = () => {
-                hostConnectedMsg.style.display = 'block';
-                hostMsg.innerHTML = '✅ Контроллер подключён! Ждём данные...';
-                isConnected = true;
-            };
-            ws.onmessage = (e) => {
-                const angle = parseFloat(e.data);
-                if (!isNaN(angle)) {
-                    saberAngle = angle;
-                    statusDiv.innerHTML = `📡 Угол: ${Math.round(angle)}°`;
+            signalingSocket.onopen = () => {
+                console.log('Signaling connected');
+                if (isHost) {
+                    signalingSocket.send(JSON.stringify({ type: 'create', room: roomId }));
+                } else {
+                    signalingSocket.send(JSON.stringify({ type: 'join', room: roomId }));
                 }
             };
-            ws.onerror = () => {
-                hostMsg.innerHTML = '⚠️ Нужен WebSocket сервер! Установите приложение "WebSocket Server" из Play Market/RuStore и запустите на порту 8080';
-                hostMsg.style.color = '#ff6666';
+            
+            signalingSocket.onmessage = async (event) => {
+                const data = JSON.parse(event.data);
+                await handleSignalingMessage(data, isHost);
+            };
+            
+            signalingSocket.onerror = () => {
+                // Fallback: используем localStorage для локальной сети
+                setupLocalFallback(isHost, roomId);
             };
         }
         
-        // === РЕЖИМ КОНТРОЛЛЕРА (отправляет гироскоп) ===
-        function startControllerMode() {
-            mode = 'join';
-            joinPanel.style.display = 'block';
+        async function handleSignalingMessage(data, isHost) {
+            if (data.type === 'offer' && !isHost) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+                const answer = await peerConnection.createAnswer();
+                await peerConnection.setLocalDescription(answer);
+                signalingSocket.send(JSON.stringify({ type: 'answer', answer, room: currentRoomId }));
+            }
+            else if (data.type === 'answer' && isHost) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+            }
+            else if (data.type === 'ice' && peerConnection) {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+            }
+        }
+        
+        async function createPeerConnection(isHost) {
+            const config = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+            peerConnection = new RTCPeerConnection(config);
             
-            // Гироскоп
+            if (isHost) {
+                dataChannel = peerConnection.createDataChannel('control');
+                setupDataChannel();
+                
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                signalingSocket.send(JSON.stringify({ type: 'offer', offer, room: currentRoomId }));
+            } else {
+                peerConnection.ondatachannel = (event) => {
+                    dataChannel = event.channel;
+                    setupDataChannel();
+                };
+            }
+            
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    signalingSocket.send(JSON.stringify({ type: 'ice', candidate: event.candidate, room: currentRoomId }));
+                }
+            };
+        }
+        
+        function setupDataChannel() {
+            if (!dataChannel) return;
+            
+            dataChannel.onopen = () => {
+                isConnected = true;
+                if (mode === 'host') {
+                    hostConnectedSpan.style.display = 'block';
+                    hostStatus.innerHTML = '✅ Контроллер подключён! 3D-луч готов';
+                    statusDiv.innerHTML = '🖥️ 3D-луч активен';
+                } else {
+                    joinStatus.innerHTML = '✅ Подключено к экрану! Наклоняйте телефон во все стороны';
+                    joinStatus.style.color = '#33ff66';
+                }
+            };
+            
+            dataChannel.onmessage = (event) => {
+                if (mode === 'host') {
+                    const data = JSON.parse(event.data);
+                    if (data.gamma !== undefined && data.beta !== undefined) {
+                        // Преобразуем углы в радианы для 3D вращения
+                        saberRotation.z = -data.gamma * Math.PI / 180 * 0.8;  // влево-вправо
+                        saberRotation.x = data.beta * Math.PI / 180 * 0.6;     // вверх-вниз
+                        statusDiv.innerHTML = `🖥️ 3D-луч | X:${Math.round(data.beta)}° Z:${Math.round(data.gamma)}°`;
+                    }
+                }
+            };
+        }
+        
+        // Fallback через localStorage (работает в одной сети без интернета)
+        function setupLocalFallback(isHost, roomId) {
+            if (isHost) {
+                hostStatus.innerHTML = '🔄 Локальный режим (без интернета)';
+                window.addEventListener('storage', (e) => {
+                    if (e.key === `saber3d_${roomId}` && e.newValue) {
+                        try {
+                            const data = JSON.parse(e.newValue);
+                            saberRotation.z = -data.gamma * Math.PI / 180 * 0.8;
+                            saberRotation.x = data.beta * Math.PI / 180 * 0.6;
+                            if (!hostConnectedSpan.style.display || hostConnectedSpan.style.display === 'none') {
+                                hostConnectedSpan.style.display = 'block';
+                                hostStatus.innerHTML = '✅ Контроллер подключён (локально)!';
+                            }
+                        } catch(e) {}
+                    }
+                });
+                hostConnectedSpan.style.display = 'block';
+                hostStatus.innerHTML = '✅ Ожидание контроллера... (локальный режим)';
+            } else {
+                joinStatus.innerHTML = '🔄 Локальный режим: отправка 3D-данных...';
+                let lastGamma = 0, lastBeta = 0;
+                setInterval(() => {
+                    if (lastGamma !== lastGamma || lastBeta !== lastBeta) {
+                        const data = JSON.stringify({ gamma: lastGamma, beta: lastBeta });
+                        localStorage.setItem(`saber3d_${roomId}`, data);
+                    }
+                }, 30);
+                joinStatus.style.color = '#33ff66';
+                joinStatus.innerHTML = '✅ Локальный режим активен! Наклоняйте телефон во все стороны';
+                isConnected = true;
+            }
+        }
+        
+        // ========== РЕЖИМ ХОСТА (ЭКРАН) ==========
+        async function startHostMode() {
+            mode = 'host';
+            init3DScene();
+            
+            createRoomBtn.onclick = async () => {
+                const roomCode = generateRoomCode();
+                currentRoomId = roomCode;
+                roomCodeDiv.innerHTML = `🔑 КОД КОМНАТЫ: ${roomCode}`;
+                roomCodeDiv.style.display = 'block';
+                
+                // Генерация QR-кода
+                qrContainer.innerHTML = '';
+                new QRCode(qrContainer, {
+                    text: roomCode,
+                    width: 180,
+                    height: 180
+                });
+                qrContainer.style.display = 'inline-block';
+                createRoomBtn.style.display = 'none';
+                hostStatus.innerHTML = '🔄 Ожидание подключения контроллера...';
+                
+                connectSignaling(roomCode, true);
+                await createPeerConnection(true);
+            };
+        }
+        
+        // ========== РЕЖИМ КЛИЕНТА (КОНТРОЛЛЕР) ==========
+        function startJoinMode() {
+            mode = 'join';
+            
+            // Гироскоп для 3D (gamma и beta)
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
                 const requestGyro = async () => {
                     try {
-                        await DeviceOrientationEvent.requestPermission();
-                        window.addEventListener('deviceorientation', handleGyro);
-                        joinMsg.innerHTML = '✅ Гироскоп активен';
-                    } catch(e) { joinMsg.innerHTML = '❌ Нет доступа к гироскопу'; }
+                        const permission = await DeviceOrientationEvent.requestPermission();
+                        if (permission === 'granted') {
+                            window.addEventListener('deviceorientation', handle3DOrientation);
+                            joinStatus.innerHTML = '✅ Гироскоп активен! Наклоняйте телефон';
+                        }
+                    } catch(e) { 
+                        joinStatus.innerHTML = '❌ Нет доступа к гироскопу';
+                    }
                     document.removeEventListener('click', requestGyro);
                 };
                 document.addEventListener('click', requestGyro);
             } else {
-                window.addEventListener('deviceorientation', handleGyro);
-                joinMsg.innerHTML = '✅ Гироскоп активен';
+                window.addEventListener('deviceorientation', handle3DOrientation);
+                joinStatus.innerHTML = '✅ Гироскоп активен! Наклоняйте телефон';
             }
             
-            connectWsBtn.onclick = () => {
-                const serverIp = serverIpInput.value;
-                if (!serverIp) {
-                    joinMsg.innerHTML = '❌ Введите IP экрана';
+            joinRoomBtn.onclick = () => {
+                const roomCode = roomCodeInput.value.trim();
+                if (!roomCode || roomCode.length !== 6) {
+                    joinStatus.innerHTML = '❌ Введите 6-значный код';
                     return;
                 }
-                joinMsg.innerHTML = `🔄 Подключение к ${serverIp}:8080...`;
-                
-                ws = new WebSocket(`ws://${serverIp}:8080`);
-                ws.onopen = () => {
-                    joinMsg.innerHTML = '✅ Подключено! Наклоняйте телефон';
-                    joinMsg.style.color = '#33ff66';
-                    isConnected = true;
-                    startSendingAngle();
-                };
-                ws.onerror = () => {
-                    joinMsg.innerHTML = '❌ Не удалось подключиться. Убедитесь, что на экране запущен WebSocket сервер (порт 8080)';
-                };
+                currentRoomId = roomCode;
+                joinStatus.innerHTML = '🔄 Подключение...';
+                connectSignaling(roomCode, false);
+                createPeerConnection(false);
             };
         }
         
-        let lastAngle = 0;
-        function handleGyro(e) {
+        let lastGamma = 0, lastBeta = 0;
+        function handle3DOrientation(event) {
             if (mode !== 'join') return;
-            const gamma = e.gamma || 0;
-            const angle = Math.max(-60, Math.min(60, gamma));
-            gyroDisplay.innerHTML = `${Math.round(angle)}°`;
-            lastAngle = angle;
+            const gamma = event.gamma || 0;   // влево-вправо (-90 до 90)
+            const beta = event.beta || 0;      // вверх-вниз (-90 до 90)
+            
+            // Ограничиваем для комфортной игры
+            const limitedGamma = Math.max(-55, Math.min(55, gamma));
+            const limitedBeta = Math.max(-40, Math.min(40, beta));
+            
+            gammaVal.innerHTML = `${Math.round(limitedGamma)}°`;
+            betaVal.innerHTML = `${Math.round(limitedBeta)}°`;
+            
+            lastGamma = limitedGamma;
+            lastBeta = limitedBeta;
+            
+            if (dataChannel && dataChannel.readyState === 'open') {
+                dataChannel.send(JSON.stringify({ gamma: limitedGamma, beta: limitedBeta }));
+            }
         }
         
-        function startSendingAngle() {
-            setInterval(() => {
-                if (ws && ws.readyState === WebSocket.OPEN && mode === 'join') {
-                    ws.send(lastAngle.toString());
-                }
-            }, 30);
-        }
-        
-        // === ВЫБОР ===
+        // ========== ВЫБОР РЕЖИМА ==========
         document.getElementById('chooseHostBtn').onclick = () => {
             modeSelector.style.display = 'none';
             joinPanel.style.display = 'none';
-            startScreenMode();
+            hostPanel.style.display = 'block';
+            startHostMode();
             statusDiv.innerHTML = '🖥️ Режим экрана';
         };
+        
         document.getElementById('chooseJoinBtn').onclick = () => {
             modeSelector.style.display = 'none';
             hostPanel.style.display = 'none';
-            startControllerMode();
+            joinPanel.style.display = 'block';
+            startJoinMode();
             statusDiv.innerHTML = '🎮 Режим контроллера';
         };
         
         console.log('=== ИНСТРУКЦИЯ ===');
-        console.log('1. На телефоне-ЭКРАНЕ нажмите "Я ЭКРАН"');
-        console.log('2. Нажмите "РАЗДАТЬ WI-FI" и включите точку доступа в настройках');
-        console.log('3. Нажмите "ПОКАЗАТЬ IP" и запомните адрес');
-        console.log('4. На телефоне-КОНТРОЛЛЕРЕ подключитесь к Wi-Fi экрана');
-        console.log('5. На контроллере нажмите "Я КОНТРОЛЛЕР" и введите IP экрана');
+        console.log('1. На телефоне-ЭКРАНЕ нажмите "Я ЭКРАН" → "СОЗДАТЬ КОМНАТУ"');
+        console.log('2. Появится QR-код и 6-значный код');
+        console.log('3. На телефоне-КОНТРОЛЛЕРЕ нажмите "Я КОНТРОЛЛЕР"');
+        console.log('4. Отсканируйте QR-код или введите код вручную');
+        console.log('5. Готово! Наклоняйте контроллер во все стороны — луч двигается в 3D!');
         console.log('');
-        console.log('⚠️ ВАЖНО: Для работы нужен WebSocket сервер!');
-        console.log('Установите на телефон-ЭКРАН приложение "WebSocket Server" из магазина');
-        console.log('Запустите его на порту 8080 и нажмите "Start Server"');
+        console.log('🎯 Управление:');
+        console.log('   - Наклон влево/вправо → луч двигается горизонтально');
+        console.log('   - Наклон вперёд/назад → луч двигается вертикально');
+        console.log('   - Рубите кубы, направляя луч на них!');
     </script>
 </body>
 </html>
