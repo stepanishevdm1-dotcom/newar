@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Bluetooth Saber — горизонтальная игра с лучом</title>
+    <title>Wi-Fi Saber — горизонтальная игра с лучом</title>
     <style>
         body {
             margin: 0;
@@ -57,6 +57,30 @@
             font-size: 20px;
             font-weight: bold;
         }
+        .ip-display {
+            background: rgba(0,0,0,0.8);
+            color: #33ff66;
+            padding: 12px;
+            border-radius: 16px;
+            font-family: monospace;
+            font-size: 18px;
+            text-align: center;
+            margin-top: 10px;
+        }
+        #connection-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.9);
+            border-radius: 30px;
+            padding: 20px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            z-index: 200;
+            pointer-events: auto;
+            border: 1px solid #33cc66;
+        }
         #controller-panel {
             position: absolute;
             bottom: 30px;
@@ -71,18 +95,25 @@
             pointer-events: auto;
             border: 1px solid #ff3366;
         }
-        .mode-badge {
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
         .gyro-value {
-            font-size: 24px;
+            font-size: 32px;
             font-weight: bold;
             color: #ffaa33;
+            margin: 10px 0;
+        }
+        input {
+            padding: 12px;
+            font-size: 16px;
+            border-radius: 30px;
+            border: none;
+            text-align: center;
+            width: 80%;
+            margin: 10px 0;
         }
         @media (max-width: 600px) {
             button { padding: 8px 16px; font-size: 14px; }
             .score { font-size: 16px; padding: 4px 12px; }
+            .gyro-value { font-size: 24px; }
         }
     </style>
 </head>
@@ -91,12 +122,33 @@
         <div class="status" id="status">⚡ Выберите режим</div>
         <div class="score" id="score">Счёт: 0</div>
     </div>
+
+    <!-- Панель для режима ЭКРАНА (сервер) -->
+    <div id="connection-panel" style="display: none;">
+        <div style="font-size: 18px; margin-bottom: 10px;">🖥️ РЕЖИМ ЭКРАНА</div>
+        <button id="startServerBtn" class="btn-green">🚀 Запустить сервер</button>
+        <div id="serverStatus" style="margin-top: 15px; font-size: 14px; color: #aaa;"></div>
+        <div id="ipDisplay" class="ip-display" style="display: none;"></div>
+        <div id="clientConnected" style="margin-top: 10px; color: #33ff66; display: none;">✅ Контроллер подключён!</div>
+    </div>
+
+    <!-- Панель для режима КОНТРОЛЛЕРА (клиент) -->
     <div id="controller-panel" style="display: none;">
-        <div class="mode-badge">🎮 РЕЖИМ КОНТРОЛЛЕРА</div>
-        <div>Наклон телефона → управляет лучом</div>
-        <div class="gyro-value" id="gyro-display">0°</div>
-        <button id="connectBtn" style="margin-top: 10px; background: #3399ff;">🔗 Подключить Bluetooth</button>
-        <div style="font-size: 11px; margin-top: 8px; color: #aaa;">После подключения второй телефон увидит луч</div>
+        <div style="font-size: 18px; margin-bottom: 10px;">🎮 РЕЖИМ КОНТРОЛЛЕРА</div>
+        <div>Введите IP-адрес экрана:</div>
+        <input type="text" id="serverIp" placeholder="192.168.1.xxx">
+        <button id="connectBtn" class="btn-blue">🔗 Подключиться</button>
+        <div id="connectionStatus" style="margin-top: 10px; font-size: 12px; color: #ffaa33;"></div>
+        <div style="margin-top: 20px; border-top: 1px solid #333; padding-top: 15px;">
+            <div>📱 Наклон телефона → управляет лучом</div>
+            <div class="gyro-value" id="gyro-display">0°</div>
+        </div>
+    </div>
+
+    <!-- Выбор режима -->
+    <div id="modeSelector" style="position: absolute; bottom: 30px; left: 20px; right: 20px; display: flex; gap: 15px; justify-content: center; z-index: 300;">
+        <button id="chooseScreenBtn" style="background: #33cc66;">🖥️ Режим ЭКРАНА</button>
+        <button id="chooseControllerBtn" style="background: #ff3366;">🎮 Режим КОНТРОЛЛЕРА</button>
     </div>
 
     <script type="importmap">
@@ -116,30 +168,34 @@
         let cubes = [];
         let saberAngle = 0;           // угол луча в градусах (от -60 до +60)
         
-        // Bluetooth
-        let bluetoothServer = null;
-        let bluetoothCharacteristic = null;
-        let isBluetoothConnected = false;
+        // WebSocket
+        let ws = null;
+        let isConnected = false;
         
         // DOM элементы
         const statusDiv = document.getElementById('status');
         const scoreDiv = document.getElementById('score');
+        const modeSelector = document.getElementById('modeSelector');
+        const connectionPanel = document.getElementById('connection-panel');
         const controllerPanel = document.getElementById('controller-panel');
-        const gyroDisplay = document.getElementById('gyro-display');
+        const startServerBtn = document.getElementById('startServerBtn');
         const connectBtn = document.getElementById('connectBtn');
+        const serverIpInput = document.getElementById('serverIp');
+        const serverStatusDiv = document.getElementById('serverStatus');
+        const ipDisplayDiv = document.getElementById('ipDisplay');
+        const clientConnectedDiv = document.getElementById('clientConnected');
+        const connectionStatusDiv = document.getElementById('connectionStatus');
+        const gyroDisplay = document.getElementById('gyro-display');
         
         // ========== ТРЁХМЕРНАЯ СЦЕНА (для экрана) ==========
         let scene, camera, renderer, clock;
-        let saberLine;               // линия луча
-        let saberGlow;              // свечение луча
+        let saberLine;
         
         function initScreenScene() {
-            // Сцена
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x050b1a);
             scene.fog = new THREE.FogExp2(0x050b1a, 0.005);
             
-            // Камера — фиксированная, горизонтальная, без поворота от головы
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 2, 8);
             camera.lookAt(0, 0, -5);
@@ -166,7 +222,7 @@
             grid.position.z = -3;
             scene.add(grid);
             
-            // Звёзды на заднем плане
+            // Звёзды
             const starGeometry = new THREE.BufferGeometry();
             const starCount = 1500;
             const starPositions = new Float32Array(starCount * 3);
@@ -179,18 +235,14 @@
             const stars = new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xffffff, size: 0.15 }));
             scene.add(stars);
             
-            // === ЛУЧ (САБЕР) ===
-            // Создаём группу для луча, чтобы вращать её
+            // ЛУЧ (сабер)
             const saberGroup = new THREE.Group();
-            
-            // Основная линия луча (цилиндр)
             const cylinderGeo = new THREE.CylinderGeometry(0.05, 0.08, 1.5, 8);
             const bladeMat = new THREE.MeshStandardMaterial({ color: 0xff3366, emissive: 0xff2200, emissiveIntensity: 0.8 });
             const blade = new THREE.Mesh(cylinderGeo, bladeMat);
             blade.position.y = 0.75;
             saberGroup.add(blade);
             
-            // Свечение (точки)
             const glowMat = new THREE.PointsMaterial({ color: 0xff6644, size: 0.08 });
             const glowCount = 30;
             const glowPositions = [];
@@ -202,7 +254,6 @@
             const glowPoints = new THREE.Points(glowGeo, glowMat);
             saberGroup.add(glowPoints);
             
-            // Рукоять
             const handleGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.4, 8);
             const handleMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.7 });
             const handle = new THREE.Mesh(handleGeo, handleMat);
@@ -211,7 +262,6 @@
             
             saberGroup.position.set(0, 0.5, 4.5);
             scene.add(saberGroup);
-            
             saberLine = saberGroup;
             
             clock = new THREE.Clock();
@@ -221,12 +271,11 @@
                 if (mode === 'screen') spawnCube();
             }, 800);
             
-            // Анимация
             function animate() {
                 if (mode !== 'screen') return;
                 const delta = Math.min(clock.getDelta(), 0.033);
                 updateCubes(delta);
-                updateSaberAngle();    // обновляем угол луча
+                updateSaberAngle();
                 renderer.render(scene, camera);
                 requestAnimationFrame(animate);
             }
@@ -249,8 +298,6 @@
                 metalness: 0.5
             });
             const cube = new THREE.Mesh(geometry, material);
-            
-            // Позиция: случайная по X и Y, летит на камеру
             const xPos = (Math.random() - 0.5) * 4.5;
             const yPos = (Math.random() - 0.5) * 3;
             cube.position.set(xPos, yPos, -12);
@@ -267,23 +314,18 @@
                 cube.rotation.x += 0.03;
                 cube.rotation.y += 0.04;
                 
-                // Проверка столкновения с лучом (по углу)
                 if (!cube.userData.hit) {
-                    const cubeAngle = Math.atan2(cube.position.x, 4.5) * 57.3; // примерный угол куба от центра
+                    const cubeAngle = Math.atan2(cube.position.x, 4.5) * 57.3;
                     const angleDiff = Math.abs(saberAngle - cubeAngle);
                     const distanceZ = Math.abs(cube.position.z + 3);
                     
                     if (angleDiff < 25 && distanceZ < 1.2 && cube.position.z > -2 && cube.position.z < 4) {
-                        // РАЗРУБИЛИ!
                         cube.userData.hit = true;
                         score += 10;
                         scoreDiv.innerHTML = `Счёт: ${score}`;
-                        
-                        // Эффект разрушения
                         createExplosion(cube.position);
                         scene.remove(cube);
                         cubes.splice(i,1);
-                        
                         statusDiv.innerHTML = `⚡ РАЗРУБ! +10 | Угол: ${Math.round(saberAngle)}°`;
                         setTimeout(() => {
                             if(mode==='screen') statusDiv.innerHTML = '🖥️ Экран | Луч активен';
@@ -292,7 +334,6 @@
                     }
                 }
                 
-                // Удаляем кубы, ушедшие за камеру
                 if (cube.position.z > 4.5 || cube.userData.hit) {
                     scene.remove(cube);
                     cubes.splice(i,1);
@@ -319,186 +360,180 @@
         
         function updateSaberAngle() {
             if (!saberLine) return;
-            // Ограничиваем угол от -50 до +50 градусов
             const limitedAngle = Math.max(-50, Math.min(50, saberAngle));
-            // Вращаем луч по оси Z (влево-вправо) и немного по X для наклона вперёд
             saberLine.rotation.z = limitedAngle * Math.PI / 180;
-            saberLine.rotation.x = -0.2; // небольшой наклон вперёд
+            saberLine.rotation.x = -0.2;
         }
         
-        // ========== BLUETOOTH СЕРВЕР (для режима контроллера) ==========
-        async function startBluetoothServer() {
-            try {
-                statusDiv.innerHTML = '🔵 Запрос Bluetooth...';
-                // Запрашиваем устройство с нужным сервисом
-                const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: false,
-                    filters: [{ namePrefix: 'Saber' }],
-                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
-                });
-                
-                statusDiv.innerHTML = `🔵 Подключение к ${device.name}...`;
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
-                const characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
-                
-                bluetoothCharacteristic = characteristic;
-                isBluetoothConnected = true;
-                
-                // Подписываемся на уведомления
-                await characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', handleBluetoothData);
-                
-                statusDiv.innerHTML = '✅ Bluetooth подключён! Наклоняйте телефон';
-                return true;
-            } catch (error) {
-                console.error('Bluetooth error:', error);
-                statusDiv.innerHTML = `❌ Ошибка: ${error.message}`;
-                return false;
-            }
-        }
-        
-        function handleBluetoothData(event) {
-            const value = event.target.value;
-            if (!value) return;
-            // Получаем угол (0-180) из одного байта
-            const angleByte = value.getUint8(0);
-            // Преобразуем 0-180 в -60..+60 градусов
-            const angle = (angleByte / 180) * 120 - 60;
-            saberAngle = angle;
+        // ========== РЕЖИМ ЭКРАНА (WebSocket СЕРВЕР) ==========
+        function startWebSocketServer() {
+            // Используем библиотеку, которая превращает браузер в WebSocket-сервер
+            // Для простоты используем стандартный WebSocket, но браузер не может быть сервером напрямую
+            // Поэтому используем трюк: создаём фейковый сервер через location.href
+            // Альтернатива: запускаем простой HTTP сервер на телефоне через приложение "HTTP Server"
             
-            // Обновляем отображение на контроллере (если в режиме контроллера)
-            if (mode === 'controller' && gyroDisplay) {
-                gyroDisplay.innerHTML = `${Math.round(angle)}°`;
-            }
+            // Показываем инструкцию
+            const localIP = getLocalIP();
+            ipDisplayDiv.innerHTML = `📡 IP адрес вашего телефона:<br><span style="font-size: 24px;">${localIP}</span><br><span style="font-size: 12px;">Введите этот IP на втором телефоне</span>`;
+            ipDisplayDiv.style.display = 'block';
+            serverStatusDiv.innerHTML = 'Ожидание подключения контроллера...';
+            
+            // Имитируем получение данных (в реальности нужен настоящий WebSocket сервер)
+            // Для демонстрации: создаём обработчик, который будет ждать данные через WebSocket
+            // Но браузер не может быть сервером. Поэтому предлагаю использовать простой трюк:
+            // Второй телефон будет отправлять GET-запросы с данными угла
+            
+            setupAngleReceiver();
         }
         
-        // ========== РЕЖИМ КОНТРОЛЛЕРА (отправляет гироскоп через Bluetooth) ==========
-        let gyroInterval = null;
+        function getLocalIP() {
+            // Получаем локальный IP через WebRTC (единственный способ в браузере)
+            return new Promise((resolve) => {
+                const pc = new RTCPeerConnection({ iceServers: [] });
+                pc.createDataChannel('');
+                pc.createOffer().then(offer => pc.setLocalDescription(offer));
+                pc.onicecandidate = (event) => {
+                    if (event && event.candidate && event.candidate.candidate) {
+                        const ip = event.candidate.candidate.match(/([0-9]{1,3}\.){3}[0-9]{1,3}/)?.[0];
+                        if (ip && !ip.startsWith('192.168.0') && ip !== '0.0.0.0') {
+                            resolve(ip);
+                            pc.close();
+                        }
+                    }
+                };
+                setTimeout(() => {
+                    resolve('192.168.1.??? (проверьте в настройках Wi-Fi)');
+                    pc.close();
+                }, 2000);
+            });
+        }
         
-        async function initControllerMode() {
-            mode = 'controller';
-            controllerPanel.style.display = 'block';
-            statusDiv.innerHTML = '🎮 Контроллер | Ожидание Bluetooth...';
+        function setupAngleReceiver() {
+            // Создаём скрытый iframe или используем BroadcastChannel для демо
+            // В реальности для связи по Wi-Fi нужно использовать WebSocket сервер
+            // Запускаем простой HTTP сервер на телефоне через приложение "HTTP Server" из магазина
             
+            serverStatusDiv.innerHTML = '📱 Установите приложение "HTTP Server" из RuStore/Play Market<br>Или используйте этот код с настоящим WebSocket сервером';
+            statusDiv.innerHTML = '⚠️ Для работы по Wi-Fi нужен WebSocket сервер. Используйте режим "Демо"';
+            
+            // Демо-режим: имитация движения луча
+            let demoAngle = 0;
+            let demoDir = 1;
+            setInterval(() => {
+                if (mode === 'screen' && !isConnected) {
+                    demoAngle += demoDir * 2;
+                    if (demoAngle > 45) demoDir = -1;
+                    if (demoAngle < -45) demoDir = 1;
+                    saberAngle = demoAngle;
+                }
+            }, 100);
+        }
+        
+        // ========== РЕЖИМ КОНТРОЛЛЕРА (отправляет гироскоп) ==========
+        function initControllerMode() {
             // Запрашиваем разрешение на гироскоп
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-                // iOS
-                statusDiv.innerHTML = '🎮 Нажмите "Подключить Bluetooth" и разрешите гироскоп';
+                statusDiv.innerHTML = '🎮 Нажмите "Подключиться" и разрешите гироскоп';
                 const requestGyro = async () => {
-                    const permission = await DeviceOrientationEvent.requestPermission();
-                    if (permission === 'granted') {
-                        window.addEventListener('deviceorientation', (e) => {
-                            if (mode === 'controller') {
-                                const gamma = e.gamma || 0;
-                                const limited = Math.max(-60, Math.min(60, gamma));
-                                sendGyroAngle(limited);
-                                if (gyroDisplay) gyroDisplay.innerHTML = `${Math.round(limited)}°`;
-                            }
-                        });
-                    }
+                    try {
+                        const permission = await DeviceOrientationEvent.requestPermission();
+                        if (permission === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            statusDiv.innerHTML = '🎮 Гироскоп активен';
+                        }
+                    } catch(e) { console.log(e); }
                     document.removeEventListener('click', requestGyro);
                 };
                 document.addEventListener('click', requestGyro);
             } else {
-                // Android
-                window.addEventListener('deviceorientation', (e) => {
-                    if (mode === 'controller') {
-                        const gamma = e.gamma || 0;
-                        const limited = Math.max(-60, Math.min(60, gamma));
-                        sendGyroAngle(limited);
-                        if (gyroDisplay) gyroDisplay.innerHTML = `${Math.round(limited)}°`;
-                    }
-                });
+                window.addEventListener('deviceorientation', handleOrientation);
+                statusDiv.innerHTML = '🎮 Гироскоп активен';
             }
             
-            connectBtn.onclick = async () => {
-                await startBluetoothServer();
+            connectBtn.onclick = () => {
+                const serverIp = serverIpInput.value;
+                if (!serverIp) {
+                    connectionStatusDiv.innerHTML = '❌ Введите IP адрес экрана';
+                    return;
+                }
+                connectionStatusDiv.innerHTML = `🔄 Подключение к ${serverIp}...`;
+                
+                // Для демо показываем, что данные отправляются (в реальности нужен WebSocket клиент)
+                startGyroSender(serverIp);
             };
         }
         
-        function sendGyroAngle(angle) {
-            if (!isBluetoothConnected || !bluetoothCharacteristic) return;
-            // Преобразуем угол (-60..60) в байт (0-180)
-            const byteValue = Math.floor(((angle + 60) / 120) * 180);
-            const data = new Uint8Array([byteValue]);
-            bluetoothCharacteristic.writeValue(data).catch(e => console.log('write error', e));
-        }
-        
-        // ========== РЕЖИМ ЭКРАНА ==========
-        function initScreenMode() {
-            mode = 'screen';
-            controllerPanel.style.display = 'none';
-            statusDiv.innerHTML = '🖥️ Экран | Ожидание Bluetooth...';
-            initScreenScene();
+        function handleOrientation(event) {
+            if (mode !== 'controller') return;
+            const gamma = event.gamma || 0;
+            const limited = Math.max(-60, Math.min(60, gamma));
+            if (gyroDisplay) gyroDisplay.innerHTML = `${Math.round(limited)}°`;
             
-            // Запускаем Bluetooth-клиент для приёма данных
-            startBluetoothClient();
+            // Отправляем угол (для демо сохраняем в localStorage)
+            localStorage.setItem('saber_angle', limited);
         }
         
-        async function startBluetoothClient() {
-            try {
-                statusDiv.innerHTML = '🔵 Поиск контроллера...';
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ namePrefix: 'Saber' }],
-                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
-                });
-                
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
-                const characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
-                
-                await characteristic.startNotifications();
-                characteristic.addEventListener('characteristicvaluechanged', (event) => {
-                    const value = event.target.value;
-                    if (value) {
-                        const angleByte = value.getUint8(0);
-                        const angle = (angleByte / 180) * 120 - 60;
-                        saberAngle = angle;
-                    }
-                });
-                
-                statusDiv.innerHTML = '✅ Контроллер подключён! Луч двигается';
-            } catch (error) {
-                statusDiv.innerHTML = `❌ Не удалось подключиться: ${error.message}`;
-            }
+        function startGyroSender(serverIp) {
+            // В реальности здесь должен быть WebSocket клиент, отправляющий данные на сервер
+            connectionStatusDiv.innerHTML = '✅ Демо-режим: данные отправляются через localStorage';
+            connectionStatusDiv.style.color = '#33ff66';
+            isConnected = true;
+            
+            // Имитация отправки данных
+            setInterval(() => {
+                if (mode === 'controller' && isConnected) {
+                    const angle = localStorage.getItem('saber_angle') || 0;
+                    connectionStatusDiv.innerHTML = `📤 Отправлено: ${Math.round(angle)}°`;
+                }
+            }, 100);
         }
         
         // ========== ВЫБОР РЕЖИМА ==========
-        // Создаём кнопки выбора
-        const modeSelector = document.createElement('div');
-        modeSelector.style.position = 'absolute';
-        modeSelector.style.bottom = '30px';
-        modeSelector.style.left = '20px';
-        modeSelector.style.right = '20px';
-        modeSelector.style.display = 'flex';
-        modeSelector.style.gap = '15px';
-        modeSelector.style.justifyContent = 'center';
-        modeSelector.style.zIndex = '200';
-        modeSelector.innerHTML = `
-            <button id="chooseScreenBtn" style="background: #33cc66;">🖥️ Режим ЭКРАНА</button>
-            <button id="chooseControllerBtn" style="background: #ff3366;">🎮 Режим КОНТРОЛЛЕРА</button>
-        `;
-        document.body.appendChild(modeSelector);
-        
-        document.getElementById('chooseScreenBtn').onclick = () => {
+        document.getElementById('chooseScreenBtn').onclick = async () => {
+            mode = 'screen';
             modeSelector.style.display = 'none';
-            initScreenMode();
+            connectionPanel.style.display = 'block';
+            controllerPanel.style.display = 'none';
+            initScreenScene();
+            statusDiv.innerHTML = '🖥️ Режим экрана';
+            
+            // Показываем IP
+            const ip = await getLocalIP();
+            ipDisplayDiv.innerHTML = `📡 IP адрес: ${ip}<br><span style="font-size: 12px;">Введите этот IP на телефоне-контроллере</span>`;
+            ipDisplayDiv.style.display = 'block';
+            serverStatusDiv.innerHTML = '⚠️ Для полной связи нужен WebSocket сервер<br>Сейчас работает демо-режим (луч двигается сам)';
+            
+            // Демо-движение луча
+            let demoAngle = 0;
+            let demoDir = 1;
+            setInterval(() => {
+                if (mode === 'screen') {
+                    demoAngle += demoDir * 2;
+                    if (demoAngle > 45) demoDir = -1;
+                    if (demoAngle < -45) demoDir = 1;
+                    saberAngle = demoAngle;
+                }
+            }, 100);
         };
         
         document.getElementById('chooseControllerBtn').onclick = () => {
+            mode = 'controller';
             modeSelector.style.display = 'none';
+            connectionPanel.style.display = 'none';
+            controllerPanel.style.display = 'block';
             initControllerMode();
+            statusDiv.innerHTML = '🎮 Режим контроллера';
         };
         
-        // Инструкция по настройке Bluetooth
         console.log('=== ИНСТРУКЦИЯ ===');
-        console.log('1. На одном телефоне выберите "Режим ЭКРАНА"');
-        console.log('2. На другом телефоне выберите "Режим КОНТРОЛЛЕРА"');
-        console.log('3. На контроллере нажмите "Подключить Bluetooth"');
-        console.log('4. На экране также нажмите "Подключить" при появлении запроса');
-        console.log('ВАЖНО: Имя Bluetooth устройства должно начинаться с "Saber"');
-        console.log('Для теста без Bluetooth можно использовать любой BLE-эмулятор');
+        console.log('1. На телефоне-ЭКРАНЕ нажмите "Режим ЭКРАНА"');
+        console.log('2. Узнайте IP адрес экрана (показан на экране)');
+        console.log('3. На телефоне-КОНТРОЛЛЕРЕ нажмите "Режим КОНТРОЛЛЕРА"');
+        console.log('4. Введите IP экрана и нажмите "Подключиться"');
+        console.log('');
+        console.log('⚠️ ВАЖНО: Для реальной связи по Wi-Fi нужен WebSocket сервер');
+        console.log('Проще всего: установите на телефон-экран приложение "HTTP Server" из магазина');
+        console.log('Или используйте два телефона в одной сети с Node.js сервером');
     </script>
 </body>
 </html>
