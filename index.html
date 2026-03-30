@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>NEON SABER — горизонтальная игра с пультом</title>
+    <title>BLUETOOTH SABER — полный контроль</title>
     <style>
         body {
             margin: 0;
             overflow: hidden;
-            font-family: 'Segoe UI', 'Arial', sans-serif;
+            font-family: 'Segoe UI', system-ui, sans-serif;
             background: #000;
         }
         #ui {
@@ -22,75 +22,62 @@
             pointer-events: none;
         }
         .status {
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.75);
             backdrop-filter: blur(8px);
             padding: 8px 16px;
             border-radius: 30px;
             color: #0f0;
             font-family: monospace;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: bold;
-            border-left: 3px solid #0f0;
         }
         .score {
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.75);
             backdrop-filter: blur(8px);
             padding: 8px 16px;
             border-radius: 30px;
             color: #ff44cc;
             font-weight: bold;
             font-size: 20px;
-            text-shadow: 0 0 5px #ff44cc;
         }
-        .mode-selector {
-            position: absolute;
-            bottom: 40px;
-            left: 20px;
-            right: 20px;
-            display: flex;
-            gap: 15px;
-            z-index: 200;
-            justify-content: center;
-        }
-        button {
-            background: linear-gradient(135deg, #ff3366, #ff6699);
-            border: none;
-            color: white;
-            padding: 14px 28px;
-            border-radius: 60px;
-            font-weight: bold;
-            font-size: 18px;
-            cursor: pointer;
-            transition: 0.1s;
-            box-shadow: 0 0 15px rgba(255,51,102,0.5);
-        }
-        button:active { transform: scale(0.96); }
-        .btn-green { background: linear-gradient(135deg, #33cc66, #66ff99); box-shadow: 0 0 15px rgba(51,204,102,0.5); }
-        .btn-blue { background: linear-gradient(135deg, #3399ff, #66ccff); box-shadow: 0 0 15px rgba(51,153,255,0.5); }
         .panel {
             position: absolute;
             bottom: 30px;
             left: 20px;
             right: 20px;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.92);
             backdrop-filter: blur(20px);
             border-radius: 40px;
             padding: 20px;
             text-align: center;
-            z-index: 150;
+            z-index: 200;
             border: 1px solid rgba(255,255,255,0.2);
         }
-        .room-code {
-            font-size: 52px;
+        button {
+            background: linear-gradient(135deg, #ff3366, #ff6699);
+            border: none;
+            color: white;
+            padding: 14px 24px;
+            border-radius: 60px;
             font-weight: bold;
-            letter-spacing: 8px;
-            background: linear-gradient(135deg, #1a1a2e, #16213e);
-            padding: 15px;
-            border-radius: 30px;
-            margin: 15px 0;
-            color: #33ff66;
-            font-family: monospace;
-            text-shadow: 0 0 10px #33ff66;
+            font-size: 18px;
+            margin: 8px;
+            cursor: pointer;
+            transition: 0.1s;
+            box-shadow: 0 0 12px rgba(255,51,102,0.5);
+        }
+        button:active { transform: scale(0.96); }
+        .btn-green { background: linear-gradient(135deg, #33cc66, #66ff99); box-shadow: 0 0 12px rgba(51,204,102,0.5); }
+        .btn-blue { background: linear-gradient(135deg, #3399ff, #66ccff); box-shadow: 0 0 12px rgba(51,153,255,0.5); }
+        .mode-selector {
+            position: absolute;
+            bottom: 30px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            z-index: 300;
         }
         .gyro-value {
             font-size: 48px;
@@ -100,62 +87,58 @@
             background-clip: text;
             color: transparent;
             margin: 10px 0;
-            text-shadow: 0 0 20px #ffaa33;
         }
-        .instruction {
-            font-size: 12px;
-            color: #aaa;
-            margin-top: 10px;
+        .device-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 15px 0;
+            text-align: left;
         }
-        input {
-            padding: 15px;
-            font-size: 28px;
-            text-align: center;
-            border-radius: 50px;
-            border: none;
-            width: 70%;
-            margin: 10px 0;
+        .device-item {
             background: #1a1a2e;
-            color: #33ff66;
-            font-family: monospace;
-            letter-spacing: 4px;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 30px;
+            cursor: pointer;
+            color: white;
+        }
+        .device-item:hover { background: #2a2a4e; }
+        .instruction {
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 12px;
         }
         @media (max-width: 600px) {
-            .room-code { font-size: 36px; letter-spacing: 4px; }
             .gyro-value { font-size: 36px; }
-            button { padding: 10px 20px; font-size: 16px; }
+            button { padding: 10px 18px; font-size: 14px; }
         }
     </style>
-    
-    <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 </head>
 <body>
     <div id="ui">
-        <div class="status" id="status">⚡ NEON SABER</div>
+        <div class="status" id="status">⚡ BLUETOOTH SABER</div>
         <div class="score" id="score">💥 0</div>
     </div>
 
     <div id="modeSelector" class="mode-selector">
-        <button id="vrBtn" class="btn-green">🖥️ ЭКРАН (игра)</button>
-        <button id="controllerBtn" class="btn-blue">🎮 ПУЛЬТ (гироскоп)</button>
+        <button id="screenBtn" class="btn-green">🖥️ Я ЭКРАН (игра)</button>
+        <button id="controllerBtn" class="btn-blue">🎮 Я ПУЛЬТ (гироскоп)</button>
     </div>
 
-    <div id="hostPanel" class="panel" style="display: none;">
-        <div style="font-size: 20px; margin-bottom: 10px;">🖥️ ВЫ — ИГРОВОЙ ЭКРАН</div>
-        <div>🔑 КОД КОМНАТЫ:</div>
-        <div class="room-code" id="roomCode">------</div>
-        <div id="hostStatus">⏳ Ожидание пульта...</div>
-        <div class="instruction">📱 На втором телефоне нажмите "ПУЛЬТ" и введите этот код</div>
+    <!-- Панель экрана -->
+    <div id="screenPanel" class="panel" style="display: none;">
+        <div style="font-size: 20px; margin-bottom: 10px;">🖥️ РЕЖИМ ЭКРАНА</div>
+        <button id="startServerBtn" class="btn-green">📡 ЗАПУСТИТЬ BLUETOOTH СЕРВЕР</button>
+        <div id="screenStatus">⏳ Ожидание подключения пульта...</div>
+        <div class="instruction">🔹 На пульте нажмите "Поиск устройств" и выберите этот телефон</div>
     </div>
 
-    <div id="joinPanel" class="panel" style="display: none;">
-        <div style="font-size: 20px; margin-bottom: 10px;">🎮 ВЫ — ПУЛЬТ</div>
-        <div>Введите код с экрана:</div>
-        <input type="text" id="codeInput" maxlength="6" placeholder="123456">
-        <button id="connectBtn" style="background: #33cc66; margin-top: 10px;">🔗 ПОДКЛЮЧИТЬСЯ</button>
-        <div id="joinStatus"></div>
+    <!-- Панель пульта -->
+    <div id="controllerPanel" class="panel" style="display: none;">
+        <div style="font-size: 20px; margin-bottom: 10px;">🎮 РЕЖИМ ПУЛЬТА</div>
+        <button id="scanBtn" class="btn-blue">🔍 ПОИСК BLUETOOTH УСТРОЙСТВ</button>
+        <div id="deviceList" class="device-list" style="display: none;"></div>
+        <div id="controllerStatus"></div>
         <div class="gyro-value" id="gyroAngle">0°</div>
         <div class="instruction">📱 НАКЛОНЯЙТЕ ТЕЛЕФОН ВЛЕВО/ВПРАВО → луч двигается</div>
     </div>
@@ -171,212 +154,154 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // ========== FIREBASE ==========
-        const firebaseConfig = {
-            apiKey: "AIzaSyB4E6kXqJ3L5Y7x9W2mN4pQ8rS1tU3vV5w",
-            authDomain: "vr-saber-9a8c7.firebaseapp.com",
-            databaseURL: "https://vr-saber-9a8c7-default-rtdb.firebaseio.com",
-            projectId: "vr-saber-9a8c7",
-            storageBucket: "vr-saber-9a8c7.appspot.com"
-        };
-        
-        let database;
-        try {
-            const app = firebase.initializeApp(firebaseConfig);
-            database = firebase.database();
-            console.log('✅ Firebase готов');
-        } catch(e) {
-            console.warn('Firebase error:', e);
-        }
-        
-        // ========== ПЕРЕМЕННЫЕ ==========
-        let mode = null;
-        let currentRoom = null;
+        // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
+        let mode = null;  // 'screen' или 'controller'
         let score = 0;
         let cubes = [];
         let saberAngle = 0;
         
-        // 3D
-        let scene, camera, renderer, saberGroup, clock;
+        // Bluetooth
+        let bluetoothDevice = null;
+        let bluetoothServer = null;
+        let bluetoothService = null;
+        let bluetoothCharacteristic = null;
+        let isConnected = false;
         
         // DOM
         const statusDiv = document.getElementById('status');
         const scoreDiv = document.getElementById('score');
         const modeSelector = document.getElementById('modeSelector');
-        const hostPanel = document.getElementById('hostPanel');
-        const joinPanel = document.getElementById('joinPanel');
-        const roomCodeDiv = document.getElementById('roomCode');
-        const hostStatusSpan = document.getElementById('hostStatus');
-        const codeInput = document.getElementById('codeInput');
-        const connectBtn = document.getElementById('connectBtn');
-        const joinStatusSpan = document.getElementById('joinStatus');
+        const screenPanel = document.getElementById('screenPanel');
+        const controllerPanel = document.getElementById('controllerPanel');
+        const screenStatus = document.getElementById('screenStatus');
+        const controllerStatus = document.getElementById('controllerStatus');
         const gyroAngleSpan = document.getElementById('gyroAngle');
+        const scanBtn = document.getElementById('scanBtn');
+        const startServerBtn = document.getElementById('startServerBtn');
+        const deviceListDiv = document.getElementById('deviceList');
         
-        // ========== ГЕНЕРАТОР КОДА ==========
-        function generateRoomCode() {
-            return Math.floor(100000 + Math.random() * 900000).toString();
-        }
+        // ========== 3D СЦЕНА (ТОЛЬКО ДЛЯ ЭКРАНА) ==========
+        let scene, camera, renderer, saberGroup, ring;
         
-        // ========== НЕОНОВАЯ 3D СЦЕНА (горизонтальная, кубы снизу) ==========
         function initGameScene() {
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x050510);
             scene.fog = new THREE.FogExp2(0x050510, 0.02);
             
-            // Камера — фиксированная, горизонтальная, без VR
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.position.set(0, 2.5, 8);
             camera.lookAt(0, 1.5, 0);
             
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
             
-            // ===== НЕОНОВОЕ ОСВЕЩЕНИЕ =====
+            // Неоновое освещение
             const ambient = new THREE.AmbientLight(0x111122);
             scene.add(ambient);
+            const light = new THREE.PointLight(0xff66cc, 0.7);
+            light.position.set(2, 4, 3);
+            scene.add(light);
             
-            const mainLight = new THREE.DirectionalLight(0xffaacc, 0.8);
-            mainLight.position.set(2, 5, 3);
-            scene.add(mainLight);
+            // Сетка
+            const grid = new THREE.GridHelper(20, 20, 0xff33cc, 0x33ff66);
+            grid.position.y = -1.8;
+            grid.material.transparent = true;
+            grid.material.opacity = 0.5;
+            scene.add(grid);
             
-            const backLight = new THREE.PointLight(0x3366ff, 0.5);
-            backLight.position.set(0, 2, -5);
-            scene.add(backLight);
-            
-            const colorLight = new THREE.PointLight(0xff44aa, 0.4);
-            colorLight.position.set(1, 2, 2);
-            scene.add(colorLight);
-            
-            // ===== НЕОНОВЫЙ ПОЛ С СЕТКОЙ =====
-            const gridHelper = new THREE.GridHelper(20, 20, 0xff33cc, 0x33ff66);
-            gridHelper.position.y = -1.8;
-            gridHelper.material.transparent = true;
-            gridHelper.material.opacity = 0.6;
-            scene.add(gridHelper);
-            
-            // Сияющая арена
-            const ringGeo = new THREE.TorusGeometry(3.8, 0.08, 64, 200);
-            const ringMat = new THREE.MeshStandardMaterial({ color: 0xff33cc, emissive: 0xff1199, emissiveIntensity: 0.8 });
-            const ring = new THREE.Mesh(ringGeo, ringMat);
+            // Кольцо
+            ring = new THREE.Mesh(
+                new THREE.TorusGeometry(3.8, 0.08, 64, 200),
+                new THREE.MeshStandardMaterial({ color: 0xff33cc, emissive: 0xff1199, emissiveIntensity: 0.7 })
+            );
             ring.rotation.x = Math.PI / 2;
             ring.position.y = -1.6;
             scene.add(ring);
             
-            // Вращающиеся неоновые кольца
-            const outerRingGeo = new THREE.TorusGeometry(4.5, 0.05, 64, 200);
-            const outerRingMat = new THREE.MeshStandardMaterial({ color: 0x33ff66, emissive: 0x33ff66, emissiveIntensity: 0.5 });
-            const outerRing = new THREE.Mesh(outerRingGeo, outerRingMat);
-            outerRing.rotation.x = Math.PI / 2;
-            outerRing.position.y = -1.4;
-            scene.add(outerRing);
-            
-            // ===== ЗВЁЗДЫ С МЕРЦАНИЕМ =====
-            const starCount = 2000;
-            const starGeo = new THREE.BufferGeometry();
-            const starPositions = new Float32Array(starCount * 3);
-            for (let i = 0; i < starCount; i++) {
-                starPositions[i*3] = (Math.random() - 0.5) * 200;
-                starPositions[i*3+1] = (Math.random() - 0.5) * 80;
-                starPositions[i*3+2] = (Math.random() - 0.5) * 60 - 30;
-            }
-            starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-            const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.12, transparent: true, opacity: 0.7 }));
-            scene.add(stars);
-            
-            // ===== НЕОНОВЫЙ ЛУЧ (САБЕР) — ОГРОМНЫЙ И ВИДИМЫЙ =====
+            // ЛУЧ (яркий)
             const saberGroupObj = new THREE.Group();
-            
-            // Основное лезвие
-            const bladeGeo = new THREE.CylinderGeometry(0.07, 0.12, 1.8, 16);
-            const bladeMat = new THREE.MeshStandardMaterial({ color: 0xff2266, emissive: 0xff0044, emissiveIntensity: 1.2 });
-            const blade = new THREE.Mesh(bladeGeo, bladeMat);
+            const blade = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.07, 0.12, 1.8, 16),
+                new THREE.MeshStandardMaterial({ color: 0xff2266, emissive: 0xff0044, emissiveIntensity: 1.2 })
+            );
             blade.position.y = 0.9;
-            blade.castShadow = true;
             saberGroupObj.add(blade);
             
-            // Внутреннее свечение
-            const coreGeo = new THREE.CylinderGeometry(0.04, 0.07, 1.75, 8);
-            const coreMat = new THREE.MeshStandardMaterial({ color: 0xffaa88, emissive: 0xff6600, emissiveIntensity: 1.5 });
-            const core = new THREE.Mesh(coreGeo, coreMat);
+            const core = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.04, 0.07, 1.75, 8),
+                new THREE.MeshStandardMaterial({ color: 0xffaa88, emissive: 0xff6600, emissiveIntensity: 1.5 })
+            );
             core.position.y = 0.9;
             saberGroupObj.add(core);
             
-            // Партиклы вокруг лезвия
-            const glowCount = 80;
-            const glowPositions = [];
-            for (let i = 0; i < glowCount; i++) {
-                glowPositions.push(
-                    (Math.random() - 0.5) * 0.3,
-                    i * 0.03 + 0.2,
-                    (Math.random() - 0.5) * 0.25
-                );
-            }
-            const glowGeo = new THREE.BufferGeometry();
-            glowGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(glowPositions), 3));
-            const glowMat = new THREE.PointsMaterial({ color: 0xff4488, size: 0.06 });
-            const glowPoints = new THREE.Points(glowGeo, glowMat);
-            saberGroupObj.add(glowPoints);
-            
-            // Рукоять
-            const handleGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.5, 8);
-            const handleMat = new THREE.MeshStandardMaterial({ color: 0xccaa88, metalness: 0.8, roughness: 0.2 });
-            const handle = new THREE.Mesh(handleGeo, handleMat);
+            const handle = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.14, 0.14, 0.5, 8),
+                new THREE.MeshStandardMaterial({ color: 0xccaa88, metalness: 0.8 })
+            );
             handle.position.y = -0.2;
             saberGroupObj.add(handle);
-            
-            // Неоновая гарда
-            const guardGeo = new THREE.BoxGeometry(0.35, 0.08, 0.35);
-            const guardMat = new THREE.MeshStandardMaterial({ color: 0xffaa44, emissive: 0xff4400, emissiveIntensity: 0.5 });
-            const guard = new THREE.Mesh(guardGeo, guardMat);
-            guard.position.y = 0.3;
-            saberGroupObj.add(guard);
             
             saberGroupObj.position.set(0, 0.8, 3.5);
             scene.add(saberGroupObj);
             saberGroup = saberGroupObj;
             
-            // ===== ЭФФЕКТ МЕРЦАНИЯ ЛУЧА =====
-            setInterval(() => {
-                if (saberGroup && saberGroup.children[0]) {
-                    const intensity = 0.8 + Math.random() * 0.8;
-                    saberGroup.children[0].material.emissiveIntensity = intensity;
-                    saberGroup.children[1].material.emissiveIntensity = intensity + 0.3;
-                }
-            }, 80);
-            
-            // Вращающиеся неоновые частицы вокруг
-            const ambientParticles = new THREE.BufferGeometry();
-            const ambientPositions = new Float32Array(400 * 3);
-            for (let i = 0; i < 400; i++) {
-                ambientPositions[i*3] = (Math.random() - 0.5) * 12;
-                ambientPositions[i*3+1] = (Math.random() - 0.5) * 8;
-                ambientPositions[i*3+2] = (Math.random() - 0.5) * 10 - 3;
+            // Звёзды
+            const stars = new THREE.Points(
+                new THREE.BufferGeometry(),
+                new THREE.PointsMaterial({ color: 0xffffff, size: 0.1 })
+            );
+            const starPos = [];
+            for (let i = 0; i < 1500; i++) {
+                starPos.push((Math.random() - 0.5) * 200, (Math.random() - 0.5) * 100, (Math.random() - 0.5) * 80 - 30);
             }
-            ambientParticles.setAttribute('position', new THREE.BufferAttribute(ambientPositions, 3));
-            const ambientParticleSys = new THREE.Points(ambientParticles, new THREE.PointsMaterial({ color: 0xff66cc, size: 0.05, transparent: true }));
-            scene.add(ambientParticleSys);
+            stars.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(starPos), 3));
+            scene.add(stars);
             
-            clock = new THREE.Clock();
-            
-            // Генерация кубов (летят СНИЗУ ВВЕРХ)
+            // Генерация кубов (летят снизу вверх)
             setInterval(() => {
-                if (mode === 'vr') spawnCube();
+                if (mode === 'screen') spawnCube();
             }, 650);
             
-            // Анимация
             function animate() {
-                if (mode !== 'vr') return;
-                const delta = Math.min(clock.getDelta(), 0.033);
-                updateCubes(delta);
-                updateSaber();
+                if (mode !== 'screen') return;
                 
-                // Вращаем кольца
-                outerRing.rotation.z += 0.01;
-                ring.rotation.z -= 0.008;
-                ambientParticleSys.rotation.y += 0.005;
+                // Обновляем кубы
+                for (let i = cubes.length-1; i >= 0; i--) {
+                    const cube = cubes[i];
+                    cube.position.y += cube.userData.speed * 0.035;
+                    cube.rotation.x += 0.05;
+                    cube.rotation.z += 0.06;
+                    
+                    // Попадание лучом
+                    const cubeX = cube.position.x;
+                    const cubeY = cube.position.y;
+                    const angleToCube = Math.atan2(cubeX, 2) * 57.3;
+                    const distance = Math.abs(cubeX) + Math.abs(cubeY - 1);
+                    
+                    if (Math.abs(saberAngle - angleToCube) < 28 && distance < 1.3 && cube.position.y > -1 && cube.position.y < 2.8) {
+                        scene.remove(cube);
+                        cubes.splice(i,1);
+                        score += 10;
+                        scoreDiv.innerHTML = `💥 ${score}`;
+                        statusDiv.innerHTML = `⚡ РАЗРУБ! +10`;
+                        setTimeout(() => statusDiv.innerHTML = '🖥️ BLUETOOTH SABER', 500);
+                        continue;
+                    }
+                    
+                    if (cube.position.y > 4.5) {
+                        scene.remove(cube);
+                        cubes.splice(i,1);
+                    }
+                }
+                
+                // Вращение луча
+                if (saberGroup) {
+                    saberGroup.rotation.z = -saberAngle * Math.PI / 180 * 0.8;
+                }
+                if (ring) ring.rotation.z += 0.008;
+                stars.rotation.y += 0.002;
                 
                 renderer.render(scene, camera);
                 requestAnimationFrame(animate);
@@ -390,220 +315,162 @@
             });
         }
         
-        // КУБЫ ЛЕТЯТ СНИЗУ ВВЕРХ
         function spawnCube() {
-            const size = 0.55 + Math.random() * 0.4;
-            const colors = [0xff3366, 0x33ff66, 0xffaa33, 0xaa44ff, 0x33ccff, 0xff44aa];
-            const material = new THREE.MeshStandardMaterial({ 
-                color: colors[Math.floor(Math.random() * colors.length)],
-                emissive: 0x331100,
-                emissiveIntensity: 0.5,
-                metalness: 0.3
-            });
-            const cube = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), material);
-            
-            // Позиция: X в пределах экрана, Y снизу (-3), Z фиксированный
-            const xPos = (Math.random() - 0.5) * 5;
-            cube.position.set(xPos, -2.5, (Math.random() - 0.5) * 3);
-            cube.userData = { speed: 1.8 + Math.random() * 1.5, hit: false, startY: -2.5 };
-            cube.castShadow = true;
+            const size = 0.5 + Math.random() * 0.45;
+            const colors = [0xff3366, 0x33ff66, 0xffaa33, 0xaa44ff, 0xff44aa];
+            const cube = new THREE.Mesh(
+                new THREE.BoxGeometry(size, size, size),
+                new THREE.MeshStandardMaterial({ color: colors[Math.floor(Math.random() * colors.length)], emissive: 0x331100, emissiveIntensity: 0.4 })
+            );
+            cube.position.set((Math.random() - 0.5) * 5, -2.8, (Math.random() - 0.5) * 3);
+            cube.userData = { speed: 1.2 + Math.random() * 1.8 };
             scene.add(cube);
             cubes.push(cube);
         }
         
-        function updateCubes(delta) {
-            for (let i = cubes.length-1; i >= 0; i--) {
-                const cube = cubes[i];
-                cube.position.y += cube.userData.speed * delta;
-                cube.rotation.x += 0.05;
-                cube.rotation.z += 0.06;
+        // ========== BLUETOOTH ДЛЯ ЭКРАНА (СЕРВЕР) ==========
+        // ВНИМАНИЕ: Web Bluetooth НЕ может быть сервером. Поэтому используем альтернативу:
+        // Экран будет подключаться к пульту как клиент, а пульт будет сервером.
+        // Но для простоты: экран ищет пульт и подключается к нему.
+        
+        async function startBluetoothServer() {
+            screenStatus.innerHTML = '🔍 Поиск пульта...';
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'Saber' }],
+                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+                });
                 
-                // Проверка попадания лучом
-                if (!cube.userData.hit) {
-                    // Позиция куба относительно центра экрана
-                    const cubeX = cube.position.x;
-                    const cubeY = cube.position.y;
-                    
-                    // Луч направлен влево-вправо, рубит в горизонтальной плоскости
-                    const angleToCube = Math.atan2(cubeX, 2) * 57.3;
-                    const distanceToCube = Math.abs(cubeX) + Math.abs(cubeY - 1);
-                    
-                    if (Math.abs(saberAngle - angleToCube) < 28 && distanceToCube < 1.3 && cube.position.y > -1 && cube.position.y < 2.5) {
-                        cube.userData.hit = true;
-                        score += 10;
-                        scoreDiv.innerHTML = `💥 ${score}`;
-                        createNeonExplosion(cube.position);
-                        scene.remove(cube);
-                        cubes.splice(i,1);
-                        statusDiv.innerHTML = `⚡ РАЗРУБ! +10`;
-                        setTimeout(() => statusDiv.innerHTML = '🖥️ NEON SABER', 600);
-                        continue;
+                screenStatus.innerHTML = `🔗 Подключение к ${device.name}...`;
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+                const characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
+                
+                await characteristic.startNotifications();
+                characteristic.addEventListener('characteristicvaluechanged', (event) => {
+                    const value = event.target.value;
+                    if (value) {
+                        const angle = value.getUint8(0);
+                        const mappedAngle = (angle / 180) * 100 - 50;
+                        saberAngle = Math.max(-50, Math.min(50, mappedAngle));
+                        statusDiv.innerHTML = `🎯 Луч: ${Math.round(saberAngle)}°`;
                     }
-                }
+                });
                 
-                // Удаляем если улетел вверх
-                if (cube.position.y > 4) {
-                    scene.remove(cube);
-                    cubes.splice(i,1);
-                }
+                isConnected = true;
+                screenStatus.innerHTML = '✅ ПУЛЬТ ПОДКЛЮЧЁН! Наклоняйте второй телефон';
+                statusDiv.innerHTML = '✅ Пульт подключён';
+            } catch (error) {
+                screenStatus.innerHTML = `❌ Ошибка: ${error.message}`;
+                console.error(error);
             }
         }
         
-        function createNeonExplosion(pos) {
-            const particleCount = 60;
-            const geometry = new THREE.BufferGeometry();
-            const positions = new Float32Array(particleCount * 3);
-            const colors = new Float32Array(particleCount * 3);
-            for (let i = 0; i < particleCount; i++) {
-                positions[i*3] = (Math.random() - 0.5) * 0.9;
-                positions[i*3+1] = (Math.random() - 0.5) * 0.9;
-                positions[i*3+2] = (Math.random() - 0.5) * 0.9;
-                colors[i*3] = Math.random();
-                colors[i*3+1] = 0.3 + Math.random() * 0.5;
-                colors[i*3+2] = 0.5 + Math.random() * 0.5;
-            }
-            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-            const material = new THREE.PointsMaterial({ size: 0.1, vertexColors: true });
-            const particles = new THREE.Points(geometry, material);
-            particles.position.copy(pos);
-            scene.add(particles);
-            
-            // Взрывная вспышка
-            const flashGeo = new THREE.SphereGeometry(0.3, 8, 8);
-            const flashMat = new THREE.MeshStandardMaterial({ color: 0xff6600, emissive: 0xff4400, emissiveIntensity: 1 });
-            const flash = new THREE.Mesh(flashGeo, flashMat);
-            flash.position.copy(pos);
-            scene.add(flash);
-            
-            setTimeout(() => {
-                scene.remove(particles);
-                scene.remove(flash);
-            }, 250);
-        }
+        // ========== BLUETOOTH ДЛЯ ПУЛЬТА (КЛИЕНТ) ==========
+        let bluetoothInterval = null;
         
-        function updateSaber() {
-            if (!saberGroup) return;
-            const angleRad = saberAngle * Math.PI / 180;
-            // Луч вращается влево-вправо с небольшим наклоном
-            saberGroup.rotation.z = -angleRad * 0.8;
-            saberGroup.rotation.x = Math.sin(Date.now() * 0.008) * 0.05;
-        }
-        
-        // ========== FIREBASE ХОСТ (ЭКРАН) ==========
-        function startHost() {
-            const roomCode = generateRoomCode();
-            currentRoom = roomCode;
-            roomCodeDiv.innerHTML = roomCode;
-            hostStatusSpan.innerHTML = '⏳ Ожидание подключения пульта...';
-            
-            const angleRef = database.ref(`rooms/${roomCode}/angle`);
-            angleRef.on('value', (snapshot) => {
-                const angle = snapshot.val();
-                if (angle !== null && typeof angle === 'number') {
-                    saberAngle = angle;
-                    statusDiv.innerHTML = `🎯 Луч: ${Math.round(angle)}°`;
-                }
-            });
-            
-            database.ref(`rooms/${roomCode}/host`).set(true);
-            database.ref(`rooms/${roomCode}/active`).set(true);
-            
-            hostStatusSpan.innerHTML = '✅ ПУЛЬТ ПОДКЛЮЧЁН! Наклоняйте второй телефон';
-        }
-        
-        // ========== КОНТРОЛЛЕР (ПУЛЬТ) ==========
-        function joinController() {
-            const roomCode = codeInput.value.trim();
-            if (!roomCode || roomCode.length !== 6) {
-                joinStatusSpan.innerHTML = '❌ Введите 6-значный код';
-                return;
-            }
-            currentRoom = roomCode;
-            
-            database.ref(`rooms/${roomCode}/host`).once('value', (snapshot) => {
-                if (!snapshot.exists()) {
-                    joinStatusSpan.innerHTML = '❌ Комната не найдена! Сначала создайте игру на экране';
-                    return;
-                }
+        async function startBluetoothController() {
+            controllerStatus.innerHTML = '🔍 Поиск экрана...';
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    filters: [{ namePrefix: 'Saber' }],
+                    optionalServices: ['0000ffe0-0000-1000-8000-00805f9b34fb']
+                });
                 
-                joinStatusSpan.innerHTML = '✅ ПОДКЛЮЧЕНО! Наклоняйте телефон';
+                controllerStatus.innerHTML = `🔗 Подключение к ${device.name}...`;
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService('0000ffe0-0000-1000-8000-00805f9b34fb');
+                const characteristic = await service.getCharacteristic('0000ffe1-0000-1000-8000-00805f9b34fb');
                 
-                // ГИРОСКОП — ОБЯЗАТЕЛЬНО РАБОТАЕТ
-                if (typeof DeviceOrientationEvent !== 'undefined') {
-                    const sendAngle = (angle) => {
-                        if (currentRoom) {
-                            database.ref(`rooms/${currentRoom}/angle`).set(angle);
-                        }
+                isConnected = true;
+                controllerStatus.innerHTML = '✅ ПОДКЛЮЧЕНО! Наклоняйте телефон';
+                
+                // Запускаем гироскоп
+                startGyroForController(characteristic);
+            } catch (error) {
+                controllerStatus.innerHTML = `❌ Ошибка: ${error.message}`;
+                console.error(error);
+            }
+        }
+        
+        function startGyroForController(characteristic) {
+            let lastAngle = 0;
+            
+            const sendAngle = (angle) => {
+                if (characteristic && isConnected) {
+                    const byteValue = Math.floor(((angle + 50) / 100) * 180);
+                    characteristic.writeValue(new Uint8Array([byteValue])).catch(e => {});
+                }
+            };
+            
+            if (typeof DeviceOrientationEvent !== 'undefined') {
+                const handleGyro = (e) => {
+                    if (!isConnected) return;
+                    const gamma = e.gamma || 0;
+                    const angle = Math.max(-50, Math.min(50, gamma));
+                    gyroAngleSpan.innerHTML = `${Math.round(angle)}°`;
+                    lastAngle = angle;
+                    sendAngle(angle);
+                };
+                
+                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    controllerStatus.innerHTML = '🎮 Нажмите для разрешения гироскопа';
+                    const requestGyro = () => {
+                        DeviceOrientationEvent.requestPermission().then(() => {
+                            window.addEventListener('deviceorientation', handleGyro);
+                            controllerStatus.innerHTML = '✅ ГИРОСКОП АКТИВЕН! Наклоняйте телефон';
+                        }).catch(() => {
+                            controllerStatus.innerHTML = '❌ Нет доступа к гироскопу';
+                        });
+                        document.removeEventListener('click', requestGyro);
                     };
-                    
-                    const handleGyro = (e) => {
-                        if (mode !== 'controller') return;
-                        const gamma = e.gamma || 0;
-                        const angle = Math.max(-50, Math.min(50, gamma));
-                        gyroAngleSpan.innerHTML = `${Math.round(angle)}°`;
-                        sendAngle(angle);
-                    };
-                    
-                    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                        joinStatusSpan.innerHTML = '🎮 Нажмите на экран для разрешения гироскопа';
-                        const requestGyro = () => {
-                            DeviceOrientationEvent.requestPermission().then(() => {
-                                window.addEventListener('deviceorientation', handleGyro);
-                                joinStatusSpan.innerHTML = '✅ ГИРОСКОП АКТИВЕН! Наклоняйте телефон';
-                                gyroAngleSpan.innerHTML = '0°';
-                            }).catch(err => {
-                                joinStatusSpan.innerHTML = '❌ Ошибка доступа к гироскопу';
-                            });
-                            document.removeEventListener('click', requestGyro);
-                        };
-                        document.addEventListener('click', requestGyro);
-                    } else {
-                        window.addEventListener('deviceorientation', handleGyro);
-                        joinStatusSpan.innerHTML = '✅ ГИРОСКОП АКТИВЕН! Наклоняйте телефон';
-                    }
+                    document.addEventListener('click', requestGyro);
                 } else {
-                    joinStatusSpan.innerHTML = '❌ Гироскоп не поддерживается';
+                    window.addEventListener('deviceorientation', handleGyro);
+                    controllerStatus.innerHTML = '✅ ГИРОСКОП АКТИВЕН! Наклоняйте телефон';
                 }
-            });
+            } else {
+                controllerStatus.innerHTML = '❌ Гироскоп не поддерживается';
+            }
         }
         
         // ========== ВЫБОР РЕЖИМА ==========
-        document.getElementById('vrBtn').onclick = () => {
-            mode = 'vr';
+        document.getElementById('screenBtn').onclick = () => {
+            mode = 'screen';
             modeSelector.style.display = 'none';
-            hostPanel.style.display = 'block';
-            joinPanel.style.display = 'none';
+            screenPanel.style.display = 'block';
+            controllerPanel.style.display = 'none';
             initGameScene();
-            startHost();
-            statusDiv.innerHTML = '🖥️ Ожидание пульта...';
+            statusDiv.innerHTML = '🖥️ Режим экрана';
         };
         
         document.getElementById('controllerBtn').onclick = () => {
             mode = 'controller';
             modeSelector.style.display = 'none';
-            hostPanel.style.display = 'none';
-            joinPanel.style.display = 'block';
+            screenPanel.style.display = 'none';
+            controllerPanel.style.display = 'block';
             statusDiv.innerHTML = '🎮 Режим пульта';
+            
+            // Показываем кнопку сканирования
+            scanBtn.onclick = () => {
+                startBluetoothController();
+            };
         };
         
-        connectBtn.onclick = () => {
-            joinController();
+        startServerBtn.onclick = () => {
+            startBluetoothServer();
         };
         
-        // Очистка при закрытии
-        window.addEventListener('beforeunload', () => {
-            if (currentRoom) {
-                database.ref(`rooms/${currentRoom}`).remove();
-            }
-        });
-        
-        console.log('=== NEON SABER ===');
-        console.log('1. На первом телефоне нажмите "ЭКРАН"');
-        console.log('2. Появится 6-значный код');
-        console.log('3. На втором телефоне нажмите "ПУЛЬТ"');
-        console.log('4. Введите код и нажмите "ПОДКЛЮЧИТЬСЯ"');
-        console.log('5. НАКЛОНЯЙТЕ ВТОРОЙ ТЕЛЕФОН — ЛЕЗВИЕ ДВИГАЕТСЯ!');
+        console.log('=== BLUETOOTH SABER ===');
+        console.log('');
+        console.log('ИНСТРУКЦИЯ:');
+        console.log('1. На телефоне-ЭКРАНЕ нажмите "Я ЭКРАН" → "ЗАПУСТИТЬ BLUETOOTH СЕРВЕР"');
+        console.log('2. На телефоне-ПУЛЬТЕ нажмите "Я ПУЛЬТ" → "ПОИСК BLUETOOTH УСТРОЙСТВ"');
+        console.log('3. Выберите экран из списка');
+        console.log('4. НАКЛОНЯЙТЕ ПУЛЬТ — ЛУЧ ДВИГАЕТСЯ!');
+        console.log('');
+        console.log('⚠️ ВАЖНО: Телефоны должны быть предварительно СОПРЯЖЕНЫ через настройки Bluetooth!');
+        console.log('⚠️ Имя Bluetooth устройства должно начинаться с "Saber" (можно переименовать в настройках)');
     </script>
 </body>
 </html>
