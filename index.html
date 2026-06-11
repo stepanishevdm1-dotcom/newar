@@ -1,474 +1,755 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Интерактивная подружка</title>
-    <style>
-        * {
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>Заброшенный город</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:'Segoe UI',system-ui,sans-serif;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+canvas{display:block;width:100%;height:100%}
 
-        body {
-            background: linear-gradient(145deg, #2b3b4e 0%, #1d2c3a 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-family: 'Segoe UI', 'Quicksand', system-ui, -apple-system, sans-serif;
-            margin: 0;
-            padding: 20px;
-        }
+#ui{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+#startOverlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#050510;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;pointer-events:auto}
+#startOverlay h1{color:#0ff;font-size:clamp(1.8rem,6vw,3rem);text-shadow:0 0 30px #0ff,0 0 60px #0ff;margin-bottom:0.5rem;letter-spacing:0.2em}
+#startOverlay p{color:rgba(255,255,255,0.4);font-size:clamp(0.8rem,2.5vw,1rem);margin-bottom:2rem;text-align:center;padding:0 20px}
+#startBtn{pointer-events:auto;padding:18px 50px;font-size:clamp(1rem,3vw,1.3rem);background:transparent;border:2px solid #0ff;color:#fff;border-radius:50px;letter-spacing:0.15em;text-transform:uppercase;cursor:pointer;box-shadow:0 0 20px rgba(0,255,255,0.3),inset 0 0 20px rgba(0,255,255,0.1);transition:all 0.3s;font-family:inherit;margin-top:10px}
+#startBtn:active{transform:scale(0.95)}
+.gamepad-status{color:rgba(255,255,255,0.3);font-size:clamp(0.7rem,2vw,0.85rem);margin-top:20px}
 
-        .card {
-            background: rgba(255, 248, 235, 0.9);
-            backdrop-filter: blur(4px);
-            border-radius: 64px 64px 48px 48px;
-            box-shadow: 0 25px 45px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 215, 180, 0.5);
-            padding: 24px 24px 35px 24px;
-            transition: 0.2s;
-        }
+#hud{position:fixed;top:0;left:0;width:100%;height:100%;display:none;pointer-events:none}
+#hud.active{display:block}
 
-        canvas {
-            display: block;
-            margin: 0 auto;
-            border-radius: 48px;
-            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);
-            cursor: pointer;
-            background: #ffe8da;
-            width: 100%;
-            height: auto;
-        }
+#questPanel{position:absolute;top:15px;left:15px;right:15px;background:rgba(5,5,16,0.75);backdrop-filter:blur(8px);border:1px solid rgba(0,255,255,0.15);border-radius:14px;padding:14px 18px;box-shadow:0 0 30px rgba(0,255,255,0.05)}
+#questTitle{color:#fff;font-size:clamp(0.9rem,3vw,1.1rem);font-weight:700;letter-spacing:0.05em}
+#questDesc{color:rgba(255,255,255,0.5);font-size:clamp(0.75rem,2.5vw,0.9rem);margin-top:4px}
+#questProgress{color:rgba(255,0,255,0.5);font-size:clamp(0.65rem,2vw,0.75rem);margin-top:6px;letter-spacing:0.1em}
 
-        .info-panel {
-            margin-top: 22px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 12px;
-            background: #fef2e4;
-            padding: 12px 24px;
-            border-radius: 100px;
-            backdrop-filter: blur(4px);
-        }
+#compassContainer{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px}
+#compass{width:60px;height:60px;border-radius:50%;border:2px solid rgba(0,255,255,0.2);background:rgba(5,5,16,0.6);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;position:relative}
+#arrow{font-size:28px;color:#0ff;text-shadow:0 0 20px #0ff;transition:transform 0.15s ease}
+#distText{color:rgba(255,255,255,0.5);font-size:clamp(0.7rem,2.5vw,0.85rem);font-family:monospace;letter-spacing:0.05em}
 
-        .bubble {
-            background: #ffffffdd;
-            padding: 8px 18px;
-            border-radius: 40px;
-            font-weight: 600;
-            color: #c25b2e;
-            font-size: 1.1rem;
-            letter-spacing: 0.5px;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-        }
+#controlHint{position:absolute;bottom:15px;left:50%;transform:translateX(-50%);color:rgba(255,255,255,0.15);font-size:clamp(0.6rem,2vw,0.75rem);letter-spacing:0.1em;text-align:center}
 
-        .reaction {
-            background: #ffecd6;
-            padding: 8px 20px;
-            border-radius: 32px;
-            font-weight: 500;
-            color: #a6431a;
-            transition: 0.2s;
-            min-width: 160px;
-            text-align: center;
-            font-size: 1rem;
-        }
+#gamepadBadge{position:absolute;top:15px;right:15px;font-size:clamp(0.6rem,2vw,0.75rem);color:rgba(255,0,255,0.3);letter-spacing:0.1em;font-family:monospace}
 
-        button {
-            background: none;
-            border: none;
-            background: #ffe1c4;
-            padding: 8px 18px;
-            border-radius: 40px;
-            font-weight: bold;
-            color: #9b4a28;
-            cursor: pointer;
-            transition: 0.15s;
-            font-size: 0.9rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
+#msgPopup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(5,5,16,0.9);border:2px solid rgba(0,255,255,0.3);border-radius:16px;padding:30px 40px;text-align:center;z-index:30;pointer-events:auto;box-shadow:0 0 60px rgba(0,255,255,0.1);display:none;backdrop-filter:blur(10px)}
+#msgPopup .title{color:#0ff;font-size:clamp(1.2rem,4vw,1.6rem);font-weight:700;text-shadow:0 0 20px #0ff}
+#msgPopup .desc{color:rgba(255,255,255,0.6);font-size:clamp(0.8rem,2.5vw,1rem);margin-top:8px}
+#msgPopup .sub{color:rgba(255,0,255,0.4);font-size:clamp(0.65rem,2vw,0.8rem);margin-top:12px}
+#msgPopup .close-btn{pointer-events:auto;margin-top:16px;padding:10px 30px;background:transparent;border:1px solid rgba(255,0,255,0.3);color:rgba(255,255,255,0.6);border-radius:25px;font-size:0.85rem;cursor:pointer;font-family:inherit}
 
-        button:active {
-            transform: scale(0.96);
-            background: #ffd2ae;
-        }
-
-        .footer {
-            font-size: 0.7rem;
-            text-align: center;
-            margin-top: 18px;
-            color: #c0a07a;
-        }
-
-        @media (max-width: 550px) {
-            .info-panel {
-                flex-direction: column;
-                align-items: stretch;
-                border-radius: 40px;
-            }
-            .reaction {
-                text-align: center;
-            }
-        }
-    </style>
+#compassNeedle{width:3px;height:25px;background:linear-gradient(to top,#0ff,transparent);position:absolute;bottom:50%;left:50%;transform-origin:bottom center;border-radius:2px;box-shadow:0 0 10px #0ff}
+</style>
 </head>
 <body>
-<div>
-    <div class="card">
-        <canvas id="characterCanvas" width="500" height="600" style="width:100%; height:auto; max-width:500px; aspect-ratio:500/600"></canvas>
 
-        <div class="info-panel">
-            <div class="bubble">✨ Нажми на руку/плечо ✨</div>
-            <div class="reaction" id="reactionText">👉 Привет! Нажми на меня</div>
-            <button id="resetTopBtn">🎨 Сменить цвет топа</button>
-        </div>
-        <div class="footer">
-            🤗 только дружеские прикосновения • меняет цвет одежды • без интимных зон
-        </div>
+<div id="ui">
+  <div id="startOverlay">
+    <h1>✦ ЗАБРОШЕННЫЙ ✦</h1>
+    <h1 style="color:#f0f;text-shadow:0 0 30px #f0f,0 0 60px #f0f;font-size:clamp(1.5rem,5vw,2.5rem);margin-top:-0.3rem">ГОРОД</h1>
+    <p>Надень наушники.<br>Встань ровно, подними телефон.<br>Ходи физически — исследуй реально.</p>
+    <button id="startBtn">◈ Войти ◈</button>
+    <div class="gamepad-status" id="gpStatus">⏻ Bluetooth геймпад не найден</div>
+  </div>
+
+  <div id="hud">
+    <div id="questPanel">
+      <div id="questTitle">—</div>
+      <div id="questDesc">—</div>
+      <div id="questProgress">▸ 0 / 5</div>
     </div>
+    <div id="gamepadBadge">⎔ —</div>
+
+    <div id="compassContainer">
+      <div id="compass"><div id="compassNeedle"></div></div>
+      <div id="distText">— м</div>
+    </div>
+
+    <div id="controlHint">✦ ходи в реальности · Bluetooth стик — поворот ✦</div>
+  </div>
 </div>
 
+<div id="msgPopup">
+  <div class="title" id="popupTitle">—</div>
+  <div class="desc" id="popupDesc">—</div>
+  <div class="sub" id="popupSub">—</div>
+  <button class="close-btn" id="popupClose">◈ далее ◈</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
-    (function() {
-        const canvas = document.getElementById('characterCanvas');
-        const ctx = canvas.getContext('2d');
-        const reactionDiv = document.getElementById('reactionText');
+// ============================================================
+// CONFIG
+// ============================================================
+const CONFIG = {
+  fogColor: 0x080810,
+  fogNear: 3,
+  fogFar: 28,
+  groundSize: 80,
+  buildCount: 70,
+  cityRadius: 28,
+  questRadius: 3.5,
+  rotSpeed: 2.5,
+};
 
-        // размеры
-        const width = 500, height = 600;
-        canvas.width = width;
-        canvas.height = height;
+// ============================================================
+// GLOBALS
+// ============================================================
+let scene, camera, renderer;
+let worldGroup;
+let xrSession = null, xrRefSpace = null;
+let inXR = false;
+let joystickYaw = 0;
+let gamepadConnected = false;
+let prevAxes = [0, 0];
+const clock = new THREE.Clock();
 
-        // ---- состояния ----
-        let topColor = "#E66A5C";   // стартовый цвет топика (кораллово-красный)
-        let currentExpression = "neutral"; // neutral, happy, blush
-        let tempMessage = "";
-        let messageTimer = null;
+const quests = [
+  { id:'church', name:'Заброшенная церковь', desc:'Туман скрывает старую церковь. Найди её.', pos:new THREE.Vector3(14,0,10), found:false, story:'Тишина здесь гуще, чем воздух. Кто-то был здесь до тебя.' },
+  { id:'bridge', name:'Ржавый мост', desc:'За мостом начинается другая часть города.', pos:new THREE.Vector3(-13,0,14), found:false, story:'Мост дрожит. Снизу доносится звук воды.' },
+  { id:'bunker', name:'Старый бункер', desc:'Спуск в бункер завален, но свет всё ещё горит.', pos:new THREE.Vector3(10,0,-16), found:false, story:'Дверь открыта. Внутри тепло и пахнет машинным маслом.' },
+  { id:'tower', name:'Радиовышка', desc:'Сигнал идёт от вышки на холме.', pos:new THREE.Vector3(-18,0,-10), found:false, story:'Вышка всё ещё передаёт сигнал. Короткие помехи, потом голос.' },
+  { id:'center', name:'Центральная площадь', desc:'Возвращайся туда, откуда начал.', pos:new THREE.Vector3(0,0,0), found:false, story:'Город молчит. Но теперь ты знаешь — ты не один.' },
+];
+let currentQuestIdx = 0;
+let questComplete = false;
 
-        // ---- анатомические зоны (только для дружеских кликов: руки, плечи, шея (без груди), живот/талия по бокам)----
-        // Координаты областей (полигоны / круги). Грудь НЕ входит в триггеры.
-        // Все зоны — безопасные: левое плечо, правое плечо, левая рука, правая рука, область шеи (выше ключиц)
-        
-        // Левое плечо (округлая область)
-        const leftShoulder = { x: 165, y: 285, r: 28 };
-        // Правое плечо
-        const rightShoulder = { x: 335, y: 285, r: 28 };
-        // Левая рука (предплечье)
-        const leftArm = { x: 128, y: 355, r: 26 };
-        // Правая рука
-        const rightArm = { x: 372, y: 355, r: 26 };
-        // Шея (безопасная зона, высоко)
-        const neckArea = { x: 250, y: 260, r: 22 };
-        
-        // дополнительно - бока талии (не грудь)
-        const leftWaist = { x: 175, y: 410, r: 20 };
-        const rightWaist = { x: 325, y: 410, r: 20 };
-        
-        const safeZones = [leftShoulder, rightShoulder, leftArm, rightArm, neckArea, leftWaist, rightWaist];
-        
-        // ---- Рисование девушки в топе (без обнажения, грудь прикрыта полностью) ----
-        function drawCharacter() {
-            ctx.clearRect(0, 0, width, height);
-            
-            // ---- тело (кожа) ----
-            ctx.save();
-            
-            // голова
-            ctx.beginPath();
-            ctx.ellipse(250, 195, 45, 52, 0, 0, Math.PI * 2);
-            ctx.fillStyle = "#FBD9B0";
-            ctx.fill();
-            ctx.strokeStyle = "#D99E6B";
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-            
-            // шея
-            ctx.beginPath();
-            ctx.rect(230, 235, 40, 35);
-            ctx.fillStyle = "#FBD9B0";
-            ctx.fill();
-            ctx.strokeStyle = "#D99E6B";
-            ctx.stroke();
-            
-            // торс (с топом)
-            ctx.beginPath();
-            ctx.moveTo(205, 268);
-            ctx.quadraticCurveTo(210, 380, 190, 460);
-            ctx.lineTo(310, 460);
-            ctx.quadraticCurveTo(290, 380, 295, 268);
-            ctx.fillStyle = topColor;
-            ctx.fill();
-            ctx.strokeStyle = "#B34E3A";
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-            
-            // линия топика (вырез, но без акцента на грудь)
-            ctx.beginPath();
-            ctx.moveTo(220, 295);
-            ctx.quadraticCurveTo(250, 310, 280, 295);
-            ctx.strokeStyle = "#8B3C2A";
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            
-            // бретельки топа
-            ctx.beginPath();
-            ctx.moveTo(218, 272);
-            ctx.lineTo(212, 255);
-            ctx.lineTo(230, 260);
-            ctx.fillStyle = topColor;
-            ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(282, 272);
-            ctx.lineTo(288, 255);
-            ctx.lineTo(270, 260);
-            ctx.fill();
-            
-            // руки (кожа)
-            // левая рука
-            ctx.beginPath();
-            ctx.moveTo(190, 285);
-            ctx.quadraticCurveTo(145, 310, 125, 360);
-            ctx.lineTo(150, 375);
-            ctx.quadraticCurveTo(168, 335, 200, 310);
-            ctx.fillStyle = "#FBD9B0";
-            ctx.fill();
-            ctx.strokeStyle = "#D99E6B";
-            ctx.stroke();
-            
-            // правая рука
-            ctx.beginPath();
-            ctx.moveTo(310, 285);
-            ctx.quadraticCurveTo(355, 310, 375, 360);
-            ctx.lineTo(350, 375);
-            ctx.quadraticCurveTo(332, 335, 300, 310);
-            ctx.fill();
-            ctx.stroke();
-            
-            // кисти
-            ctx.beginPath();
-            ctx.ellipse(118, 385, 15, 20, -0.2, 0, Math.PI*2);
-            ctx.fillStyle = "#FBD9B0";
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(382, 385, 15, 20, 0.2, 0, Math.PI*2);
-            ctx.fill();
-            
-            // лицо (глаза, рот в зависимости от эмоции)
-            // глаза
-            ctx.fillStyle = "#3F2A1F";
-            ctx.beginPath();
-            ctx.arc(230, 185, 4, 0, Math.PI*2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(270, 185, 4, 0, Math.PI*2);
-            ctx.fill();
-            ctx.fillStyle = "white";
-            ctx.beginPath();
-            ctx.arc(228, 183, 1.5, 0, Math.PI*2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.arc(268, 183, 1.5, 0, Math.PI*2);
-            ctx.fill();
-            
-            // брови
-            ctx.beginPath();
-            ctx.moveTo(220, 173);
-            ctx.quadraticCurveTo(230, 169, 240, 172);
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = "#6E4128";
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(260, 172);
-            ctx.quadraticCurveTo(270, 169, 280, 173);
-            ctx.stroke();
-            
-            // рот / выражение
-            ctx.beginPath();
-            ctx.lineWidth = 2;
-            ctx.strokeStyle = "#9F5A3A";
-            if (currentExpression === "happy") {
-                ctx.arc(250, 210, 12, 0.05, Math.PI - 0.05);
-                ctx.stroke();
-                ctx.fillStyle = "#E68A6A";
-                ctx.beginPath();
-                ctx.ellipse(250, 216, 5, 3, 0, 0, Math.PI*2);
-                ctx.fill();
-            } else if (currentExpression === "blush") {
-                ctx.arc(250, 210, 10, 0, Math.PI);
-                ctx.stroke();
-                // румянец
-                ctx.fillStyle = "#FFB6B0";
-                ctx.globalAlpha = 0.5;
-                ctx.beginPath();
-                ctx.ellipse(222, 200, 8, 5, 0, 0, Math.PI*2);
-                ctx.fill();
-                ctx.beginPath();
-                ctx.ellipse(278, 200, 8, 5, 0, 0, Math.PI*2);
-                ctx.fill();
-                ctx.globalAlpha = 1;
-                ctx.fillStyle = "#E56A48";
-                ctx.beginPath();
-                ctx.ellipse(250, 212, 5, 3, 0, 0, Math.PI*2);
-                ctx.fill();
-            } else {
-                // neutral
-                ctx.arc(250, 210, 8, 0.05, Math.PI - 0.05);
-                ctx.stroke();
-            }
-            
-            // волосы
-            ctx.fillStyle = "#7A4A2A";
-            ctx.beginPath();
-            ctx.ellipse(250, 165, 52, 58, 0, 0, Math.PI*2);
-            ctx.fill();
-            ctx.fillStyle = "#985E38";
-            ctx.beginPath();
-            ctx.ellipse(235, 152, 30, 45, -0.3, 0, Math.PI*2);
-            ctx.fill();
-            ctx.beginPath();
-            ctx.ellipse(265, 152, 30, 45, 0.3, 0, Math.PI*2);
-            ctx.fill();
-            
-            // декоративные звёздочки (для настроения)
-            if (currentExpression === "happy") {
-                ctx.fillStyle = "#FFD966";
-                ctx.shadowBlur = 8;
-                ctx.beginPath();
-                drawStar(ctx, 180, 135, 5);
-                ctx.fill();
-                ctx.beginPath();
-                drawStar(ctx, 320, 140, 4);
-                ctx.fill();
-                ctx.shadowBlur = 0;
-            }
-            
-            ctx.restore();
-        }
-        
-        function drawStar(ctx, x, y, r) {
-            ctx.moveTo(x, y - r);
-            for (let i = 0; i < 5; i++) {
-                let angle = (i * 72 - 90) * Math.PI / 180;
-                let x1 = x + r * Math.cos(angle);
-                let y1 = y + r * Math.sin(angle);
-                ctx.lineTo(x1, y1);
-                let angle2 = (i * 72 - 54) * Math.PI / 180;
-                let x2 = x + r * 0.45 * Math.cos(angle2);
-                let y2 = y + r * 0.45 * Math.sin(angle2);
-                ctx.lineTo(x2, y2);
-            }
-            ctx.closePath();
-        }
-        
-        // показать сообщение на панели + анимация эмоции
-        function setReaction(msg, emotion, isTouchSafe = true) {
-            if (!isTouchSafe) return;
-            reactionDiv.innerHTML = msg;
-            if (messageTimer) clearTimeout(messageTimer);
-            messageTimer = setTimeout(() => {
-                if (reactionDiv) reactionDiv.innerHTML = "🤗 Нажми на руку или плечо!";
-            }, 2000);
-            
-            // смена эмоции
-            currentExpression = emotion;
-            drawCharacter();
-            // вернуть нейтральную эмоцию через 1.2 сек
-            setTimeout(() => {
-                if (currentExpression !== "neutral") {
-                    currentExpression = "neutral";
-                    drawCharacter();
-                }
-            }, 1200);
-        }
-        
-        // проверка попадания в безопасные зоны (руки, плечи, шея, бока)
-        function getHitZone(mouseX, mouseY) {
-            for (let zone of safeZones) {
-                const dx = mouseX - zone.x;
-                const dy = mouseY - zone.y;
-                const dist = Math.sqrt(dx*dx + dy*dy);
-                if (dist <= zone.r) {
-                    return zone;
-                }
-            }
-            return null;
-        }
-        
-        // обработка клика
-        function onCanvasClick(e) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;   // canvas intrinsic width (500) / display width
-            const scaleY = canvas.height / rect.height;
-            
-            let clientX, clientY;
-            if (e.touches) {
-                clientX = e.touches[0].clientX;
-                clientY = e.touches[0].clientY;
-                e.preventDefault();
-            } else {
-                clientX = e.clientX;
-                clientY = e.clientY;
-            }
-            
-            let canvasX = (clientX - rect.left) * scaleX;
-            let canvasY = (clientY - rect.top) * scaleY;
-            canvasX = Math.min(Math.max(0, canvasX), width);
-            canvasY = Math.min(Math.max(0, canvasY), height);
-            
-            const zone = getHitZone(canvasX, canvasY);
-            if (zone) {
-                // дружеская реакция
-                const messages = [
-                    "😊 Приятно!", "✨ Щекотно!", "🌸 Ты такой милый!", 
-                    "💖 Улыбаюсь тебе!", "🌟 Ещё!", "🎵 Как приятно!",
-                    "🤲 Дружба!", "💫 Класс!", "🍭 Хи-хи!"
-                ];
-                const randomMsg = messages[Math.floor(Math.random() * messages.length)];
-                setReaction(randomMsg, "happy", true);
-            } else {
-                // клик в недопустимую зону (в том числе грудь) — вежливый отказ
-                setReaction("❌ Давай только за руку или плечо? ❌", "neutral", true);
-            }
-        }
-        
-        // смена цвета топа (кнопка)
-        function changeTopColor() {
-            const colors = ["#E66A5C", "#5C9E6B", "#5A8FCF", "#D9A13B", "#B970A8", "#60B0A0", "#E08E6A"];
-            let newColor = colors[Math.floor(Math.random() * colors.length)];
-            while (newColor === topColor && colors.length > 1) {
-                newColor = colors[Math.floor(Math.random() * colors.length)];
-            }
-            topColor = newColor;
-            drawCharacter();
-            setReaction("🎨 Топ сменил цвет! 👍", "blush", true);
-        }
-        
-        // обработчики
-        canvas.addEventListener('click', onCanvasClick);
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches[0];
-            const fakeEvent = { clientX: touch.clientX, clientY: touch.clientY };
-            onCanvasClick(fakeEvent);
-        });
-        
-        document.getElementById('resetTopBtn').addEventListener('click', () => {
-            changeTopColor();
-        });
-        
-        // начальная отрисовка
-        drawCharacter();
-        
-        // подсказка при старте
-        setTimeout(() => {
-            setReaction("👋 Привет! Нажми на плечо или руку", "neutral", true);
-        }, 500);
-    })();
+// ============================================================
+// DOM REFS
+// ============================================================
+const startOverlay = document.getElementById('startOverlay');
+const startBtn = document.getElementById('startBtn');
+const hud = document.getElementById('hud');
+const questTitle = document.getElementById('questTitle');
+const questDesc = document.getElementById('questDesc');
+const questProgress = document.getElementById('questProgress');
+const compassNeedle = document.getElementById('compassNeedle');
+const distText = document.getElementById('distText');
+const gpStatus = document.getElementById('gpStatus');
+const gpBadge = document.getElementById('gamepadBadge');
+const popup = document.getElementById('msgPopup');
+const popupTitle = document.getElementById('popupTitle');
+const popupDesc = document.getElementById('popupDesc');
+const popupSub = document.getElementById('popupSub');
+const popupClose = document.getElementById('popupClose');
+
+// ============================================================
+// THREE.JS SETUP
+// ============================================================
+function initScene() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(CONFIG.fogColor);
+  scene.fog = new THREE.Fog(CONFIG.fogColor, CONFIG.fogNear, CONFIG.fogFar);
+
+  camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.1, 100);
+
+  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:false });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.8;
+  renderer.xr.enabled = true;
+  document.body.prepend(renderer.domElement);
+
+  worldGroup = new THREE.Group();
+  scene.add(worldGroup);
+
+  // Background sphere (hides camera in AR)
+  const bgGeo = new THREE.SphereGeometry(90, 32, 32);
+  const bgMat = new THREE.MeshBasicMaterial({
+    color: CONFIG.fogColor,
+    side: THREE.BackSide,
+  });
+  const bgMesh = new THREE.Mesh(bgGeo, bgMat);
+  bgMesh.position.y = 0;
+  scene.add(bgMesh);
+
+  // Lights
+  const amb = new THREE.AmbientLight(0x111133, 0.35);
+  scene.add(amb);
+
+  const moon = new THREE.DirectionalLight(0x4466aa, 0.2);
+  moon.position.set(-30, 50, -20);
+  moon.castShadow = true;
+  moon.shadow.mapSize.width = 512;
+  moon.shadow.mapSize.height = 512;
+  scene.add(moon);
+
+  const fill = new THREE.DirectionalLight(0x8844aa, 0.08);
+  fill.position.set(20, 30, 40);
+  scene.add(fill);
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+}
+
+// ============================================================
+// GROUND
+// ============================================================
+function createGround() {
+  const gc = document.createElement('canvas');
+  gc.width = 512; gc.height = 512;
+  const gctx = gc.getContext('2d');
+  gctx.fillStyle = '#08080f';
+  gctx.fillRect(0,0,512,512);
+  for(let i=0;i<8000;i++){
+    const x=Math.random()*512,y=Math.random()*512;
+    const s=Math.floor(Math.random()*12);
+    gctx.fillStyle=`rgb(${s},${s},${s+4})`;
+    gctx.fillRect(x,y,2,2);
+  }
+  gctx.strokeStyle='rgba(0,255,255,0.015)';
+  gctx.lineWidth=1;
+  for(let i=0;i<512;i+=32){
+    gctx.beginPath();gctx.moveTo(i,0);gctx.lineTo(i,512);gctx.stroke();
+    gctx.beginPath();gctx.moveTo(0,i);gctx.lineTo(512,i);gctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(gc);
+  tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
+  tex.repeat.set(25,25);
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(CONFIG.groundSize, CONFIG.groundSize),
+    new THREE.MeshStandardMaterial({ map:tex, roughness:0.9, metalness:0.0, color:0x444466, transparent:true, opacity:0.6 })
+  );
+  ground.rotation.x = -Math.PI/2;
+  ground.position.y = -1.3;
+  ground.receiveShadow = true;
+  worldGroup.add(ground);
+}
+
+// ============================================================
+// BUILDINGS
+// ============================================================
+function createBuilding(x, z, w, d, h, opts={}) {
+  const g = new THREE.Group();
+  const col = opts.color || 0x15151f;
+  const mat = new THREE.MeshStandardMaterial({
+    color: col, roughness:0.85, metalness:0.05,
+    emissive: new THREE.Color(0x000814), emissiveIntensity: 0.08,
+  });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  body.position.y = h/2;
+  body.castShadow = true; body.receiveShadow = true;
+  g.add(body);
+
+  // Edge glow
+  const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d));
+  const eMat = new THREE.LineBasicMaterial({
+    color: opts.glowColor || 0x004455,
+    transparent: true, opacity: 0.06 + Math.random()*0.06,
+  });
+  const eLine = new THREE.LineSegments(edges, eMat);
+  eLine.position.y = h/2;
+  g.add(eLine);
+
+  // Windows (dim)
+  const cols = Math.max(1, Math.floor(w/1.6));
+  const rows = Math.max(1, Math.floor(h/1.8));
+  const spW = w/(cols+1), spH = h/(rows+1);
+  const winMat = new THREE.MeshBasicMaterial({
+    color: 0x223344, transparent:true, opacity:0.15 + Math.random()*0.1,
+  });
+  const winLit = new THREE.MeshBasicMaterial({
+    color: 0xff8833, transparent:true, opacity:0.08 + Math.random()*0.15,
+  });
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
+    if(Math.random()>0.25) continue;
+    const wm = Math.random()>0.7 ? winLit : winMat;
+    const win = new THREE.Mesh(new THREE.PlaneGeometry(0.3,0.45), wm);
+    const face = Math.floor(Math.random()*4);
+    const wx=(c+1)*spW-w/2, wy=(r+1)*spH;
+    if(face===0){ win.position.set(wx,wy,d/2+0.01); }
+    else if(face===1){ win.position.set(wx,wy,-d/2-0.01); win.rotation.y=Math.PI; }
+    else if(face===2){ win.position.set(w/2+0.01,wy,(c+1)*spW-d); win.rotation.y=Math.PI/2; }
+    else{ win.position.set(-w/2-0.01,wy,(c+1)*spW-d); win.rotation.y=-Math.PI/2; }
+    g.add(win);
+  }
+
+  // Roof detail
+  if(Math.random()>0.55){
+    const strip = new THREE.Mesh(
+      new THREE.BoxGeometry(w*0.7, 0.04, d*0.7),
+      new THREE.MeshBasicMaterial({
+        color: opts.roofColor || 0x003344,
+        transparent:true, opacity:0.2+Math.random()*0.2,
+      })
+    );
+    strip.position.y = h+0.02;
+    g.add(strip);
+  }
+
+  // Antenna
+  if(Math.random()>0.7 && h>3){
+    const aMat = new THREE.MeshBasicMaterial({ color:0x446688, transparent:true, opacity:0.3 });
+    const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.8+Math.random()*1.5), aMat);
+    ant.position.y = h+0.4+Math.random()*0.8;
+    g.add(ant);
+  }
+
+  g.position.set(x, 0, z);
+  if(opts.tilt){
+    g.rotation.z = (Math.random()-0.5)*0.12;
+    g.rotation.x = (Math.random()-0.5)*0.12;
+  }
+  return g;
+}
+
+function generateCity() {
+  // Central ruins
+  for(let i=0;i<6;i++){
+    const a = Math.random()*Math.PI*2, r = 2+Math.random()*3;
+    const b = createBuilding(Math.cos(a)*r, Math.sin(a)*r, 0.8+Math.random()*1.2, 0.8+Math.random()*1.2, 1+Math.random()*3, {color:0x0a0a14, tilt:Math.random()>0.5, glowColor:0x222233});
+    worldGroup.add(b);
+  }
+
+  // Surrounding buildings
+  for(let i=0;i<CONFIG.buildCount;i++){
+    const a = Math.random()*Math.PI*2;
+    const r = 5 + Math.random()*CONFIG.cityRadius;
+    const x = Math.cos(a)*r, z = Math.sin(a)*r;
+    const w = 1+Math.random()*2.8, d = 1+Math.random()*2.8;
+    const maxH = 12 * (1 - r/(CONFIG.cityRadius*1.4));
+    const h = Math.max(1.5, 1+Math.random()*maxH);
+    const b = createBuilding(x, z, w, d, h, {
+      tilt: r>12 && Math.random()>0.7,
+      color: Math.random()>0.8 ? 0x0a0a18 : 0x15151f,
+      glowColor: Math.random()>0.7 ? 0x003355 : 0x004455,
+      roofColor: Math.random()>0.7 ? 0x004422 : 0x003344,
+    });
+    worldGroup.add(b);
+  }
+
+  // Far fog buildings (low detail)
+  for(let i=0;i<30;i++){
+    const a = Math.random()*Math.PI*2;
+    const r = CONFIG.cityRadius + 5 + Math.random()*15;
+    const x = Math.cos(a)*r, z = Math.sin(a)*r;
+    const h = 3+Math.random()*8;
+    const b = new THREE.Mesh(
+      new THREE.BoxGeometry(2+Math.random()*4, h, 2+Math.random()*4),
+      new THREE.MeshStandardMaterial({ color:0x0a0a12, roughness:1, metalness:0 })
+    );
+    b.position.set(x, h/2, z);
+    b.castShadow = false;
+    worldGroup.add(b);
+  }
+
+  // Debris
+  for(let i=0;i<40;i++){
+    const a = Math.random()*Math.PI*2, r = 2+Math.random()*CONFIG.cityRadius;
+    const dMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1+Math.random()*0.8, 0.1+Math.random()*0.5, 0.1+Math.random()*0.8),
+      new THREE.MeshStandardMaterial({ color:0x1a1a24, roughness:1 })
+    );
+    dMesh.position.set(Math.cos(a)*r, -1.3+Math.random()*0.2, Math.sin(a)*r);
+    dMesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+    worldGroup.add(dMesh);
+  }
+}
+
+// ============================================================
+// QUEST BEACONS
+// ============================================================
+const beaconMeshes = [];
+
+function createBeacon(pos, color, idx) {
+  const g = new THREE.Group();
+
+  // Pillar
+  const pillar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.15, 3.5, 6),
+    new THREE.MeshBasicMaterial({ color:0x222244, transparent:true, opacity:0.3 })
+  );
+  pillar.position.y = 1.5;
+  g.add(pillar);
+
+  // Orb
+  const orbMat = new THREE.MeshBasicMaterial({
+    color: color, transparent:true, opacity:0.8,
+  });
+  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 12), orbMat);
+  orb.position.y = 3.5;
+  orb.userData = { baseColor: color, idx };
+  g.add(orb);
+
+  // Light beam (transparent cone)
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: color, transparent:true, opacity:0.08, side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false,
+  });
+  const beam = new THREE.Mesh(new THREE.ConeGeometry(1.2, 12, 12), beamMat);
+  beam.position.y = 6;
+  g.add(beam);
+
+  // Point light
+  const pl = new THREE.PointLight(color, 0.3, 8);
+  pl.position.y = 3.5;
+  g.add(pl);
+
+  // Glow ring on ground
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: color, transparent:true, opacity:0.08, side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false,
+  });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.6, 1.0, 24), ringMat);
+  ring.rotation.x = -Math.PI/2;
+  ring.position.y = 0.01;
+  g.add(ring);
+
+  g.position.copy(pos);
+  g.userData = { idx, orb, beamMat, ringMat, orbMat, pl };
+  beaconMeshes.push(g);
+  worldGroup.add(g);
+  return g;
+}
+
+function updateBeacons(time) {
+  for(const bg of beaconMeshes){
+    const d = bg.userData;
+    const pulse = 0.5 + 0.5 * Math.sin(time * 1.5 + d.idx * 2.1);
+    if(d.orb){
+      d.orb.material.opacity = 0.4 + pulse * 0.4;
+      d.orb.scale.setScalar(0.8 + pulse * 0.2);
+    }
+    if(d.pl) d.pl.intensity = 0.1 + pulse * 0.4;
+    if(d.beamMat) d.beamMat.opacity = 0.03 + pulse * 0.06;
+    if(d.ringMat) d.ringMat.opacity = 0.03 + pulse * 0.06;
+  }
+}
+
+// ============================================================
+// ATMOSPHERE
+// ============================================================
+let particles;
+
+function createAtmosphere() {
+  // Floating particles
+  const count = 600;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count * 3);
+  const sizes = new Float32Array(count);
+  for(let i=0;i<count;i++){
+    const a = Math.random()*Math.PI*2, r = 2+Math.random()*CONFIG.cityRadius*1.3;
+    pos[i*3] = Math.cos(a)*r;
+    pos[i*3+1] = -1.3 + Math.random()*8;
+    pos[i*3+2] = Math.sin(a)*r;
+    sizes[i] = 0.03 + Math.random()*0.1;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+  const mat = new THREE.PointsMaterial({
+    color: 0x4488aa, size:0.08, transparent:true, opacity:0.15,
+    blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true,
+  });
+  particles = new THREE.Points(geo, mat);
+  worldGroup.add(particles);
+
+  // Glowing orbs floating
+  for(let i=0;i<6;i++){
+    const a = Math.random()*Math.PI*2, r = 5+Math.random()*15;
+    const om = new THREE.Mesh(
+      new THREE.SphereGeometry(0.3+Math.random()*0.5, 8, 8),
+      new THREE.MeshBasicMaterial({
+        color: Math.random()>0.5 ? 0x00ff88 : 0x8844ff,
+        transparent:true, opacity:0.04+Math.random()*0.04,
+        blending:THREE.AdditiveBlending, depthWrite:false,
+      })
+    );
+    om.position.set(Math.cos(a)*r, 1+Math.random()*4, Math.sin(a)*r);
+    om.userData = { phase: Math.random()*Math.PI*2, speed: 0.2+Math.random()*0.3 };
+    worldGroup.add(om);
+    // store for animation
+    if(!window._orbs) window._orbs=[];
+    window._orbs.push(om);
+  }
+}
+
+// ============================================================
+// QUESTS
+// ============================================================
+const beaconColors = [0x00ffff, 0xff44ff, 0x44ff88, 0xffaa00, 0x66aaff];
+
+function initQuests() {
+  for(let i=0;i<quests.length;i++){
+    createBeacon(quests[i].pos, beaconColors[i % beaconColors.length], i);
+  }
+  updateQuestUI();
+}
+
+function updateQuests(playerPos) {
+  if(currentQuestIdx >= quests.length) return;
+  const q = quests[currentQuestIdx];
+  if(q.found) return;
+
+  const dist = playerPos.distanceTo(q.pos);
+  if(dist < CONFIG.questRadius) {
+    q.found = true;
+    questComplete = true;
+    showQuestComplete(q);
+    return;
+  }
+
+  // Update compass
+  const toQuest = new THREE.Vector3().copy(q.pos).sub(playerPos);
+  const horizDist = Math.sqrt(toQuest.x*toQuest.x + toQuest.z*toQuest.z);
+  distText.textContent = Math.round(horizDist) + ' м';
+
+  // Direction in world space
+  const forward = new THREE.Vector3(0,0,-1);
+  const angle = Math.atan2(
+    toQuest.x*forward.z - toQuest.z*forward.x,
+    toQuest.x*forward.x + toQuest.z*forward.z
+  );
+  compassNeedle.style.transform = `rotate(${angle * 180 / Math.PI}deg)`;
+}
+
+function showQuestComplete(q) {
+  popupTitle.textContent = '✦ ' + q.name + ' ✦';
+  popupDesc.textContent = q.story;
+  const remain = quests.length - (currentQuestIdx + 1);
+  if(remain > 0){
+    popupSub.textContent = 'Осталось найти: ' + remain;
+  } else {
+    popupSub.textContent = '★ Все задания выполнены. Город раскрыл свои тайны. ★';
+  }
+  popup.style.display = 'block';
+
+  // Hide this beacon
+  if(beaconMeshes[currentQuestIdx]){
+    beaconMeshes[currentQuestIdx].visible = false;
+  }
+}
+
+popupClose.addEventListener('click', () => {
+  popup.style.display = 'none';
+  currentQuestIdx++;
+  if(currentQuestIdx >= quests.length) {
+    questTitle.textContent = '★ Все задания выполнены ★';
+    questDesc.textContent = 'Город раскрыл свои тайны.';
+    questProgress.textContent = '▸ 5 / 5';
+    distText.textContent = '—';
+    compassNeedle.style.opacity = '0';
+    return;
+  }
+  // Show next beacon
+  if(beaconMeshes[currentQuestIdx]) beaconMeshes[currentQuestIdx].visible = true;
+  questComplete = false;
+  updateQuestUI();
+});
+
+function updateQuestUI() {
+  if(currentQuestIdx >= quests.length) return;
+  const q = quests[currentQuestIdx];
+  questTitle.textContent = '✦ ' + q.name;
+  questDesc.textContent = q.desc;
+  questProgress.textContent = '▸ ' + currentQuestIdx + ' / ' + quests.length;
+}
+
+// ============================================================
+// CONTROLS — GAMEPAD
+// ============================================================
+function pollGamepad() {
+  const gamepads = navigator.getGamepads?.() || [];
+  let found = false;
+  for(const gp of gamepads){
+    if(gp && gp.connected){
+      found = true;
+      const x = gp.axes[0] || 0;
+      if(Math.abs(x) > 0.15) joystickYaw -= x * 0.025;
+      if (!gamepadConnected) {
+        gamepadConnected = true;
+        gpStatus.textContent = '⌨ Bluetooth геймпад: подключён';
+        gpBadge.textContent = '⎔ connected';
+      }
+    }
+  }
+  if(!found && gamepadConnected){
+    gamepadConnected = false;
+    gpStatus.textContent = '⏻ Bluetooth геймпад не найден';
+    gpBadge.textContent = '⎔ —';
+  }
+  // Also check if any gamepad is in the list
+  if(!found){
+    for(const gp of gamepads){
+      if(gp && gp.connected) { found=true; break; }
+    }
+  }
+}
+
+// ============================================================
+// CONTROLS — TOUCH
+// ============================================================
+let touchActive = false;
+let touchX = 0;
+
+function setupTouch() {
+  renderer.domElement.addEventListener('touchstart', (e) => {
+    if(e.touches.length === 1 && inXR) {
+      touchActive = true;
+      touchX = e.touches[0].clientX;
+    }
+  }, { passive:true });
+
+  renderer.domElement.addEventListener('touchmove', (e) => {
+    if(touchActive && e.touches.length === 1 && inXR) {
+      const dx = e.touches[0].clientX - touchX;
+      joystickYaw -= dx * 0.008;
+      touchX = e.touches[0].clientX;
+    }
+  }, { passive:true });
+
+  renderer.domElement.addEventListener('touchend', () => { touchActive = false; }, { passive:true });
+  renderer.domElement.addEventListener('touchcancel', () => { touchActive = false; }, { passive:true });
+}
+
+// ============================================================
+// XR SETUP
+// ============================================================
+async function startXR() {
+  if(!navigator.xr) {
+    alert('WebXR не поддерживается. Используй Android Chrome с ARCore.');
+    return;
+  }
+
+  try {
+    xrSession = await navigator.xr.requestSession('immersive-ar', {
+      optionalFeatures: ['local-floor', 'local'],
+    });
+
+    xrRefSpace = await xrSession.requestReferenceSpace('local');
+
+    await renderer.xr.setSession(xrSession);
+
+    inXR = true;
+    startOverlay.style.display = 'none';
+    hud.classList.add('active');
+
+    // Adjust ground for typical phone height
+    // (we'll fine-tune in the XR frame)
+
+    xrSession.addEventListener('end', () => {
+      inXR = false;
+      hud.classList.remove('active');
+      startOverlay.style.display = 'flex';
+    });
+
+  } catch(e) {
+    console.error(e);
+    alert('Ошибка запуска AR: ' + e.message);
+  }
+}
+
+startBtn.addEventListener('click', startXR);
+// Also try Gamepad API polling
+setInterval(pollGamepad, 200);
+
+// ============================================================
+// ANIMATION LOOP
+// ============================================================
+function animate(time, xrFrame) {
+  const dt = clock.getDelta();
+  const t = clock.getElapsedTime();
+
+  // Apply joystick rotation
+  worldGroup.rotation.y += joystickYaw * CONFIG.rotSpeed * dt;
+  joystickYaw *= 0.92; // decay
+
+  // Gamepad poll in loop
+  pollGamepad();
+
+  // Get player position in world space
+  let playerPos = new THREE.Vector3();
+  if(inXR && xrFrame) {
+    const pose = xrFrame.getViewerPose(xrRefSpace);
+    if(pose) {
+      const p = pose.transform.position;
+      playerPos.set(p.x, p.y, p.z);
+      // Adjust ground offset based on first frame height
+    }
+  } else {
+    // Fallback camera pos
+    if(camera) playerPos.copy(camera.position);
+  }
+
+  // Update quests
+  if(inXR) updateQuests(playerPos);
+
+  // Update beacons
+  updateBeacons(t);
+
+  // Animate particles
+  if(particles){
+    const pos = particles.geometry.attributes.position.array;
+    for(let i=0;i<pos.length/3;i++){
+      pos[i*3+1] += Math.sin(t*0.15 + i*0.1) * 0.002;
+      pos[i*3] += Math.sin(t*0.05 + i*0.5) * 0.001;
+      pos[i*3+2] += Math.cos(t*0.05 + i*0.3) * 0.001;
+    }
+    particles.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // Animate orbs
+  if(window._orbs){
+    for(const o of window._orbs){
+      const d = o.userData;
+      o.position.y += Math.sin(t * d.speed + d.phase) * 0.003;
+      o.material.opacity = 0.03 + Math.sin(t * d.speed * 0.5 + d.phase) * 0.02;
+    }
+  }
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  initScene();
+  createGround();
+  generateCity();
+  initQuests();
+  createAtmosphere();
+  setupTouch();
+
+  // Non-XR preview animation
+  function previewLoop() {
+    if(!inXR){
+      requestAnimationFrame(previewLoop);
+      const t = clock.getElapsedTime();
+      camera.position.x = Math.sin(t*0.1)*12;
+      camera.position.z = Math.cos(t*0.1)*12;
+      camera.position.y = 3;
+      camera.lookAt(0, 0, 0);
+      renderer.render(scene, camera);
+    }
+  }
+
+  // XR animation loop
+  renderer.setAnimationLoop((time, xrFrame) => {
+    if(!inXR) {
+      // Still render preview
+      const t = clock.getElapsedTime();
+      camera.position.x = Math.sin(t*0.1)*12;
+      camera.position.z = Math.cos(t*0.1)*12;
+      camera.position.y = 3;
+      camera.lookAt(0, 0, 0);
+      renderer.render(scene, camera);
+      return;
+    }
+    animate(time, xrFrame);
+    // XR handles its own render
+  });
+
+  // Initial gamepad check
+  setTimeout(pollGamepad, 1000);
+}
+
+init();
 </script>
 </body>
 </html>
