@@ -103,7 +103,6 @@ let inXR = false;
 let joystickYaw = 0;
 let gamepadConnected = false;
 const clock = new THREE.Clock();
-let groundY = 0; // filled after ref space is known
 
 const quests = [
   { id:'church', name:'Заброшенная церковь', desc:'Туман скрывает старую церковь. Найди её.', pos:new THREE.Vector3(14,0,10), found:false, story:'Тишина здесь гуще, чем воздух. Кто-то был здесь до тебя.' },
@@ -152,22 +151,36 @@ function initScene() {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.8;
   renderer.xr.enabled = true;
+
+  // Подавляем принудительную альфу 0 для AR (Three.js ставит её чтобы показать камеру)
+  const origClearAlpha = renderer.setClearAlpha.bind(renderer);
+  renderer.setClearAlpha = function(alpha) {
+    if (inXR && alpha === 0) origClearAlpha(1);
+    else origClearAlpha(alpha);
+  };
+
   document.body.prepend(renderer.domElement);
 
   worldGroup = new THREE.Group();
   scene.add(worldGroup);
 
+  // Непроницаемая сфера — на случай если scene.background не скроет камеру
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(120, 48, 48),
+    new THREE.MeshBasicMaterial({ color: CONFIG.fogColor, side: THREE.BackSide, depthWrite: false })
+  );
+  sky.renderOrder = -1;
+  scene.add(sky);
+
   // Lights
   const amb = new THREE.AmbientLight(0x111133, 0.35);
   scene.add(amb);
-
   const moon = new THREE.DirectionalLight(0x4466aa, 0.2);
   moon.position.set(-30, 50, -20);
   moon.castShadow = true;
   moon.shadow.mapSize.width = 512;
   moon.shadow.mapSize.height = 512;
   scene.add(moon);
-
   const fill = new THREE.DirectionalLight(0x8844aa, 0.08);
   fill.position.set(20, 30, 40);
   scene.add(fill);
@@ -203,13 +216,12 @@ function createGround() {
   const tex = new THREE.CanvasTexture(gc);
   tex.wrapS=tex.wrapT=THREE.RepeatWrapping;
   tex.repeat.set(25,25);
-
   groundMesh = new THREE.Mesh(
     new THREE.PlaneGeometry(CONFIG.groundSize, CONFIG.groundSize),
     new THREE.MeshStandardMaterial({ map:tex, roughness:0.9, metalness:0.0, color:0x444466, transparent:true, opacity:0.6 })
   );
   groundMesh.rotation.x = -Math.PI/2;
-  groundMesh.position.y = 0; // will be adjusted by ref space
+  groundMesh.position.y = 0;
   groundMesh.receiveShadow = true;
   worldGroup.add(groundMesh);
 }
@@ -228,7 +240,6 @@ function createBuilding(x, z, w, d, h, opts={}) {
   body.position.y = h/2;
   body.castShadow = true; body.receiveShadow = true;
   g.add(body);
-
   const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(w, h, d));
   const eMat = new THREE.LineBasicMaterial({
     color: opts.glowColor || 0x004455,
@@ -237,101 +248,61 @@ function createBuilding(x, z, w, d, h, opts={}) {
   const eLine = new THREE.LineSegments(edges, eMat);
   eLine.position.y = h/2;
   g.add(eLine);
-
   const cols = Math.max(1, Math.floor(w/1.6));
   const rows = Math.max(1, Math.floor(h/1.8));
   const spW = w/(cols+1), spH = h/(rows+1);
-  const winMat = new THREE.MeshBasicMaterial({
-    color: 0x223344, transparent:true, opacity:0.15 + Math.random()*0.1,
-  });
-  const winLit = new THREE.MeshBasicMaterial({
-    color: 0xff8833, transparent:true, opacity:0.08 + Math.random()*0.15,
-  });
+  const winMat = new THREE.MeshBasicMaterial({ color:0x223344, transparent:true, opacity:0.15+Math.random()*0.1 });
+  const winLit = new THREE.MeshBasicMaterial({ color:0xff8833, transparent:true, opacity:0.08+Math.random()*0.15 });
   for(let r=0;r<rows;r++) for(let c=0;c<cols;c++){
     if(Math.random()>0.25) continue;
     const wm = Math.random()>0.7 ? winLit : winMat;
     const win = new THREE.Mesh(new THREE.PlaneGeometry(0.3,0.45), wm);
     const face = Math.floor(Math.random()*4);
     const wx=(c+1)*spW-w/2, wy=(r+1)*spH;
-    if(face===0){ win.position.set(wx,wy,d/2+0.01); }
+    if(face===0) win.position.set(wx,wy,d/2+0.01);
     else if(face===1){ win.position.set(wx,wy,-d/2-0.01); win.rotation.y=Math.PI; }
     else if(face===2){ win.position.set(w/2+0.01,wy,(c+1)*spW-d); win.rotation.y=Math.PI/2; }
     else{ win.position.set(-w/2-0.01,wy,(c+1)*spW-d); win.rotation.y=-Math.PI/2; }
     g.add(win);
   }
-
   if(Math.random()>0.55){
-    const strip = new THREE.Mesh(
-      new THREE.BoxGeometry(w*0.7, 0.04, d*0.7),
-      new THREE.MeshBasicMaterial({
-        color: opts.roofColor || 0x003344,
-        transparent:true, opacity:0.2+Math.random()*0.2,
-      })
-    );
-    strip.position.y = h+0.02;
-    g.add(strip);
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(w*0.7,0.04,d*0.7), new THREE.MeshBasicMaterial({ color:opts.roofColor||0x003344, transparent:true, opacity:0.2+Math.random()*0.2 }));
+    strip.position.y = h+0.02; g.add(strip);
   }
-
   if(Math.random()>0.7 && h>3){
     const aMat = new THREE.MeshBasicMaterial({ color:0x446688, transparent:true, opacity:0.3 });
     const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,0.8+Math.random()*1.5), aMat);
-    ant.position.y = h+0.4+Math.random()*0.8;
-    g.add(ant);
+    ant.position.y = h+0.4+Math.random()*0.8; g.add(ant);
   }
-
   g.position.set(x, 0, z);
-  if(opts.tilt){
-    g.rotation.z = (Math.random()-0.5)*0.12;
-    g.rotation.x = (Math.random()-0.5)*0.12;
-  }
+  if(opts.tilt){ g.rotation.z=(Math.random()-0.5)*0.12; g.rotation.x=(Math.random()-0.5)*0.12; }
   return g;
 }
 
 function generateCity() {
   for(let i=0;i<6;i++){
-    const a = Math.random()*Math.PI*2, r = 2+Math.random()*3;
-    const b = createBuilding(Math.cos(a)*r, Math.sin(a)*r, 0.8+Math.random()*1.2, 0.8+Math.random()*1.2, 1+Math.random()*3, {color:0x0a0a14, tilt:Math.random()>0.5, glowColor:0x222233});
-    worldGroup.add(b);
+    const a=Math.random()*Math.PI*2, r=2+Math.random()*3;
+    worldGroup.add(createBuilding(Math.cos(a)*r,Math.sin(a)*r,0.8+Math.random()*1.2,0.8+Math.random()*1.2,1+Math.random()*3,{color:0x0a0a14,tilt:Math.random()>0.5,glowColor:0x222233}));
   }
-
   for(let i=0;i<CONFIG.buildCount;i++){
-    const a = Math.random()*Math.PI*2;
-    const r = 5 + Math.random()*CONFIG.cityRadius;
-    const x = Math.cos(a)*r, z = Math.sin(a)*r;
-    const w = 1+Math.random()*2.8, d = 1+Math.random()*2.8;
-    const maxH = 12 * (1 - r/(CONFIG.cityRadius*1.4));
-    const h = Math.max(1.5, 1+Math.random()*maxH);
-    const b = createBuilding(x, z, w, d, h, {
-      tilt: r>12 && Math.random()>0.7,
-      color: Math.random()>0.8 ? 0x0a0a18 : 0x15151f,
-      glowColor: Math.random()>0.7 ? 0x003355 : 0x004455,
-      roofColor: Math.random()>0.7 ? 0x004422 : 0x003344,
-    });
-    worldGroup.add(b);
+    const a=Math.random()*Math.PI*2, r=5+Math.random()*CONFIG.cityRadius;
+    const x=Math.cos(a)*r, z=Math.sin(a)*r;
+    const w=1+Math.random()*2.8, d=1+Math.random()*2.8;
+    const maxH=12*(1-r/(CONFIG.cityRadius*1.4));
+    const h=Math.max(1.5,1+Math.random()*maxH);
+    worldGroup.add(createBuilding(x,z,w,d,h,{tilt:r>12&&Math.random()>0.7,color:Math.random()>0.8?0x0a0a18:0x15151f,glowColor:Math.random()>0.7?0x003355:0x004455,roofColor:Math.random()>0.7?0x004422:0x003344}));
   }
-
   for(let i=0;i<30;i++){
-    const a = Math.random()*Math.PI*2;
-    const r = CONFIG.cityRadius + 5 + Math.random()*15;
-    const x = Math.cos(a)*r, z = Math.sin(a)*r;
-    const h = 3+Math.random()*8;
-    const b = new THREE.Mesh(
-      new THREE.BoxGeometry(2+Math.random()*4, h, 2+Math.random()*4),
-      new THREE.MeshStandardMaterial({ color:0x0a0a12, roughness:1, metalness:0 })
-    );
-    b.position.set(x, h/2, z);
-    b.castShadow = false;
-    worldGroup.add(b);
+    const a=Math.random()*Math.PI*2, r=CONFIG.cityRadius+5+Math.random()*15;
+    const h=3+Math.random()*8;
+    const b=new THREE.Mesh(new THREE.BoxGeometry(2+Math.random()*4,h,2+Math.random()*4),new THREE.MeshStandardMaterial({color:0x0a0a12,roughness:1,metalness:0}));
+    b.position.set(Math.cos(a)*r,h/2,Math.sin(a)*r); worldGroup.add(b);
   }
-
   for(let i=0;i<40;i++){
-    const a = Math.random()*Math.PI*2, r = 2+Math.random()*CONFIG.cityRadius;
-    const dMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.1+Math.random()*0.8, 0.1+Math.random()*0.5, 0.1+Math.random()*0.8),
-      new THREE.MeshStandardMaterial({ color:0x1a1a24, roughness:1 })
-    );
-    dMesh.position.set(Math.cos(a)*r, Math.random()*0.3, Math.sin(a)*r);
-    dMesh.rotation.set(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI);
+    const a=Math.random()*Math.PI*2, r=2+Math.random()*CONFIG.cityRadius;
+    const dMesh=new THREE.Mesh(new THREE.BoxGeometry(0.1+Math.random()*0.8,0.1+Math.random()*0.5,0.1+Math.random()*0.8),new THREE.MeshStandardMaterial({color:0x1a1a24,roughness:1}));
+    dMesh.position.set(Math.cos(a)*r,Math.random()*0.3,Math.sin(a)*r);
+    dMesh.rotation.set(Math.random()*Math.PI,Math.random()*Math.PI,Math.random()*Math.PI);
     worldGroup.add(dMesh);
   }
 }
@@ -344,57 +315,31 @@ const beaconColors = [0x00ffff, 0xff44ff, 0x44ff88, 0xffaa00, 0x66aaff];
 
 function createBeacon(pos, color, idx) {
   const g = new THREE.Group();
-
-  const pillar = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.08, 0.15, 3.5, 6),
-    new THREE.MeshBasicMaterial({ color:0x222244, transparent:true, opacity:0.3 })
-  );
-  pillar.position.y = 1.5;
-  g.add(pillar);
-
-  const orbMat = new THREE.MeshBasicMaterial({ color:color, transparent:true, opacity:0.8 });
-  const orb = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 12), orbMat);
-  orb.position.y = 3.5;
-  orb.userData = { baseColor: color, idx };
-  g.add(orb);
-
-  const beamMat = new THREE.MeshBasicMaterial({
-    color:color, transparent:true, opacity:0.08, side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false,
-  });
-  const beam = new THREE.Mesh(new THREE.ConeGeometry(1.2, 12, 12), beamMat);
-  beam.position.y = 6;
-  g.add(beam);
-
-  const pl = new THREE.PointLight(color, 0.3, 8);
-  pl.position.y = 3.5;
-  g.add(pl);
-
-  const ringMat = new THREE.MeshBasicMaterial({
-    color:color, transparent:true, opacity:0.08, side:THREE.DoubleSide, blending:THREE.AdditiveBlending, depthWrite:false,
-  });
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.6, 1.0, 24), ringMat);
-  ring.rotation.x = -Math.PI/2;
-  ring.position.y = 0.01;
-  g.add(ring);
-
+  const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.15,3.5,6),new THREE.MeshBasicMaterial({color:0x222244,transparent:true,opacity:0.3}));
+  pillar.position.y=1.5; g.add(pillar);
+  const orbMat=new THREE.MeshBasicMaterial({color:color,transparent:true,opacity:0.8});
+  const orb=new THREE.Mesh(new THREE.SphereGeometry(0.25,12,12),orbMat);
+  orb.position.y=3.5; orb.userData={baseColor:color,idx}; g.add(orb);
+  const beamMat=new THREE.MeshBasicMaterial({color:color,transparent:true,opacity:0.08,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false});
+  const beam=new THREE.Mesh(new THREE.ConeGeometry(1.2,12,12),beamMat);
+  beam.position.y=6; g.add(beam);
+  const pl=new THREE.PointLight(color,0.3,8); pl.position.y=3.5; g.add(pl);
+  const ringMat=new THREE.MeshBasicMaterial({color:color,transparent:true,opacity:0.08,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false});
+  const ring=new THREE.Mesh(new THREE.RingGeometry(0.6,1.0,24),ringMat);
+  ring.rotation.x=-Math.PI/2; ring.position.y=0.01; g.add(ring);
   g.position.copy(pos);
-  g.userData = { idx, orb, beamMat, ringMat, orbMat, pl };
-  beaconMeshes.push(g);
-  worldGroup.add(g);
-  return g;
+  g.userData={idx,orb,beamMat,ringMat,orbMat,pl};
+  beaconMeshes.push(g); worldGroup.add(g);
 }
 
 function updateBeacons(time) {
   for(const bg of beaconMeshes){
-    const d = bg.userData;
-    const pulse = 0.5 + 0.5 * Math.sin(time * 1.5 + d.idx * 2.1);
-    if(d.orb){
-      d.orb.material.opacity = 0.4 + pulse * 0.4;
-      d.orb.scale.setScalar(0.8 + pulse * 0.2);
-    }
-    if(d.pl) d.pl.intensity = 0.1 + pulse * 0.4;
-    if(d.beamMat) d.beamMat.opacity = 0.03 + pulse * 0.06;
-    if(d.ringMat) d.ringMat.opacity = 0.03 + pulse * 0.06;
+    const d=bg.userData;
+    const pulse=0.5+0.5*Math.sin(time*1.5+d.idx*2.1);
+    if(d.orb){ d.orb.material.opacity=0.4+pulse*0.4; d.orb.scale.setScalar(0.8+pulse*0.2); }
+    if(d.pl) d.pl.intensity=0.1+pulse*0.4;
+    if(d.beamMat) d.beamMat.opacity=0.03+pulse*0.06;
+    if(d.ringMat) d.ringMat.opacity=0.03+pulse*0.06;
   }
 }
 
@@ -404,42 +349,27 @@ function updateBeacons(time) {
 let particles;
 
 function createAtmosphere() {
-  const count = 600;
-  const geo = new THREE.BufferGeometry();
-  const pos = new Float32Array(count * 3);
-  const sizes = new Float32Array(count);
+  const count=600;
+  const geo=new THREE.BufferGeometry();
+  const pos=new Float32Array(count*3);
+  const sizes=new Float32Array(count);
   for(let i=0;i<count;i++){
-    const a = Math.random()*Math.PI*2, r = 2+Math.random()*CONFIG.cityRadius*1.3;
-    pos[i*3] = Math.cos(a)*r;
-    pos[i*3+1] = Math.random()*8;
-    pos[i*3+2] = Math.sin(a)*r;
-    sizes[i] = 0.03 + Math.random()*0.1;
+    const a=Math.random()*Math.PI*2, r=2+Math.random()*CONFIG.cityRadius*1.3;
+    pos[i*3]=Math.cos(a)*r; pos[i*3+1]=Math.random()*8; pos[i*3+2]=Math.sin(a)*r;
+    sizes[i]=0.03+Math.random()*0.1;
   }
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-
-  const mat = new THREE.PointsMaterial({
-    color: 0x4488aa, size:0.08, transparent:true, opacity:0.15,
-    blending:THREE.AdditiveBlending, depthWrite:false, sizeAttenuation:true,
-  });
-  particles = new THREE.Points(geo, mat);
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('size',new THREE.BufferAttribute(sizes,1));
+  const mat=new THREE.PointsMaterial({color:0x4488aa,size:0.08,transparent:true,opacity:0.15,blending:THREE.AdditiveBlending,depthWrite:false,sizeAttenuation:true});
+  particles=new THREE.Points(geo,mat);
   worldGroup.add(particles);
-
-  window._orbs = [];
+  window._orbs=[];
   for(let i=0;i<6;i++){
-    const a = Math.random()*Math.PI*2, r = 5+Math.random()*15;
-    const om = new THREE.Mesh(
-      new THREE.SphereGeometry(0.3+Math.random()*0.5, 8, 8),
-      new THREE.MeshBasicMaterial({
-        color: Math.random()>0.5 ? 0x00ff88 : 0x8844ff,
-        transparent:true, opacity:0.04+Math.random()*0.04,
-        blending:THREE.AdditiveBlending, depthWrite:false,
-      })
-    );
-    om.position.set(Math.cos(a)*r, 1+Math.random()*4, Math.sin(a)*r);
-    om.userData = { phase: Math.random()*Math.PI*2, speed: 0.2+Math.random()*0.3 };
-    worldGroup.add(om);
-    window._orbs.push(om);
+    const a=Math.random()*Math.PI*2,r=5+Math.random()*15;
+    const om=new THREE.Mesh(new THREE.SphereGeometry(0.3+Math.random()*0.5,8,8),new THREE.MeshBasicMaterial({color:Math.random()>0.5?0x00ff88:0x8844ff,transparent:true,opacity:0.04+Math.random()*0.04,blending:THREE.AdditiveBlending,depthWrite:false}));
+    om.position.set(Math.cos(a)*r,1+Math.random()*4,Math.sin(a)*r);
+    om.userData={phase:Math.random()*Math.PI*2,speed:0.2+Math.random()*0.3};
+    worldGroup.add(om); window._orbs.push(om);
   }
 }
 
@@ -447,225 +377,132 @@ function createAtmosphere() {
 // QUESTS
 // ============================================================
 function initQuests() {
-  for(let i=0;i<quests.length;i++){
-    createBeacon(quests[i].pos, beaconColors[i % beaconColors.length], i);
-  }
+  for(let i=0;i<quests.length;i++) createBeacon(quests[i].pos,beaconColors[i%beaconColors.length],i);
   updateQuestUI();
 }
 
 function updateQuests(playerPos) {
-  if(currentQuestIdx >= quests.length) return;
-  const q = quests[currentQuestIdx];
+  if(currentQuestIdx>=quests.length) return;
+  const q=quests[currentQuestIdx];
   if(q.found) return;
-
-  const dist = playerPos.distanceTo(q.pos);
-  if(dist < CONFIG.questRadius) {
-    q.found = true;
-    questComplete = true;
-    showQuestComplete(q);
-    return;
-  }
-
-  const toQuest = new THREE.Vector3().copy(q.pos).sub(playerPos);
-  const horizDist = Math.sqrt(toQuest.x*toQuest.x + toQuest.z*toQuest.z);
-  distText.textContent = Math.round(horizDist) + ' м';
-
-  const forward = new THREE.Vector3(0,0,-1);
-  const angle = Math.atan2(
-    toQuest.x*forward.z - toQuest.z*forward.x,
-    toQuest.x*forward.x + toQuest.z*forward.z
-  );
-  compassNeedle.style.transform = `rotate(${angle * 180 / Math.PI}deg)`;
+  const dist=playerPos.distanceTo(q.pos);
+  if(dist<CONFIG.questRadius){ q.found=true; questComplete=true; showQuestComplete(q); return; }
+  const toQuest=new THREE.Vector3().copy(q.pos).sub(playerPos);
+  const horizDist=Math.sqrt(toQuest.x*toQuest.x+toQuest.z*toQuest.z);
+  distText.textContent=Math.round(horizDist)+' м';
+  const forward=new THREE.Vector3(0,0,-1);
+  const angle=Math.atan2(toQuest.x*forward.z-toQuest.z*forward.x,toQuest.x*forward.x+toQuest.z*forward.z);
+  compassNeedle.style.transform=`rotate(${angle*180/Math.PI}deg)`;
 }
 
 function showQuestComplete(q) {
-  popupTitle.textContent = '✦ ' + q.name + ' ✦';
-  popupDesc.textContent = q.story;
-  const remain = quests.length - (currentQuestIdx + 1);
-  popupSub.textContent = remain > 0 ? 'Осталось найти: ' + remain : '★ Все задания выполнены. Город раскрыл свои тайны. ★';
-  popup.style.display = 'block';
-
-  if(beaconMeshes[currentQuestIdx]){
-    beaconMeshes[currentQuestIdx].visible = false;
-  }
+  popupTitle.textContent='✦ '+q.name+' ✦';
+  popupDesc.textContent=q.story;
+  const remain=quests.length-(currentQuestIdx+1);
+  popupSub.textContent=remain>0?'Осталось найти: '+remain:'★ Все задания выполнены.';
+  popup.style.display='block';
+  if(beaconMeshes[currentQuestIdx]) beaconMeshes[currentQuestIdx].visible=false;
 }
 
-popupClose.addEventListener('click', () => {
-  popup.style.display = 'none';
-  currentQuestIdx++;
-  if(currentQuestIdx >= quests.length) {
-    questTitle.textContent = '★ Все задания выполнены ★';
-    questDesc.textContent = 'Город раскрыл свои тайны.';
-    questProgress.textContent = '▸ 5 / 5';
-    distText.textContent = '—';
-    compassNeedle.style.opacity = '0';
-    return;
-  }
-  if(beaconMeshes[currentQuestIdx]) beaconMeshes[currentQuestIdx].visible = true;
-  questComplete = false;
-  updateQuestUI();
+popupClose.addEventListener('click',()=>{
+  popup.style.display='none'; currentQuestIdx++;
+  if(currentQuestIdx>=quests.length){ questTitle.textContent='★ Все выполнено ★'; questDesc.textContent=''; questProgress.textContent='▸ 5 / 5'; distText.textContent='—'; compassNeedle.style.opacity='0'; return; }
+  if(beaconMeshes[currentQuestIdx]) beaconMeshes[currentQuestIdx].visible=true;
+  questComplete=false; updateQuestUI();
 });
 
 function updateQuestUI() {
-  if(currentQuestIdx >= quests.length) return;
-  const q = quests[currentQuestIdx];
-  questTitle.textContent = '✦ ' + q.name;
-  questDesc.textContent = q.desc;
-  questProgress.textContent = '▸ ' + currentQuestIdx + ' / ' + quests.length;
+  if(currentQuestIdx>=quests.length) return;
+  const q=quests[currentQuestIdx];
+  questTitle.textContent='✦ '+q.name;
+  questDesc.textContent=q.desc;
+  questProgress.textContent='▸ '+currentQuestIdx+' / '+quests.length;
 }
 
 // ============================================================
 // CONTROLS
 // ============================================================
 function pollGamepad() {
-  const gamepads = navigator.getGamepads();
+  const gamepads=navigator.getGamepads();
   if(!gamepads) return;
-  let found = false;
+  let found=false;
   for(const gp of gamepads){
-    if(gp && gp.connected){
-      found = true;
-      const x = gp.axes[0] || 0;
-      if(Math.abs(x) > 0.15) joystickYaw -= x * 0.025;
-      if (!gamepadConnected) {
-        gamepadConnected = true;
-        gpStatus.textContent = '⌨ Bluetooth геймпад: подключён';
-        gpBadge.textContent = '⎔ connected';
-      }
+    if(gp&&gp.connected){
+      found=true;
+      const x=gp.axes[0]||0;
+      if(Math.abs(x)>0.15) joystickYaw-=x*0.025;
+      if(!gamepadConnected){ gamepadConnected=true; gpStatus.textContent='⌨ Bluetooth: подключён'; gpBadge.textContent='⎔ on'; }
     }
   }
-  if(!found && gamepadConnected){
-    gamepadConnected = false;
-    gpStatus.textContent = '⏻ Bluetooth геймпад не найден';
-    gpBadge.textContent = '⎔ —';
-  }
+  if(!found&&gamepadConnected){ gamepadConnected=false; gpStatus.textContent='⏻ Bluetooth не найден'; gpBadge.textContent='⎔ —'; }
 }
 
-let touchActive = false, touchX = 0;
+let touchActive=false,touchX=0;
 
 function setupTouch() {
-  const el = renderer.domElement;
-  el.addEventListener('touchstart', (e) => {
-    if(e.touches.length === 1 && inXR) {
-      touchActive = true;
-      touchX = e.touches[0].clientX;
-    }
-  }, { passive:true });
-
-  el.addEventListener('touchmove', (e) => {
-    if(touchActive && e.touches.length === 1 && inXR) {
-      const dx = e.touches[0].clientX - touchX;
-      joystickYaw -= dx * 0.008;
-      touchX = e.touches[0].clientX;
-    }
-  }, { passive:true });
-
-  el.addEventListener('touchend', () => { touchActive = false; }, { passive:true });
-  el.addEventListener('touchcancel', () => { touchActive = false; }, { passive:true });
+  const el=renderer.domElement;
+  el.addEventListener('touchstart',e=>{ if(e.touches.length===1&&inXR){ touchActive=true; touchX=e.touches[0].clientX; } },{passive:true});
+  el.addEventListener('touchmove',e=>{ if(touchActive&&e.touches.length===1&&inXR){ const dx=e.touches[0].clientX-touchX; joystickYaw-=dx*0.008; touchX=e.touches[0].clientX; } },{passive:true});
+  el.addEventListener('touchend',()=>{ touchActive=false; },{passive:true});
+  el.addEventListener('touchcancel',()=>{ touchActive=false; },{passive:true});
 }
 
 // ============================================================
-// XR SETUP — VR режим (без камеры)
+// XR SETUP — AR режим (камера скрыта)
 // ============================================================
 async function startXR() {
-  if(!navigator.xr) {
-    alert('WebXR не поддерживается. Используй Android Chrome.');
-    return;
-  }
-
-  // Проверяем поддержку VR-сессии
-  let supported = false;
-  try {
-    supported = await navigator.xr.isSessionSupported('immersive-vr');
-  } catch(e) { supported = false; }
-
-  if(!supported) {
-    alert('immersive-vr не поддерживается на этом устройстве.');
-    return;
-  }
-
-  try {
-    xrSession = await navigator.xr.requestSession('immersive-vr');
-
-    // Пытаемся получить local-floor (пол на y=0), иначе local
-    try {
-      xrRefSpace = await xrSession.requestReferenceSpace('local-floor');
-      // local-floor: пол на y=0, наши объекты уже на y=0
-      groundY = 0;
-    } catch {
-      xrRefSpace = await xrSession.requestReferenceSpace('local');
-      // local: телефон на высоте груди → опускаем мир на -1.3м
-      groundY = -1.3;
-    }
-
-    // Все 3D-объекты созданы с y=0 (уровень земли).
-    // При local-floor: мир стоит на месте, пол в сцене на y=0.
-    // При local: телефон на высоте груди → опускаем worldGroup на -1.3м.
-    worldGroup.position.y = groundY;
-
+  if(!navigator.xr){ alert('WebXR не поддерживается.'); return; }
+  let supported=false;
+  try{ supported=await navigator.xr.isSessionSupported('immersive-ar'); }catch(e){}
+  if(!supported){ alert('immersive-ar не поддерживается.'); return; }
+  try{
+    xrSession=await navigator.xr.requestSession('immersive-ar',{optionalFeatures:['local']});
+    xrRefSpace=await xrSession.requestReferenceSpace('local');
+    // При local ref space телефон = центр координат. Пол на уровне ног ~ -1.3м.
+    worldGroup.position.y=-1.3;
     await renderer.xr.setSession(xrSession);
-
-    inXR = true;
-    startOverlay.style.display = 'none';
+    inXR=true;
+    startOverlay.style.display='none';
     hud.classList.add('active');
-
-    xrSession.addEventListener('end', () => {
-      inXR = false;
-      hud.classList.remove('active');
-      startOverlay.style.display = 'flex';
-      worldGroup.position.y = 0;
-    });
-
-  } catch(e) {
-    console.error(e);
-    alert('Ошибка запуска VR: ' + e.message);
-  }
+    xrSession.addEventListener('end',()=>{ inXR=false; hud.classList.remove('active'); startOverlay.style.display='flex'; worldGroup.position.y=0; });
+  }catch(e){ alert('Ошибка: '+e.message); }
 }
 
-startBtn.addEventListener('click', startXR);
-setInterval(pollGamepad, 200);
+startBtn.addEventListener('click',startXR);
+setInterval(pollGamepad,200);
 
 // ============================================================
 // ANIMATION LOOP
 // ============================================================
-function animate(time, xrFrame) {
-  const dt = clock.getDelta();
-  const t = clock.getElapsedTime();
-
-  worldGroup.rotation.y += joystickYaw * CONFIG.rotSpeed * dt;
-  joystickYaw *= 0.92;
-
+function animate(time,xrFrame) {
+  const dt=clock.getDelta();
+  const t=clock.getElapsedTime();
+  worldGroup.rotation.y+=joystickYaw*CONFIG.rotSpeed*dt;
+  joystickYaw*=0.92;
   pollGamepad();
-
-  let playerPos = new THREE.Vector3();
-  if(inXR && xrFrame && xrRefSpace) {
-    const pose = xrFrame.getViewerPose(xrRefSpace);
-    if(pose) {
-      const p = pose.transform.position;
-      playerPos.set(p.x, p.y, p.z);
+  let playerPos=new THREE.Vector3();
+  if(inXR&&xrFrame&&xrRefSpace){
+    const pose=xrFrame.getViewerPose(xrRefSpace);
+    if(pose){
+      const p=pose.transform.position;
+      playerPos.set(p.x,p.y,p.z);
     }
-  } else if(camera) {
-    playerPos.copy(camera.position);
-  }
-
+  } else if(camera){ playerPos.copy(camera.position); }
   if(inXR) updateQuests(playerPos);
   updateBeacons(t);
-
   if(particles){
-    const pos = particles.geometry.attributes.position.array;
+    const pos=particles.geometry.attributes.position.array;
     for(let i=0;i<pos.length/3;i++){
-      pos[i*3+1] += Math.sin(t*0.15 + i*0.1) * 0.002;
-      pos[i*3] += Math.sin(t*0.05 + i*0.5) * 0.001;
-      pos[i*3+2] += Math.cos(t*0.05 + i*0.3) * 0.001;
+      pos[i*3+1]+=Math.sin(t*0.15+i*0.1)*0.002;
+      pos[i*3]+=Math.sin(t*0.05+i*0.5)*0.001;
+      pos[i*3+2]+=Math.cos(t*0.05+i*0.3)*0.001;
     }
-    particles.geometry.attributes.position.needsUpdate = true;
+    particles.geometry.attributes.position.needsUpdate=true;
   }
-
-  if(window._orbs){
-    for(const o of window._orbs){
-      const d = o.userData;
-      o.position.y += Math.sin(t * d.speed + d.phase) * 0.003;
-      o.material.opacity = 0.03 + Math.sin(t * d.speed * 0.5 + d.phase) * 0.02;
-    }
+  if(window._orbs) for(const o of window._orbs){
+    const d=o.userData;
+    o.position.y+=Math.sin(t*d.speed+d.phase)*0.003;
+    o.material.opacity=0.03+Math.sin(t*d.speed*0.5+d.phase)*0.02;
   }
 }
 
@@ -679,26 +516,21 @@ function init() {
   initQuests();
   createAtmosphere();
   setupTouch();
-
-  renderer.setAnimationLoop((time, xrFrame) => {
-    if(!inXR) {
-      // Preview
-      const t = clock.getElapsedTime();
-      camera.position.x = Math.sin(t*0.1)*12;
-      camera.position.z = Math.cos(t*0.1)*12;
-      camera.position.y = 3;
-      camera.lookAt(0, 0, 0);
-      renderer.render(scene, camera);
+  renderer.setAnimationLoop((time,xrFrame)=>{
+    if(!inXR){
+      const t=clock.getElapsedTime();
+      camera.position.x=Math.sin(t*0.1)*12;
+      camera.position.z=Math.cos(t*0.1)*12;
+      camera.position.y=3;
+      camera.lookAt(0,0,0);
+      renderer.render(scene,camera);
       return;
     }
-    animate(time, xrFrame);
+    animate(time,xrFrame);
   });
-
-  setTimeout(pollGamepad, 1000);
+  setTimeout(pollGamepad,1000);
 }
-
 init();
 </script>
 </body>
 </html>
-
