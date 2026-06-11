@@ -456,16 +456,29 @@ async function startXR() {
   try{ supported=await navigator.xr.isSessionSupported('immersive-ar'); }catch(e){}
   if(!supported){ alert('immersive-ar не поддерживается.'); return; }
   try{
-    xrSession=await navigator.xr.requestSession('immersive-ar',{optionalFeatures:['local']});
-    xrRefSpace=await xrSession.requestReferenceSpace('local');
-    // При local ref space телефон = центр координат. Пол на уровне ног ~ -1.3м.
-    worldGroup.position.y=-1.3;
+    xrSession=await navigator.xr.requestSession('immersive-ar');
+    // Пробуем local-floor → local → viewer
+    let refType='local';
+    try{
+      xrRefSpace=await xrSession.requestReferenceSpace('local-floor');
+      refType='local-floor';
+      worldGroup.position.y=0;
+    }catch(e1){
+      try{
+        xrRefSpace=await xrSession.requestReferenceSpace('local');
+        worldGroup.position.y=-1.3;
+      }catch(e2){
+        xrRefSpace=await xrSession.requestReferenceSpace('viewer');
+        refType='viewer';
+        worldGroup.position.y=-1.3;
+      }
+    }
     await renderer.xr.setSession(xrSession);
     inXR=true;
     startOverlay.style.display='none';
     hud.classList.add('active');
     xrSession.addEventListener('end',()=>{ inXR=false; hud.classList.remove('active'); startOverlay.style.display='flex'; worldGroup.position.y=0; });
-  }catch(e){ alert('Ошибка: '+e.message); }
+  }catch(e){ alert('Не удалось запустить AR: '+e.message+'\nПроверь что установлен Google Play Services for AR (ARCore) и Chrome обновлён.'); }
 }
 
 startBtn.addEventListener('click',startXR);
